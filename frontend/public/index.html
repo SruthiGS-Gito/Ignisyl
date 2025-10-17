@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IGNISYL - Threat Detection Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            color: #a8d0ff;
+            font-size: 1.1em;
+        }
+
+        .status-bar {
+            display: flex;
+            gap: 15px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            background: rgba(76, 175, 80, 0.3);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .metric-value {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            color: #a8d0ff;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .user-risk-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .user-risk-item.high {
+            border-left-color: #f44336;
+        }
+
+        .user-risk-item.medium {
+            border-left-color: #ff9800;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .username {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .department {
+            color: #a8d0ff;
+            font-size: 0.9em;
+        }
+
+        .risk-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85em;
+        }
+
+        .risk-badge.low {
+            background: rgba(76, 175, 80, 0.3);
+            border: 1px solid #4CAF50;
+        }
+
+        .risk-badge.medium {
+            background: rgba(255, 152, 0, 0.3);
+            border: 1px solid #ff9800;
+        }
+
+        .risk-badge.high {
+            background: rgba(244, 67, 54, 0.3);
+            border: 1px solid #f44336;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #a8d0ff;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .refresh-btn {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid #2196F3;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(33, 150, 243, 0.5);
+            transform: scale(1.05);
+        }
+
+        .threat-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .threat-indicator.active {
+            background: #4CAF50;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>🛡️ IGNISYL</h1>
+            <p class="subtitle">AI-Powered Insider Threat Detection System</p>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="threat-indicator active"></span>
+                    Status: <strong>OPERATIONAL</strong>
+                </div>
+                <div class="status-item">ML Engine: Active</div>
+                <div class="status-item">Real-time Monitoring: Enabled</div>
+                <div class="status-item" id="last-update">Last Update: --:--</div>
+            </div>
+        </header>
+
+        <div class="metrics-grid" id="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Total Users</div>
+                <div class="metric-value" id="total-users">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Active Sessions</div>
+                <div class="metric-value" id="active-sessions">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Threats Detected</div>
+                <div class="metric-value" id="threats-detected">--</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Threats Blocked</div>
+                <div class="metric-value" id="threats-blocked">--</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <div class="card-title">High-Risk Users</div>
+                <div id="user-risks-container">
+                    <div class="loading">Loading user risk data...</div>
+                </div>
+                <button class="refresh-btn" onclick="loadDashboardData()">Refresh Data</button>
+            </div>
+
+            <!-- NEW: Recent Threat Activities -->
+            <div class="card">
+                <div class="card-title">🚨 Recent Threat Alerts</div>
+                <div id="recent-activities" style="max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; padding: 20px; opacity: 0.6;">
+                        Monitoring for threats... Alerts will appear here in real-time.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">System Health</div>
+
+            <div class="card">
+                <div class="card-title">System Health</div>
+                <div id="system-health">
+                    <div class="loading">Checking system health...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let websocket = null;
+    
+    // Connect to WebSocket for real-time updates
+    function connectWebSocket() {
+        websocket = new WebSocket('ws://127.0.0.1:8000/ws/dashboard_client');
+        
+        websocket.onopen = () => {
+            console.log('✅ Connected to IGNISYL real-time updates');
+            updateLastUpdate('Connected to live feed');
+        };
+        
+        websocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            console.log('📩 Received:', data);
+            
+            // Handle different message types
+            if (data.type === 'threat_alert') {
+                handleThreatAlert(data.threat);
+            } else if (data.type === 'risk_change') {
+                handleRiskChange(data);
+            } else if (data.type === 'pong') {
+                console.log('WebSocket alive');
+            }
+        };
+        
+        websocket.onerror = (error) => {
+            console.error('❌ WebSocket error:', error);
+        };
+        
+        websocket.onclose = () => {
+            console.log('🔌 WebSocket disconnected. Reconnecting in 5s...');
+            setTimeout(connectWebSocket, 5000);
+        };
+    }
+    
+    // Handle incoming threat alerts
+    function handleThreatAlert(threat) {
+        console.log('🚨 THREAT ALERT:', threat);
+        
+        // Show browser notification
+        showNotification(
+            `THREAT DETECTED: ${threat.threat_type}`,
+            `Risk: ${threat.risk_score} | Action: ${threat.action}`
+        );
+        
+        // Update dashboard stats (increment threats detected)
+        const statsCard = document.getElementById('threats-detected');
+        if (statsCard) {
+            const currentValue = parseInt(statsCard.textContent) || 0;
+            statsCard.textContent = currentValue + 1;
+        }
+        
+        // Add to recent activities list
+        addRecentActivity(threat);
+        
+        // Update last update time
+        updateLastUpdate('New threat detected');
+    }
+    
+    // Show browser notification
+    function showNotification(title, body) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(title, { body: body, icon: '🛡️' });
+        }
+    }
+    
+    // Add threat to recent activities
+    function addRecentActivity(threat) {
+        const container = document.getElementById('recent-activities');
+        if (!container) return;
+        
+        const activityCard = document.createElement('div');
+        activityCard.style.cssText = `
+            background: ${threat.risk_level === 'HIGH' ? 'rgba(255,0,0,0.2)' : 'rgba(255,165,0,0.2)'};
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid ${threat.risk_level === 'HIGH' ? '#ff0000' : '#ff9800'};
+            animation: slideIn 0.3s ease-out;
+        `;
+        
+        activityCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: bold;">${threat.user_id || 'Unknown User'}</div>
+                    <div style="font-size: 0.9em; opacity: 0.8;">${threat.summary || threat.threat_type}</div>
+                    <div style="font-size: 0.8em; opacity: 0.6; margin-top: 5px;">
+                        ${new Date().toLocaleTimeString()} | ${(threat.bytes_transferred / (1024*1024)).toFixed(2)}MB
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 1.5em; font-weight: bold; color: ${threat.risk_level === 'HIGH' ? '#ff4444' : '#ff9800'};">
+                        ${threat.risk_score}
+                    </div>
+                    <div style="background: ${threat.risk_level === 'HIGH' ? '#ff4444' : '#ff9800'}; 
+                                color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">
+                        ${threat.risk_level}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.insertBefore(activityCard, container.firstChild);
+        
+        // Keep only last 5 activities
+        while (container.children.length > 5) {
+            container.removeChild(container.lastChild);
+        }
+    }
+    
+    // Update last update timestamp
+    function updateLastUpdate(message) {
+        const element = document.getElementById('last-update');
+        if (element) {
+            const now = new Date();
+            element.textContent = `Last Update: ${now.toLocaleTimeString()} - ${message}`;
+        }
+    }
+    
+    // Load dashboard data from API
+    async function loadDashboardData() {
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/v1/dashboard/stats');
+            const data = await response.json();
+            
+            // Update stats cards (only on initial load)
+            document.getElementById('total-users').textContent = data.overview.total_users;
+            document.getElementById('active-sessions').textContent = data.overview.active_sessions;
+            document.getElementById('threats-detected').textContent = data.overview.threats_detected_today;
+            document.getElementById('threats-blocked').textContent = data.overview.threats_blocked;
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+    
+    // Request notification permission
+    if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission();
+    }
+    
+    // Initialize dashboard
+    loadDashboardData();
+    connectWebSocket();
+    
+    // Keep WebSocket alive with ping
+    setInterval(() => {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+            websocket.send(JSON.stringify({type: 'ping'}));
+        }
+    }, 30000);
+</script>
+
+</body>
+</html>

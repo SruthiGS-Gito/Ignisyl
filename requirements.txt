@@ -1,0 +1,87 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+websockets==12.0
+
+# Database
+sqlalchemy==2.0.23
+
+# Machine Learning - Full Power Stack
+scikit-learn>=1.2.0
+xgboost>=1.7.0
+tensorflow>=2.13.0
+keras>=2.13.0
+pandas==2.1.4
+numpy==1.24.4
+scipy>=1.10.0
+
+# Deep Learning Extensions
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Advanced ML Tools
+imbalanced-learn>=0.11.0
+optuna>=3.4.0
+shap>=0.42.0
+
+# Data Processing & Feature Engineering
+pandas==2.1.4
+numpy==1.24.4
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# HTTP & API
+httpx==0.25.2
+requests==2.31.0
+aiofiles>=23.0.0
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Data Generation & Testing
+faker==21.0.0
+mimesis>=11.0.0
+
+# Logging & Monitoring
+loguru==0.7.2
+prometheus-client>=0.18.0
+
+# Security
+cryptography==41.0.8
+bcrypt>=4.0.0
+
+# Real-time Processing
+redis>=5.0.0
+celery>=5.3.0
+
+# Visualization & Dashboard
+plotly>=5.17.0
+dash>=2.14.0
+bokeh>=3.3.0
+
+# Network & System Monitoring
+psutil>=5.9.0
+netifaces>=0.11.0
+scapy>=2.5.0
+
+# Development & Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov>=4.1.0
+black>=23.0.0
+isort>=5.12.0
+
+# Performance & Optimization
+numba>=0.58.0
+cython>=3.0.0
+
+# Database Drivers
+asyncpg>=0.29.0
+aiosqlite>=0.19.0
+
+# Concurrent Processing
+asyncio-mqtt>=0.16.0
+aioredis>=2.0.0
