@@ -33,9 +33,42 @@ class NetworkMonitor:
         self.alert_threshold_mb = 100  # Alert if more than 100MB transferred in 30 seconds
         self.monitoring_active = False
         
+        # Load user configuration
+        self.user_config = self._load_user_config()
+        
         print("🔍 Network Monitor initialized")
         print(f"📡 Monitoring network activity on this laptop")
+        print(f"👤 User: {self.user_config['full_name']} ({self.user_config['user_id']})")
         print(f"🎯 Alert threshold: {self.alert_threshold_mb}MB in 30 seconds")
+    
+    def _load_user_config(self) -> Dict:
+        """Load user configuration from config file"""
+        import json
+        config_path = os.path.join(os.path.dirname(__file__), 'user_config.json')
+        
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+                print(f"✅ Loaded config for user: {config['full_name']}")
+                return config
+        except FileNotFoundError:
+            print("⚠️ user_config.json not found. Using default 'local_user'")
+            return {
+                "user_id": "local_user",
+                "username": "local_user",
+                "full_name": "Local User",
+                "department": "IT",
+                "role": "Developer"
+            }
+        except Exception as e:
+            print(f"⚠️ Error loading config: {e}. Using default.")
+            return {
+                "user_id": "local_user",
+                "username": "local_user",
+                "full_name": "Local User",
+                "department": "IT",
+                "role": "Developer"
+            }
     
     def get_current_network_usage(self) -> Dict:
         """
