@@ -147,19 +147,6 @@ class UserManager:
         conn.commit()
         conn.close()
     
-    def increment_threat_count(self, user_id: str):
-        """Increment user's threat counter"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE users 
-            SET total_threats = total_threats + 1
-            WHERE user_id = ?
-        """, (user_id,))
-        
-        conn.commit()
-        conn.close()
     
     def get_active_users_count(self) -> int:
         """Get count of users active in last 10 minutes"""
@@ -178,6 +165,35 @@ class UserManager:
         conn.close()
         
         return count
+
+    def increment_threat_count(self, user_id: str) -> bool:
+        """
+        Increment threat count for a user
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("""
+                UPDATE users 
+                SET total_threats = total_threats + 1,
+                    last_activity = ?
+                WHERE user_id = ?
+            """, (datetime.now().isoformat(), user_id))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Error incrementing threat count: {e}")
+            conn.close()
+            return False
 
 # Global user manager instance
 user_manager = UserManager()

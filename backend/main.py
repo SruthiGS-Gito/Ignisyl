@@ -22,12 +22,14 @@ import json
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from config.config import settings, ensure_directories
-from backend.models.database import create_tables, init_sample_data
-from backend.ml_engine.hybrid_detector import AdvancedHybridDetector
-from backend.ml_engine.risk_scorer import ContextualRiskScorer
-from backend.ml_engine.data_generator import BehavioralDataGenerator
+from models.database import create_tables, init_sample_data
+from ml_engine.hybrid_detector import AdvancedHybridDetector
+from ml_engine.risk_scorer import ContextualRiskScorer
+from ml_engine.data_generator import BehavioralDataGenerator
 from fastapi import WebSocket
-from backend.api.websocket import websocket_endpoint, manager as ws_manager
+from api.websocket import websocket_endpoint, manager as ws_manager
+from models.activity_log import activity_logger
+from models.user_management import user_manager
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -222,6 +224,8 @@ async def analyze_activity(activity_data: Dict):
     try:
         import pandas as pd
         from datetime import datetime as dt
+        from models.activity_log import activity_logger
+        from models.user_management import user_manager
         
         # Ensure all required fields have defaults
         activity_data.setdefault('timestamp', dt.now().isoformat())
@@ -241,17 +245,17 @@ async def analyze_activity(activity_data: Dict):
             'activity_frequencies': {'file_access': 0.5}
         }
         
-        # Perform risk assessment using our contextual risk scorer
+        # Perform risk assessment
         risk_assessment = risk_scorer.assess_activity_risk(activity_data, user_profile)
         
-        # Extract features consistently with training
+        # Extract features
         activity_timestamp = activity_data.get('timestamp')
         if isinstance(activity_timestamp, str):
             activity_timestamp = pd.to_datetime(activity_timestamp)
         else:
             activity_timestamp = dt.now()
         
-        # Prepare feature vector matching training (4 features)
+        # Prepare ML features
         ml_features = [[
             float(activity_timestamp.hour),
             float(activity_timestamp.weekday()),
@@ -264,8 +268,6 @@ async def analyze_activity(activity_data: Dict):
             ml_risk_score = float(ml_risk_scores[0])
         except Exception as e:
             print(f"ML prediction error: {e}")
-            import traceback
-            traceback.print_exc()  # This will show full error in terminal
             ml_risk_score = risk_assessment['risk_score']
             individual_scores = {}
         
@@ -276,6 +278,7 @@ async def analyze_activity(activity_data: Dict):
         # Determine firewall action
         firewall_action = "ALLOW" if final_risk_score < 30 else "RESTRICT" if final_risk_score < 70 else "BLOCK"
         
+        # Build response
         response = {
             "analysis_id": f"analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
             "timestamp": datetime.now().isoformat(),
@@ -308,13 +311,67 @@ async def analyze_activity(activity_data: Dict):
             }
         }
         
+        # === LOG ACTIVITY TO DATABASE ===
+        print(f"\n{'='*60}")
+        print(f"📝 LOGGING ACTIVITY TO DATABASE")
+        print(f"{'='*60}")
+        
+        user_id = activity_data.get('user_id', 'unknown')
+        print(f"1️⃣ User ID from request: {user_id}")
+        
+        # Get user from database
+        user = user_manager.get_user(user_id)
+        
+        if user:
+            print(f"2️⃣ ✅ Found user in database: {user['full_name']}")
+            
+            try:
+                # Log the activity
+                activity_id = activity_logger.log_activity({
+                    'user_id': user_id,
+                    'username': user.get('username', 'unknown'),
+                    'full_name': user.get('full_name', 'Unknown User'),
+                    'activity_type': activity_data.get('activity_type', 'network_activity'),
+                    'timestamp': datetime.now().isoformat(),
+                    'risk_score': final_risk_score,
+                    'risk_level': final_risk_level,
+                    'action': firewall_action,
+                    'bytes_transferred': activity_data.get('bytes_transferred', 0),
+                    'file_size': activity_data.get('file_size', 0),
+                    'summary': risk_assessment.get('summary', 'Activity analyzed'),
+                    'details': {
+                        'triggered_factors': risk_assessment.get('triggered_factors', []),
+                        'ml_risk_score': ml_risk_score,
+                        'contextual_risk_score': risk_assessment['risk_score']
+                    }
+                })
+                
+                print(f"3️⃣ ✅ Activity logged successfully! ID: {activity_id}")
+                
+                # Update user threat count
+                increment_result = user_manager.increment_threat_count(user_id)
+                print(f"4️⃣ ✅ User threat count updated: {increment_result}")
+                
+            except Exception as log_error:
+                print(f"❌ Error during logging: {log_error}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"2️⃣ ❌ User NOT found in database!")
+            print(f"   Requested: {user_id}")
+            all_users = user_manager.get_all_users()
+            print(f"   Available users: {[u['user_id'] for u in all_users]}")
+        
+        print(f"{'='*60}\n")
+        
         return response
         
     except Exception as e:
         import traceback
-        traceback.print_exc()  # Print full error to terminal
+        print(f"\n❌ CRITICAL ERROR in analyze_activity:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
-        
+               
 def _get_restrictions_for_risk_level(risk_level: str) -> List[str]:
     """Get firewall restrictions for risk level"""
     if risk_level == "LOW":
@@ -335,38 +392,45 @@ def _get_restrictions_for_risk_level(risk_level: str) -> List[str]:
 
 @app.get("/api/v1/dashboard/stats")
 async def dashboard_stats():
-    """Get dashboard statistics"""
-    from backend.models.user_management import user_manager
+    """Get dashboard statistics with real data"""
+    from models.user_management import user_manager
+    from models.activity_log import activity_logger
     
     # Get real user data
     all_users = user_manager.get_all_users()
     total_users = len(all_users)
     active_users = user_manager.get_active_users_count()
     
-    # Count total threats from all users
-    total_threats = sum(user.get('total_threats', 0) for user in all_users)
+    # Get activity statistics
+    activity_stats = activity_logger.get_stats()
+    
+    # Get recent activities for display
+    recent_activities_raw = activity_logger.get_recent_activities(limit=5)
+    recent_activities = []
+    for activity in recent_activities_raw:
+        recent_activities.append({
+            "user": activity['username'],
+            "full_name": activity['full_name'],
+            "activity": activity['activity_type'].replace('_', ' ').title(),
+            "risk_score": activity['risk_score'],
+            "action": activity['action'],
+            "timestamp": activity['timestamp'],
+            "bytes": activity.get('bytes_transferred', 0)
+        })
     
     stats = {
         "overview": {
-            "total_users": total_users,  # Real count!
-            "active_sessions": active_users,  # Real count!
-            "threats_detected_today": total_threats,  # Real count!
-            "threats_blocked": 5  # Can keep this for now
+            "total_users": total_users,
+            "active_sessions": active_users,
+            "threats_detected_today": activity_stats['today'],
+            "threats_blocked": activity_stats['blocked']
         },
         "risk_distribution": {
             "low_risk_users": len([u for u in all_users if u['current_risk_score'] < 30]),
             "medium_risk_users": len([u for u in all_users if 30 <= u['current_risk_score'] < 70]),
             "high_risk_users": len([u for u in all_users if u['current_risk_score'] >= 70])
         },
-        "recent_activities": [
-            {
-                "user": "sruthi.gs",
-                "activity": "Large file download",
-                "risk_score": 75,
-                "action": "RESTRICT",
-                "timestamp": "2024-01-15T14:30:00"
-            }
-        ],
+        "recent_activities": recent_activities,
         "ml_performance": {
             "accuracy": 94.2,
             "false_positive_rate": 0.05,
@@ -378,45 +442,31 @@ async def dashboard_stats():
             "memory_usage": 62,
             "disk_usage": 78,
             "network_throughput": 156.7
-        }
+        },
+        "activity_stats": activity_stats
     }
     
     return stats
 
 @app.get("/api/v1/users/risk")
 async def get_user_risks():
-    """Get risk assessments for all users"""
+    """Get risk assessments for all users with real data"""
+    from models.user_management import user_manager
     
-    # In real implementation, query from database
-    users_risk = [
-        {
-            "user_id": "user_001",
-            "username": "john.doe",
-            "department": "Finance", 
-            "current_risk_score": 25,
-            "risk_level": "LOW",
-            "last_activity": "2024-01-15T16:30:00",
-            "recent_flags": 0
-        },
-        {
-            "user_id": "user_002", 
-            "username": "jane.smith",
-            "department": "IT",
-            "current_risk_score": 85,
-            "risk_level": "HIGH", 
-            "last_activity": "2024-01-15T23:45:00",
-            "recent_flags": 3
-        },
-        {
-            "user_id": "user_003",
-            "username": "mike.wilson", 
-            "department": "HR",
-            "current_risk_score": 45,
-            "risk_level": "MEDIUM",
-            "last_activity": "2024-01-15T15:20:00", 
-            "recent_flags": 1
-        }
-    ]
+    all_users = user_manager.get_all_users()
+    
+    users_risk = []
+    for user in all_users:
+        users_risk.append({
+            "user_id": user['user_id'],
+            "username": user['username'],
+            "full_name": user['full_name'],
+            "department": user['department'],
+            "current_risk_score": user['current_risk_score'],
+            "risk_level": "LOW" if user['current_risk_score'] < 30 else "MEDIUM" if user['current_risk_score'] < 70 else "HIGH",
+            "last_activity": user['last_activity'],
+            "recent_flags": user['total_threats']
+        })
     
     return {"users": users_risk, "total_count": len(users_risk)}
 
