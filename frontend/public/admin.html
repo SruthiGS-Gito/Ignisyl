@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IGNISYL - Admin Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.8em;
+            margin-left: 10px;
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: 5px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.2);
+            font-weight: 600;
+        }
+
+        .nav-link span {
+            margin-left: 10px;
+        }
+
+        .user-profile {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .user-details {
+            margin-left: 10px;
+            flex: 1;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .user-role {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 10px;
+            background: rgba(244, 67, 54, 0.8);
+            border: none;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(244, 67, 54, 1);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        .top-bar {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-bar h2 {
+            color: #2a5298;
+            font-size: 1.8em;
+        }
+
+        .breadcrumb {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-label {
+            color: #999;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #2a5298;
+        }
+
+        .stat-change {
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        .stat-change.positive {
+            color: #4caf50;
+        }
+
+        .stat-change.negative {
+            color: #f44336;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            color: #2a5298;
+            font-weight: 600;
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .data-table td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        /* Badges */
+        .badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+
+        .badge-warning {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+        }
+
+        .badge-danger {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .loading::after {
+            content: "...";
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            color: #2a5298;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>🛡️ IGNISYL</h1>
+        </div>
+
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a class="nav-link active" onclick="showSection('dashboard')">
+                    <span>📊</span><span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="showSection('users')">
+                    <span>👥</span><span>User Management</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="showSection('activities')">
+                    <span>📋</span><span>Activity Log</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="showSection('reports')">
+                    <span>📄</span><span>Reports</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="showSection('threats')">
+                    <span>🚨</span><span>Active Threats</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" onclick="showSection('system')">
+                    <span>⚙️</span><span>System Status</span>
+                </a>
+            </li>
+        </ul>
+
+        <div class="user-profile">
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">Loading...</div>
+                    <div class="user-role" id="userRole">Administrator</div>
+                </div>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="top-bar">
+            <div>
+                <h2 id="pageTitle">Admin Dashboard</h2>
+                <div class="breadcrumb" id="breadcrumb">Home / Dashboard</div>
+            </div>
+            <div style="font-size: 0.9em; color: #999;" id="lastUpdate">
+                Last updated: --:--
+            </div>
+        </div>
+
+        <!-- Dashboard Section -->
+        <div class="content-section active" id="dashboard-section">
+            <div class="stats-grid" id="statsGrid">
+                <div class="loading">Loading statistics...</div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Recent Activity Overview</h3>
+                    <button class="btn btn-primary btn-sm" onclick="loadDashboard()">Refresh</button>
+                </div>
+                <div id="recentActivityContainer">
+                    <div class="loading">Loading recent activities...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Section -->
+        <div class="content-section" id="users-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">User Management</h3>
+                    <button class="btn btn-primary" onclick="showAddUserModal()">+ Add New User</button>
+                </div>
+                <div id="usersTableContainer">
+                    <div class="loading">Loading users...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activities Section -->
+        <div class="content-section" id="activities-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Activity Log</h3>
+                    <button class="btn btn-primary btn-sm" onclick="loadActivities()">Refresh</button>
+                </div>
+                <div id="activitiesTableContainer">
+                    <div class="loading">Loading activities...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Section -->
+        <div class="content-section" id="reports-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Generate Reports</h3>
+                </div>
+                <div id="reportsContainer">
+                    <div class="loading">Loading report options...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Threats Section -->
+        <div class="content-section" id="threats-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Active Threats</h3>
+                    <button class="btn btn-primary btn-sm" onclick="loadThreats()">Refresh</button>
+                </div>
+                <div id="threatsContainer">
+                    <div class="loading">Loading active threats...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Section -->
+        <div class="content-section" id="system-section">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">System Status</h3>
+                    <button class="btn btn-primary btn-sm" onclick="loadSystemStatus()">Refresh</button>
+                </div>
+                <div id="systemStatusContainer">
+                    <div class="loading">Loading system status...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div class="modal" id="addUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New User</h3>
+            </div>
+            <form id="addUserForm">
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" name="username" required placeholder="e.g., john_doe">
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" name="full_name" required placeholder="e.g., John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" name="email" required placeholder="e.g., john@company.com">
+                </div>
+                <div class="form-group">
+                    <label>Department *</label>
+                    <input type="text" name="department" required placeholder="e.g., IT, Finance, HR">
+                </div>
+                <div class="form-group">
+                    <label>Role *</label>
+                    <select name="role" required>
+                        <option value="">Select Role</option>
+                        <option value="Employee">Employee</option>
+                        <option value="Developer">Developer</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Administrator">Administrator</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        let currentUser = null;
+
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            const userInfo = localStorage.getItem('user_info');
+            const isAdmin = localStorage.getItem('is_admin') === 'true';
+
+            if (!token || !userInfo) {
+                window.location.href = 'login.html';
+                return false;
+            }
+
+            if (!isAdmin) {
+                alert('Access denied. Admin privileges required.');
+                window.location.href = 'index.html';
+                return false;
+            }
+
+            currentUser = JSON.parse(userInfo);
+            updateUserProfile();
+            return true;
+        }
+
+        // Update user profile in sidebar
+        function updateUserProfile() {
+            if (currentUser) {
+                document.getElementById('userName').textContent = currentUser.full_name;
+                document.getElementById('userRole').textContent = currentUser.role || 'Administrator';
+                document.getElementById('userAvatar').textContent = currentUser.full_name.charAt(0).toUpperCase();
+            }
+        }
+
+        // Show section
+        function showSection(sectionName) {
+            // Update navigation
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            event.target.closest('.nav-link').classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            document.getElementById(`${sectionName}-section`).classList.add('active');
+
+            // Update breadcrumb
+            const titles = {
+                'dashboard': 'Dashboard',
+                'users': 'User Management',
+                'activities': 'Activity Log',
+                'reports': 'Reports',
+                'threats': 'Active Threats',
+                'system': 'System Status'
+            };
+            document.getElementById('pageTitle').textContent = titles[sectionName];
+            document.getElementById('breadcrumb').textContent = `Home / ${titles[sectionName]}`;
+
+            // Load section data
+            switch(sectionName) {
+                case 'dashboard': loadDashboard(); break;
+                case 'users': loadUsers(); break;
+                case 'activities': loadActivities(); break;
+                case 'reports': loadReports(); break;
+                case 'threats': loadThreats(); break;
+                case 'system': loadSystemStatus(); break;
+            }
+        }
+
+        // Load dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/dashboard/stats`);
+                const data = await response.json();
+
+                // Update stats grid
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-value">${data.overview.total_users}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Sessions</div>
+                        <div class="stat-value">${data.overview.active_sessions}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Threats Detected</div>
+                        <div class="stat-value">${data.overview.threats_detected_today}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Threats Blocked</div>
+                        <div class="stat-value">${data.overview.threats_blocked}</div>
+                    </div>
+                `;
+
+                // Update recent activities
+                const container = document.getElementById('recentActivityContainer');
+                if (data.recent_activities && data.recent_activities.length > 0) {
+                    container.innerHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Activity</th>
+                                    <th>Risk Score</th>
+                                    <th>Action</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.recent_activities.map(activity => `
+                                    <tr>
+                                        <td>${activity.full_name}</td>
+                                        <td>${activity.activity}</td>
+                                        <td><span class="badge badge-${activity.risk_score >= 70 ? 'danger' : activity.risk_score >= 30 ? 'warning' : 'success'}">${activity.risk_score}</span></td>
+                                        <td><span class="badge badge-${activity.action === 'BLOCK' ? 'danger' : activity.action === 'RESTRICT' ? 'warning' : 'success'}">${activity.action}</span></td>
+                                        <td>${new Date(activity.timestamp).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    container.innerHTML = '<p style="text-align: center; padding: 20px; color: #999;">No recent activities</p>';
+                }
+
+                updateLastUpdate();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                document.getElementById('statsGrid').innerHTML = '<p style="color: #f44336;">Failed to load dashboard data</p>';
+            }
+        }
+
+        // Load users
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/users/list`);
+                const data = await response.json();
+
+                const container = document.getElementById('usersTableContainer');
+                if (data.users && data.users.length > 0) {
+                    container.innerHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Department</th>
+                                    <th>Role</th>
+                                    <th>Risk Score</th>
+                                    <th>Threats</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.users.map(user => `
+                                    <tr>
+                                        <td>${user.username}</td>
+                                        <td>${user.full_name}</td>
+                                        <td>${user.department}</td>
+                                        <td>${user.role}</td>
+                                        <td><span class="badge badge-${user.current_risk_score >= 70 ? 'danger' : user.current_risk_score >= 30 ? 'warning' : 'success'}">${user.current_risk_score}</span></td>
+                                        <td>${user.total_threats}</td>
+                                        <td>
+                                            <button class="btn btn-primary btn-sm" onclick="generateUserReport('${user.user_id}')">Report</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    container.innerHTML = '<p style="text-align: center; padding: 20px; color: #999;">No users found</p>';
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersTableContainer').innerHTML = '<p style="color: #f44336;">Failed to load users</p>';
+            }
+        }
+
+        // Load activities
+        async function loadActivities() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/activities/recent?limit=50`);
+                const data = await response.json();
+
+                const container = document.getElementById('activitiesTableContainer');
+        
+                // Check if we have valid activities
+                const validActivities = data.activities ? data.activities.filter(activity =>
+                    activity.user_id && 
+                    activity.user_id !== 'undefined' && 
+                    activity.full_name && 
+                    activity.full_name !== 'undefined'
+                ) : [];
+        
+                if (validActivities.length > 0) {
+                    container.innerHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>User</th>
+                                    <th>Activity</th>
+                                    <th>Risk Level</th>
+                                    <th>Action Taken</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${validActivities.map(activity => `
+                                    <tr>
+                                        <td>${new Date(activity.timestamp).toLocaleString()}</td>
+                                        <td>${activity.full_name}</td>
+                                        <td>${activity.activity_type.replace(/_/g, ' ')}</td>
+                                        <td><span class="badge badge-${activity.risk_level === 'HIGH' || activity.risk_level === 'CRITICAL' ? 'danger' : activity.risk_level === 'MEDIUM' ? 'warning' : 'success'}">${activity.risk_level}</span></td>
+                                        <td>${activity.action}</td>
+                                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${activity.summary || 'N/A'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    container.innerHTML = '<p style="text-align: center; padding: 40px; color: #999;">No activities found. Start monitoring to see activities here.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading activities:', error);
+                document.getElementById('activitiesTableContainer').innerHTML = '<p style="color: #f44336;">Failed to load activities. Check API connection.</p>';
+            }
+        }
+
+        // Load reports section
+        async function loadReports() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/users/list`);
+                const data = await response.json();
+
+                const container = document.getElementById('reportsContainer');
+                container.innerHTML = `
+                    <div style="max-width: 600px;">
+                        <h4 style="margin-bottom: 20px; color: #333;">Generate User Report</h4>
+                        <div class="form-group">
+                            <label>Select User</label>
+                            <select id="reportUserSelect" class="form-control">
+                                <option value="">Choose a user...</option>
+                                ${data.users.map(user => `
+                                    <option value="${user.user_id}">${user.full_name} (${user.username})</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="generateSelectedUserReport()">Generate PDF Report</button>
+                        <hr style="margin: 30px 0;">
+                        <h4 style="margin-bottom: 20px; color: #333;">System-Wide Report</h4>
+                        <button class="btn btn-success" onclick="generateSystemReport()">Generate System Report</button>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading reports:', error);
+                document.getElementById('reportsContainer').innerHTML = '<p style="color: #f44336;">Failed to load report options</p>';
+            }
+        }
+
+        // Load threats
+        async function loadThreats() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/threats/active`);
+                const data = await response.json();
+
+                const container = document.getElementById('threatsContainer');
+                if (data.threats && data.threats.length > 0) {
+                    container.innerHTML = `
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>User</th>
+                                    <th>Threat Type</th>
+                                    <th>Risk Score</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.threats.map(threat => `
+                                    <tr>
+                                        <td>${new Date(threat.timestamp).toLocaleString()}</td>
+                                        <td>${threat.user_name || threat.user_id}</td>
+                                        <td>${threat.threat_type.replace(/_/g, ' ')}</td>
+                                        <td><span class="badge badge-danger">${threat.risk_score}</span></td>
+                                        <td><span class="badge badge-${threat.status === 'active' ? 'danger' : 'warning'}">${threat.status}</span></td>
+                                        <td>
+                                            <button class="btn btn-danger btn-sm" onclick="blockUser('${threat.user_id}')">Block</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    container.innerHTML = '<p style="text-align: center; padding: 20px; color: #4caf50;">✓ No active threats detected</p>';
+                }
+            } catch (error) {
+                console.error('Error loading threats:', error);
+                document.getElementById('threatsContainer').innerHTML = '<p style="color: #f44336;">Failed to load threat data</p>';
+            }
+        }
+
+        // Load system status
+        async function loadSystemStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/dashboard/stats`);
+                const data = await response.json();
+
+                const container = document.getElementById('systemStatusContainer');
+                container.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">CPU Usage</div>
+                            <div class="stat-value">${data.system_health.cpu_usage}%</div>
+                            <div class="stat-change ${data.system_health.cpu_usage > 80 ? 'negative' : 'positive'}">
+                                ${data.system_health.cpu_usage > 80 ? '⚠️ High' : '✓ Normal'}
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Memory Usage</div>
+                            <div class="stat-value">${data.system_health.memory_usage}%</div>
+                            <div class="stat-change ${data.system_health.memory_usage > 80 ? 'negative' : 'positive'}">
+                                ${data.system_health.memory_usage > 80 ? '⚠️ High' : '✓ Normal'}
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Disk Usage</div>
+                            <div class="stat-value">${data.system_health.disk_usage}%</div>
+                            <div class="stat-change ${data.system_health.disk_usage > 80 ? 'negative' : 'positive'}">
+                                ${data.system_health.disk_usage > 80 ? '⚠️ High' : '✓ Normal'}
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Network Throughput</div>
+                            <div class="stat-value">${data.system_health.network_throughput}</div>
+                            <div class="stat-change positive">MB/s</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 30px;">
+                        <h4 style="color: #2a5298; margin-bottom: 15px;">ML Model Performance</h4>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Accuracy</td><td>${data.ml_performance.accuracy}%</td></tr>
+                                <tr><td>False Positive Rate</td><td>${data.ml_performance.false_positive_rate}</td></tr>
+                                <tr><td>Detection Latency</td><td>${data.ml_performance.detection_latency_ms}ms</td></tr>
+                                <tr><td>Active Models</td><td>${data.ml_performance.models_active}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading system status:', error);
+                document.getElementById('systemStatusContainer').innerHTML = '<p style="color: #f44336;">Failed to load system status</p>';
+            }
+        }
+
+        // Generate user report
+        async function generateUserReport(userId) {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.textContent = 'Generating...';
+
+                const response = await fetch(`${API_BASE}/api/v1/reports/user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`Report generated successfully!\n\nFile: ${data.filename}\nLocation: ${data.filepath}`);
+                    
+                    // Download the report
+                    window.open(`${API_BASE}/api/v1/reports/download/${data.filename}`, '_blank');
+                } else {
+                    alert('Failed to generate report: ' + (data.message || 'Unknown error'));
+                }
+
+                btn.disabled = false;
+                btn.textContent = 'Report';
+            } catch (error) {
+                console.error('Error generating report:', error);
+                alert('Failed to generate report: ' + error.message);
+                event.target.disabled = false;
+                event.target.textContent = 'Report';
+            }
+        }
+
+        // Generate selected user report
+        async function generateSelectedUserReport() {
+            const select = document.getElementById('reportUserSelect');
+            const userId = select.value;
+
+            if (!userId) {
+                alert('Please select a user');
+                return;
+            }
+
+            await generateUserReport(userId);
+        }
+
+        // Generate system report
+        async function generateSystemReport() {
+            try {
+                const btn = event.target;
+                btn.disabled = true;
+                btn.textContent = 'Generating...';
+
+                const response = await fetch(`${API_BASE}/api/v1/reports/system`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time_period: '24h' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`System report generated successfully!\n\nFile: ${data.filename}`);
+                    window.open(`${API_BASE}/api/v1/reports/download/${data.filename}`, '_blank');
+                } else {
+                    alert('Failed to generate report: ' + (data.message || 'Unknown error'));
+                }
+
+                btn.disabled = false;
+                btn.textContent = 'Generate System Report';
+            } catch (error) {
+                console.error('Error generating system report:', error);
+                alert('Failed to generate system report: ' + error.message);
+                event.target.disabled = false;
+                event.target.textContent = 'Generate System Report';
+            }
+        }
+
+        // Show add user modal
+        function showAddUserModal() {
+            document.getElementById('addUserModal').classList.add('active');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('addUserModal').classList.remove('active');
+            document.getElementById('addUserForm').reset();
+        }
+
+        // Handle add user form
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const userData = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/users/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(`User added successfully!\n\nUsername: ${userData.username}\nDefault password: demo123`);
+                    closeModal();
+                    loadUsers(); // Reload users table
+                } else {
+                    alert('Failed to add user: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error adding user:', error);
+                alert('Failed to add user: ' + error.message);
+            }
+        });
+
+        // Block user (placeholder)
+        function blockUser(userId) {
+            if (confirm(`Are you sure you want to block user ${userId}?`)) {
+                alert('User blocking feature will be implemented in Phase C (Firewall Integration)');
+            }
+        }
+
+        // Logout
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.clear();
+                window.location.href = 'login.html';
+            }
+        }
+
+        // Update last update time
+        function updateLastUpdate() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = `Last updated: ${now.toLocaleTimeString()}`;
+        }
+
+        // Auto-refresh dashboard every 30 seconds
+        setInterval(() => {
+            const activeSection = document.querySelector('.content-section.active');
+            if (activeSection && activeSection.id === 'dashboard-section') {
+                loadDashboard();
+            }
+        }, 30000);
+
+        // Initialize
+        window.addEventListener('load', () => {
+            if (checkAuth()) {
+                loadDashboard();
+            }
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('addUserModal').addEventListener('click', (e) => {
+            if (e.target.id === 'addUserModal') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -30,7 +30,7 @@ class NetworkMonitor:
         self.api_url = api_url
         self.baseline_bytes = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
         self.last_check_time = time.time()
-        self.alert_threshold_mb = 100  # Alert if more than 100MB transferred in 30 seconds
+        self.alert_threshold_mb = 50  # Alert if more than 100MB transferred in 30 seconds
         self.monitoring_active = False
         
         # Load user configuration
@@ -245,15 +245,15 @@ class NetworkMonitor:
                     
                     # Prepare activity data for API
                     activity_data = {
-                        "user_id": "local_user",
+                        "user_id": self.user_config['user_id'],  # ✅ Use actual user!
                         "activity_type": "network_activity",
                         "timestamp": datetime.now().isoformat(),
                         "file_size": int(network_usage['bytes_transferred']),
                         "bytes_transferred": int(network_usage['bytes_transferred']),
                         "transfer_rate_mbps": network_usage['transfer_rate_mbps'],
                         "active_connections": len(connections),
-                        "department": "IT",
-                        "role": "Developer"
+                        "department": self.user_config['department'],  # ✅ Use actual dept!
+                        "role": self.user_config['role']  # ✅ Use actual role!
                     }
                     
                     # Send to API for analysis

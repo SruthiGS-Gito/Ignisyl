@@ -246,8 +246,12 @@
         <header>
             <h1>🛡️ IGNISYL</h1>
             <p class="subtitle">AI-Powered Insider Threat Detection System</p>
+            <button onclick="logout()" style="position: absolute; top: 20px; right: 20px; padding: 10px 20px; background: rgba(244, 67, 54, 0.8); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                Logout
+            </button>
             <div class="status-bar">
                 <div class="status-item">
+
                     <span class="threat-indicator active"></span>
                     Status: <strong>OPERATIONAL</strong>
                 </div>
@@ -432,13 +436,32 @@
         try {
             const response = await fetch('http://127.0.0.1:8000/api/v1/dashboard/stats');
             const data = await response.json();
-            
-            // Update stats cards (only on initial load)
+        
+            // Update stats cards
             document.getElementById('total-users').textContent = data.overview.total_users;
             document.getElementById('active-sessions').textContent = data.overview.active_sessions;
             document.getElementById('threats-detected').textContent = data.overview.threats_detected_today;
             document.getElementById('threats-blocked').textContent = data.overview.threats_blocked;
+        
+            // Load initial recent activities from API
+            if (data.recent_activities && data.recent_activities.length > 0) {
+                const container = document.getElementById('recent-activities');
+                container.innerHTML = ''; // Clear loading message
             
+                data.recent_activities.forEach(activity => {
+                    addRecentActivity({
+                        user_id: activity.full_name,
+                        summary: activity.activity,
+                        risk_score: activity.risk_score,
+                        risk_level: activity.risk_score >= 70 ? 'HIGH' : 'MEDIUM',
+                        bytes_transferred: activity.bytes,
+                        timestamp: activity.timestamp
+                    });
+                });
+            }
+        
+            updateLastUpdate('Dashboard loaded');
+        
         } catch (error) {
             console.error('Error loading dashboard data:', error);
         }
@@ -459,6 +482,13 @@
             websocket.send(JSON.stringify({type: 'ping'}));
         }
     }, 30000);
+
+    function logout() {
+        if (confirm('Are you sure you want to logout?')) {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+    }
 </script>
 
 </body>
