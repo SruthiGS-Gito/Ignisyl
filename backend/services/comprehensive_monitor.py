@@ -1,16 +1,29 @@
 """
-Comprehensive Activity Monitoring System
-Monitors multiple threat vectors beyond just network activity
+Comprehensive Activity Monitoring System for IGNISYL
+Monitors honeypots, USB devices, login attempts, and file access
 """
 
 import os
+import sys
 import time
 import psutil
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from pathlib import Path
 import json
+import logging
+
+# Add project root to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(current_dir)
+project_root = os.path.dirname(backend_dir)
+sys.path.insert(0, project_root)
+
+from config.config import settings
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ComprehensiveMonitor:
     """
@@ -19,7 +32,6 @@ class ComprehensiveMonitor:
     - File access patterns
     - USB device usage
     - Honeypot access
-    - Process monitoring
     """
     
     def __init__(self):
@@ -35,33 +47,46 @@ class ComprehensiveMonitor:
     
     def _setup_honeypots(self):
         """Create honeypot files (fake sensitive files to catch intruders)"""
-        honeypot_dir = Path("data/honeypots")
+        honeypot_dir = Path(settings.DATA_PATH) / "honeypots"
         honeypot_dir.mkdir(parents=True, exist_ok=True)
         
         # Create fake sensitive files
         honeypot_files = [
-            "confidential_salary_data.xlsx",
-            "customer_credit_cards.csv",
-            "admin_passwords.txt",
-            "financial_reports_q4.pdf",
-            "trade_secrets.docx"
+            ("confidential_salary_data.xlsx", "Salary information"),
+            ("customer_credit_cards.csv", "Payment card data"),
+            ("admin_passwords.txt", "Administrative credentials"),
+            ("financial_reports_q4.pdf", "Financial statements"),
+            ("trade_secrets.docx", "Proprietary information")
         ]
         
-        for filename in honeypot_files:
+        created_count = 0
+        for filename, description in honeypot_files:
             filepath = honeypot_dir / filename
+            
             if not filepath.exists():
-                with open(filepath, 'w') as f:
-                    f.write(f"HONEYPOT - DO NOT ACCESS\n")
-                    f.write(f"This is a decoy file for security monitoring.\n")
-                    f.write(f"Access is being logged.\n")
-                
-                self.honeypots.append({
-                    'path': str(filepath),
-                    'filename': filename,
-                    'created_at': datetime.now().isoformat()
-                })
+                try:
+                    with open(filepath, 'w') as f:
+                        f.write(f"🚨 HONEYPOT FILE - DO NOT ACCESS 🚨\n")
+                        f.write(f"Type: {description}\n")
+                        f.write(f"This is a decoy file for security monitoring.\n")
+                        f.write(f"All access attempts are logged and reported.\n")
+                        f.write(f"Created: {datetime.now().isoformat()}\n")
+                    
+                    created_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to create honeypot {filename}: {e}")
+                    continue
+            
+            self.honeypots.append({
+                'path': str(filepath),
+                'filename': filename,
+                'description': description,
+                'created_at': datetime.now().isoformat(),
+                'last_checked': None,
+                'access_count': 0
+            })
         
-        print(f"✅ Created {len(honeypot_files)} honeypot files")
+        logger.info(f"✅ Created {created_count} honeypot files in {honeypot_dir}")
     
     def check_honeypot_access(self) -> List[Dict]:
         """
@@ -71,26 +96,45 @@ class ComprehensiveMonitor:
             List of honeypot access events
         """
         accesses = []
+        current_time = datetime.now()
         
         for honeypot in self.honeypots:
             filepath = Path(honeypot['path'])
             
-            if filepath.exists():
+            if not filepath.exists():
+                logger.warning(f"Honeypot file missing: {filepath}")
+                continue
+            
+            try:
                 stats = filepath.stat()
                 access_time = datetime.fromtimestamp(stats.st_atime)
                 modified_time = datetime.fromtimestamp(stats.st_mtime)
                 
-                # If file was accessed recently (within last 5 minutes)
-                time_diff = (datetime.now() - access_time).total_seconds()
+                # Check if accessed recently (last 5 minutes)
+                time_since_access = (current_time - access_time).total_seconds()
                 
-                if time_diff < 300:  # 5 minutes
-                    accesses.append({
-                        'honeypot_file': honeypot['filename'],
-                        'accessed_at': access_time.isoformat(),
-                        'modified_at': modified_time.isoformat(),
-                        'severity': 'CRITICAL',
-                        'description': f'Unauthorized access to honeypot file: {honeypot["filename"]}'
-                    })
+                # If accessed within last 5 minutes and after last check
+                if time_since_access < 300:  # 5 minutes
+                    last_checked = honeypot.get('last_checked')
+                    
+                    if last_checked is None or access_time > datetime.fromisoformat(last_checked):
+                        accesses.append({
+                            'honeypot_file': honeypot['filename'],
+                            'honeypot_path': honeypot['path'],
+                            'description': honeypot['description'],
+                            'accessed_at': access_time.isoformat(),
+                            'modified_at': modified_time.isoformat(),
+                            'time_since_access_seconds': int(time_since_access),
+                            'severity': 'CRITICAL',
+                            'alert_message': f'🚨 HONEYPOT TRIGGERED: {honeypot["filename"]}'
+                        })
+                        
+                        # Update last checked time and increment counter
+                        honeypot['last_checked'] = current_time.isoformat()
+                        honeypot['access_count'] += 1
+                
+            except Exception as e:
+                logger.error(f"Error checking honeypot {honeypot['filename']}: {e}")
         
         return accesses
     
@@ -103,10 +147,14 @@ class ComprehensiveMonitor:
                     self.usb_devices.append({
                         'device': partition.device,
                         'mountpoint': partition.mountpoint,
+                        'fstype': partition.fstype,
                         'detected_at': datetime.now().isoformat()
                     })
+            
+            if self.usb_devices:
+                logger.info(f"Detected {len(self.usb_devices)} existing USB devices")
         except Exception as e:
-            print(f"Error detecting USB devices: {e}")
+            logger.error(f"Error detecting initial USB devices: {e}")
     
     def detect_usb_activity(self) -> List[Dict]:
         """
@@ -116,10 +164,11 @@ class ComprehensiveMonitor:
             List of new USB devices detected
         """
         new_devices = []
-        current_devices = []
         
         try:
             partitions = psutil.disk_partitions()
+            current_devices = []
+            
             for partition in partitions:
                 if 'removable' in partition.opts.lower():
                     current_devices.append(partition.device)
@@ -132,14 +181,17 @@ class ComprehensiveMonitor:
                             'fstype': partition.fstype,
                             'detected_at': datetime.now().isoformat(),
                             'severity': 'MEDIUM',
-                            'description': f'New USB device connected: {partition.device}'
+                            'description': f'New USB device connected: {partition.device}',
+                            'alert_message': f'USB Device Connected: {partition.mountpoint}'
                         }
                         
                         self.usb_devices.append(device_info)
                         new_devices.append(device_info)
+                        
+                        logger.info(f"🔌 New USB device detected: {partition.device}")
         
         except Exception as e:
-            print(f"Error detecting USB: {e}")
+            logger.error(f"Error detecting USB activity: {e}")
         
         return new_devices
     
@@ -161,26 +213,29 @@ class ComprehensiveMonitor:
         if timestamp is None:
             timestamp = datetime.now().isoformat()
         
-        # Check for suspicious patterns
-        hour = datetime.fromisoformat(timestamp).hour
-        is_unusual_time = hour < 6 or hour > 22  # Outside 6 AM - 10 PM
+        login_time = datetime.fromisoformat(timestamp)
+        hour = login_time.hour
         
-        # Check for repeated failed attempts
+        # Check for unusual time (outside 6 AM - 10 PM)
+        is_unusual_time = hour < 6 or hour > 22
+        
+        # Check for repeated failed attempts in last 5 minutes
+        five_mins_ago = datetime.now() - timedelta(minutes=5)
         recent_failures = [
             attempt for attempt in self.login_attempts
             if attempt['username'] == username 
             and not attempt['success']
-            and (datetime.now() - datetime.fromisoformat(attempt['timestamp'])).total_seconds() < 300
+            and datetime.fromisoformat(attempt['timestamp']) > five_mins_ago
         ]
         
+        # Determine severity
         severity = "LOW"
         if not success:
             if len(recent_failures) >= 3:
                 severity = "HIGH"
             elif len(recent_failures) >= 1:
                 severity = "MEDIUM"
-        
-        if is_unusual_time and success:
+        elif is_unusual_time:
             severity = "MEDIUM"
         
         login_record = {
@@ -188,14 +243,20 @@ class ComprehensiveMonitor:
             'success': success,
             'ip_address': ip_address,
             'timestamp': timestamp,
-            'unusual_time': is_unusual_time,
             'hour': hour,
+            'unusual_time': is_unusual_time,
             'failed_attempts_count': len(recent_failures),
             'severity': severity,
-            'description': self._generate_login_description(username, success, is_unusual_time, len(recent_failures))
+            'description': self._generate_login_description(
+                username, success, is_unusual_time, len(recent_failures)
+            )
         }
         
         self.login_attempts.append(login_record)
+        
+        if severity in ['HIGH', 'CRITICAL']:
+            logger.warning(f"⚠️ {login_record['description']}")
+        
         return login_record
     
     def _generate_login_description(self, username: str, success: bool, 
@@ -203,11 +264,11 @@ class ComprehensiveMonitor:
         """Generate description for login attempt"""
         if not success:
             if failed_count >= 3:
-                return f"Multiple failed login attempts detected for {username} (Total: {failed_count + 1})"
+                return f"🚨 Multiple failed login attempts for {username} (Total: {failed_count + 1})"
             return f"Failed login attempt for {username}"
         
         if unusual_time:
-            return f"Login at unusual time for {username}"
+            return f"⚠️ Login at unusual time for {username}"
         
         return f"Successful login for {username}"
     
@@ -225,20 +286,25 @@ class ComprehensiveMonitor:
             File access record
         """
         # Determine sensitivity
-        sensitive_keywords = ['password', 'secret', 'confidential', 'admin', 
-                             'salary', 'financial', 'credit', 'social_security']
+        sensitive_keywords = [
+            'password', 'secret', 'confidential', 'admin', 
+            'salary', 'financial', 'credit', 'social_security',
+            'ssn', 'payroll', 'classified', 'private'
+        ]
         
-        is_sensitive = any(keyword in filepath.lower() for keyword in sensitive_keywords)
+        filepath_lower = filepath.lower()
+        is_sensitive = any(keyword in filepath_lower for keyword in sensitive_keywords)
         
         # Check if it's a honeypot
         is_honeypot = any(honeypot['path'] in filepath for honeypot in self.honeypots)
         
+        # Determine severity
         severity = "LOW"
         if is_honeypot:
             severity = "CRITICAL"
         elif is_sensitive and operation == "read":
             severity = "MEDIUM"
-        elif is_sensitive and operation in ["write", "delete"]:
+        elif is_sensitive and operation in ["write", "delete", "modify"]:
             severity = "HIGH"
         
         access_record = {
@@ -250,10 +316,16 @@ class ComprehensiveMonitor:
             'is_sensitive': is_sensitive,
             'is_honeypot': is_honeypot,
             'severity': severity,
-            'description': self._generate_file_access_description(filepath, operation, is_honeypot, is_sensitive)
+            'description': self._generate_file_access_description(
+                filepath, operation, is_honeypot, is_sensitive
+            )
         }
         
         self.file_accesses.append(access_record)
+        
+        if severity in ['HIGH', 'CRITICAL']:
+            logger.warning(f"⚠️ {access_record['description']}")
+        
         return access_record
     
     def _generate_file_access_description(self, filepath: str, operation: str, 
@@ -262,7 +334,7 @@ class ComprehensiveMonitor:
         filename = Path(filepath).name
         
         if is_honeypot:
-            return f"🚨 HONEYPOT TRIGGERED: Unauthorized access to decoy file '{filename}'"
+            return f"🚨 HONEYPOT TRIGGERED: Unauthorized access to '{filename}'"
         
         if is_sensitive:
             return f"Access to sensitive file '{filename}' ({operation})"
@@ -274,31 +346,33 @@ class ComprehensiveMonitor:
         Get all suspicious activities within time window
         
         Args:
-            time_window_minutes: Time window to check
+            time_window_minutes: Time window to check (minutes)
             
         Returns:
             List of suspicious activities
         """
-        cutoff_time = datetime.now().timestamp() - (time_window_minutes * 60)
+        cutoff_time = datetime.now() - timedelta(minutes=time_window_minutes)
         suspicious = []
         
         # Check login attempts
         for login in self.login_attempts:
-            login_time = datetime.fromisoformat(login['timestamp']).timestamp()
+            login_time = datetime.fromisoformat(login['timestamp'])
             if login_time > cutoff_time and login['severity'] in ['MEDIUM', 'HIGH', 'CRITICAL']:
                 suspicious.append({
                     'type': 'login_attempt',
                     'severity': login['severity'],
+                    'timestamp': login['timestamp'],
                     'data': login
                 })
         
         # Check file accesses
         for access in self.file_accesses:
-            access_time = datetime.fromisoformat(access['timestamp']).timestamp()
+            access_time = datetime.fromisoformat(access['timestamp'])
             if access_time > cutoff_time and access['severity'] in ['MEDIUM', 'HIGH', 'CRITICAL']:
                 suspicious.append({
                     'type': 'file_access',
                     'severity': access['severity'],
+                    'timestamp': access['timestamp'],
                     'data': access
                 })
         
@@ -308,6 +382,7 @@ class ComprehensiveMonitor:
             suspicious.append({
                 'type': 'honeypot_access',
                 'severity': 'CRITICAL',
+                'timestamp': access['accessed_at'],
                 'data': access
             })
         
@@ -317,10 +392,86 @@ class ComprehensiveMonitor:
             suspicious.append({
                 'type': 'usb_device',
                 'severity': 'MEDIUM',
+                'timestamp': usb['detected_at'],
                 'data': usb
             })
         
-        return sorted(suspicious, key=lambda x: x['data'].get('timestamp', ''), reverse=True)
+        # Sort by timestamp (most recent first)
+        suspicious.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return suspicious
+    
+    def get_stats(self) -> Dict:
+        """Get monitoring statistics"""
+        return {
+            'honeypots': {
+                'total': len(self.honeypots),
+                'total_accesses': sum(h.get('access_count', 0) for h in self.honeypots)
+            },
+            'login_attempts': {
+                'total': len(self.login_attempts),
+                'successful': len([l for l in self.login_attempts if l['success']]),
+                'failed': len([l for l in self.login_attempts if not l['success']])
+            },
+            'file_accesses': {
+                'total': len(self.file_accesses),
+                'sensitive': len([f for f in self.file_accesses if f['is_sensitive']]),
+                'honeypot': len([f for f in self.file_accesses if f['is_honeypot']])
+            },
+            'usb_devices': {
+                'total': len(self.usb_devices)
+            }
+        }
+    
+    def clear_old_records(self, days: int = 7):
+        """Clear records older than specified days"""
+        cutoff_time = datetime.now() - timedelta(days=days)
+        
+        # Clear old login attempts
+        self.login_attempts = [
+            l for l in self.login_attempts
+            if datetime.fromisoformat(l['timestamp']) > cutoff_time
+        ]
+        
+        # Clear old file accesses
+        self.file_accesses = [
+            f for f in self.file_accesses
+            if datetime.fromisoformat(f['timestamp']) > cutoff_time
+        ]
+        
+        logger.info(f"Cleared records older than {days} days")
 
 # Global instance
-comprehensive_monitor = ComprehensiveMonitor()
+try:
+    comprehensive_monitor = ComprehensiveMonitor()
+except Exception as e:
+    logger.error(f"Failed to initialize comprehensive monitor: {e}")
+    comprehensive_monitor = None
+
+def main():
+    """Test comprehensive monitor"""
+    print("\n" + "="*60)
+    print("IGNISYL Comprehensive Monitor Test")
+    print("="*60 + "\n")
+    
+    monitor = ComprehensiveMonitor()
+    
+    # Check honeypots
+    print("📁 Honeypot files:")
+    for hp in monitor.honeypots:
+        print(f"   - {hp['filename']}: {hp['description']}")
+    
+    # Check for suspicious activities
+    suspicious = monitor.get_suspicious_activities(60)
+    print(f"\n⚠️ Suspicious activities (last hour): {len(suspicious)}")
+    
+    # Get stats
+    stats = monitor.get_stats()
+    print(f"\n📊 Statistics:")
+    for category, data in stats.items():
+        print(f"   {category}: {data}")
+    
+    print("\n✅ Comprehensive monitor test complete!")
+
+if __name__ == "__main__":
+    main()

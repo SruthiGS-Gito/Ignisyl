@@ -1,11 +1,7 @@
 """
-Advanced Risk Scoring Engine for IGNISYL-Neo
+Advanced Risk Scoring Engine for IGNISYL
 Context-aware risk assessment with business intelligence
 """
-# This file : Analyzes activities with business context intelligence
-# - Applies risk factors (off-hours access, large downloads, etc.)
-# - Considers contextual modifiers (month-end for finance = normal)
-# - Generates human-readable explanations for why something is risky
 
 import numpy as np
 import pandas as pd
@@ -14,11 +10,28 @@ from typing import Dict, List, Tuple, Optional
 import json
 import sys
 import os
+import ipaddress
+import logging
 from dataclasses import dataclass
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config.config import settings, RISK_LEVELS
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configuration constants
+RARE_ACTIVITY_THRESHOLD = 0.1
+TIME_DEVIATION_MULTIPLIER = 5
+MAX_TIME_DEVIATION_SCORE = 30
+MAX_VOLUME_DEVIATION_SCORE = 25
+MAX_BASELINE_DEVIATION = 50.0
+BASELINE_DEVIATION_WEIGHT = 0.5
+LARGE_FILE_MULTIPLIER = 5
+HIGH_TRAFFIC_MULTIPLIER = 3
+BANDWIDTH_SPIKE_MULTIPLIER = 5
 
 @dataclass
 class RiskFactor:
@@ -90,79 +103,47 @@ class ContextualRiskScorer:
         return {
             # Time-based modifiers
             'month_end_finance': ContextualModifier(
-                'user.department == "Finance" and is_month_end()',
+                'is_month_end,department:Finance',
                 -20.0,
                 'Financial activities during month-end are expected'
             ),
             'quarter_end_finance': ContextualModifier(
-                'user.department == "Finance" and is_quarter_end()',
+                'is_quarter_end,department:Finance',
                 -25.0,
                 'Financial activities during quarter-end are expected'
             ),
-            'maintenance_window': ContextualModifier(
-                'user.department == "IT" and is_maintenance_window()',
+            'maintenance_window_it': ContextualModifier(
+                'is_maintenance_window,department:IT',
                 -30.0,
                 'IT activities during maintenance windows are expected'
-            ),
-            'emergency_declared': ContextualModifier(
-                'emergency_mode_active()',
-                -15.0,
-                'Increased activity during emergencies is expected'
             ),
             
             # Role-based modifiers
             'admin_high_privilege': ContextualModifier(
-                'user.role in ["System Admin", "Security Admin"] and activity.requires_high_privilege',
+                'role:System Admin|Security Admin,high_privilege:true',
                 -25.0,
                 'High privilege activities expected for admin roles'
             ),
             'executive_travel': ContextualModifier(
-                'user.seniority_level == "Executive" and location_change_detected()',
+                'seniority:Executive,location_change:true',
                 -20.0,
                 'Location changes expected for executive travel'
             ),
             'developer_code_access': ContextualModifier(
-                'user.department == "IT" and activity.involves_code_files',
+                'department:IT,code_files:true',
                 -15.0,
                 'Code file access expected for developers'
             ),
             
             # Business context modifiers
-            'project_deadline': ContextualModifier(
-                'project_deadline_approaching()',
-                -10.0,
-                'Increased activity before project deadlines'
-            ),
             'business_hours_activity': ContextualModifier(
-                'is_business_hours() and not is_weekend()',
+                'is_business_hours:true',
                 -5.0,
                 'Activities during business hours are less suspicious'
-            ),
-            'approved_overtime': ContextualModifier(
-                'overtime_approved(user)',
-                -15.0,
-                'After-hours activity with approved overtime'
-            ),
-            
-            # Security context modifiers
-            'security_audit_period': ContextualModifier(
-                'security_audit_active()',
-                +10.0,
-                'Increased vigilance during security audits'
-            ),
-            'incident_response_mode': ContextualModifier(
-                'incident_response_active()',
-                +15.0,
-                'Heightened security during incident response'
-            ),
-            'threat_intelligence_alert': ContextualModifier(
-                'threat_level_elevated()',
-                +20.0,
-                'Increased risk scoring during threat alerts'
             )
         }
     
-    def _initialize_business_calendar(self) -> Dict[str, List]:
+    def _initialize_business_calendar(self) -> Dict:
         """Initialize business calendar events"""
         return {
             'month_end_days': [28, 29, 30, 31, 1, 2, 3],
@@ -171,9 +152,6 @@ class ContextualRiskScorer:
                 'days': [6, 0],  # Saturday, Sunday
                 'hours': [2, 3, 4, 5]  # 2-6 AM
             },
-            'holiday_periods': [
-                'Christmas', 'New Year', 'Thanksgiving', 'Independence Day'
-            ],
             'business_hours': {
                 'start': 9,
                 'end': 17,
@@ -200,7 +178,8 @@ class ContextualRiskScorer:
         # Temporal risk factors
         if factor_name == 'off_hours_access':
             hour = activity_data.get('hour', 12)
-            return hour < 6 or hour > 22
+            business_hours = self.business_calendar['business_hours']
+            return hour < business_hours['start'] or hour > business_hours['end']
         
         elif factor_name == 'weekend_activity':
             return activity_data.get('is_weekend', False)
@@ -214,7 +193,7 @@ class ContextualRiskScorer:
         elif factor_name == 'large_file_transfer':
             file_size = activity_data.get('file_size', 0)
             user_avg_size = user_profile.get('avg_file_size', 10*1024*1024)  # 10MB default
-            return file_size > user_avg_size * 5
+            return file_size > user_avg_size * LARGE_FILE_MULTIPLIER
         
         elif factor_name == 'sensitive_data_access':
             return activity_data.get('sensitive_data_accessed', False)
@@ -222,7 +201,7 @@ class ContextualRiskScorer:
         elif factor_name == 'cross_department_access':
             user_dept = user_profile.get('department', '')
             accessed_resource_dept = activity_data.get('resource_department', user_dept)
-            return user_dept != accessed_resource_dept
+            return user_dept != accessed_resource_dept and user_dept != '' and accessed_resource_dept != ''
         
         elif factor_name == 'mass_data_extraction':
             rows_affected = activity_data.get('rows_affected', 0)
@@ -230,33 +209,33 @@ class ContextualRiskScorer:
         
         elif factor_name == 'external_data_transfer':
             destination = activity_data.get('destination', '')
-            return 'external' in destination.lower()
+            return 'external' in destination.lower() or 'internet' in destination.lower()
         
         # Network risk factors
         elif factor_name == 'unusual_network_traffic':
             bytes_transferred = activity_data.get('bytes_transferred', 0)
             user_avg_traffic = user_profile.get('avg_network_usage', 100*1024*1024)  # 100MB default
-            return bytes_transferred > user_avg_traffic * 3
+            return bytes_transferred > user_avg_traffic * HIGH_TRAFFIC_MULTIPLIER
         
         elif factor_name == 'external_connections':
             destination_ip = activity_data.get('destination_ip', '')
-            return not self._is_internal_ip(destination_ip)
+            return destination_ip and not self._is_internal_ip(destination_ip)
         
         elif factor_name == 'bandwidth_spike':
             current_bandwidth = activity_data.get('bandwidth_mbps', 0)
             user_avg_bandwidth = user_profile.get('avg_bandwidth', 10)
-            return current_bandwidth > user_avg_bandwidth * 5
+            return current_bandwidth > user_avg_bandwidth * BANDWIDTH_SPIKE_MULTIPLIER
         
         # Behavioral risk factors
         elif factor_name == 'login_location_change':
             current_location = activity_data.get('location', '')
             user_locations = user_profile.get('typical_locations', [])
-            return current_location not in user_locations
+            return current_location and current_location not in user_locations
         
         elif factor_name == 'device_change':
             current_device = activity_data.get('device_info', '')
             user_devices = user_profile.get('known_devices', [])
-            return current_device not in user_devices
+            return current_device and current_device not in user_devices
         
         elif factor_name == 'failed_login_attempts':
             failed_attempts = activity_data.get('failed_login_attempts', 0)
@@ -268,7 +247,7 @@ class ContextualRiskScorer:
         
         elif factor_name == 'system_file_access':
             file_path = activity_data.get('file_path', '')
-            system_paths = ['/etc/', '/sys/', 'C:\\Windows\\System32\\', 'C:\\Program Files\\']
+            system_paths = ['/etc/', '/sys/', '/var/log/', 'C:\\Windows\\System32\\', 'C:\\Program Files\\']
             return any(path in file_path for path in system_paths)
         
         elif factor_name == 'log_tampering':
@@ -278,28 +257,27 @@ class ContextualRiskScorer:
         elif factor_name == 'unauthorized_software':
             app_name = activity_data.get('application_name', '')
             authorized_apps = user_profile.get('authorized_applications', [])
-            return app_name and app_name not in authorized_apps
+            return app_name and len(authorized_apps) > 0 and app_name not in authorized_apps
         
         elif factor_name == 'suspicious_downloads':
             file_type = activity_data.get('file_type', '')
-            suspicious_types = ['.exe', '.bat', '.ps1', '.sh', '.vbs']
+            suspicious_types = ['.exe', '.bat', '.ps1', '.sh', '.vbs', '.cmd']
             return file_type in suspicious_types
         
         return False
     
     def _is_internal_ip(self, ip_address: str) -> bool:
-        """Check if IP address is internal/private"""
-        if not ip_address:
+        """Check if IP address is internal/private using ipaddress module"""
+        if not ip_address or ip_address == 'localhost':
             return True
         
-        private_ranges = [
-            '192.168.', '10.', '172.16.', '172.17.', '172.18.', '172.19.',
-            '172.20.', '172.21.', '172.22.', '172.23.', '172.24.', '172.25.',
-            '172.26.', '172.27.', '172.28.', '172.29.', '172.30.', '172.31.',
-            '127.', 'localhost'
-        ]
-        
-        return any(ip_address.startswith(prefix) for prefix in private_ranges)
+        try:
+            ip_obj = ipaddress.ip_address(ip_address)
+            return ip_obj.is_private or ip_obj.is_loopback
+        except ValueError:
+            # Invalid IP address, treat as external for safety
+            logger.warning(f"Invalid IP address: {ip_address}")
+            return False
     
     def apply_contextual_modifiers(self, base_score: float, activity_data: Dict, 
                                  user_profile: Dict) -> Tuple[float, List[str]]:
@@ -315,55 +293,79 @@ class ContextualRiskScorer:
         return max(0.0, min(modified_score, 100.0)), applied_modifiers
     
     def _evaluate_modifier_condition(self, condition: str, activity_data: Dict, user_profile: Dict) -> bool:
-        """Evaluate contextual modifier conditions"""
+        """Evaluate contextual modifier conditions using structured format"""
         
-        # Month-end check
-        if 'is_month_end()' in condition:
-            current_day = activity_data.get('day_of_month', 15)
-            return current_day in self.business_calendar['month_end_days']
+        conditions = condition.split(',')
+        all_met = True
         
-        # Quarter-end check
-        if 'is_quarter_end()' in condition:
-            current_month = activity_data.get('month', 6)
-            return current_month in self.business_calendar['quarter_end_months']
+        for cond in conditions:
+            cond = cond.strip()
+            
+            # Month-end check
+            if cond == 'is_month_end':
+                current_day = activity_data.get('day_of_month', 15)
+                if current_day not in self.business_calendar['month_end_days']:
+                    all_met = False
+                    break
+            
+            # Quarter-end check
+            elif cond == 'is_quarter_end':
+                current_month = activity_data.get('month', 6)
+                if current_month not in self.business_calendar['quarter_end_months']:
+                    all_met = False
+                    break
+            
+            # Maintenance window check
+            elif cond == 'is_maintenance_window':
+                day_of_week = activity_data.get('day_of_week', 2)
+                hour = activity_data.get('hour', 12)
+                if not (day_of_week in self.business_calendar['maintenance_windows']['days'] or
+                       hour in self.business_calendar['maintenance_windows']['hours']):
+                    all_met = False
+                    break
+            
+            # Business hours check
+            elif cond == 'is_business_hours:true':
+                hour = activity_data.get('hour', 12)
+                day_of_week = activity_data.get('day_of_week', 2)
+                bh = self.business_calendar['business_hours']
+                if not (bh['start'] <= hour <= bh['end'] and day_of_week in bh['weekdays']):
+                    all_met = False
+                    break
+            
+            # Department checks
+            elif cond.startswith('department:'):
+                expected_dept = cond.split(':')[1]
+                user_dept = user_profile.get('department', '')
+                if user_dept != expected_dept:
+                    all_met = False
+                    break
+            
+            # Role checks
+            elif cond.startswith('role:'):
+                expected_roles = cond.split(':')[1].split('|')
+                user_role = user_profile.get('role', '')
+                if user_role not in expected_roles:
+                    all_met = False
+                    break
+            
+            # Seniority checks
+            elif cond.startswith('seniority:'):
+                expected_seniority = cond.split(':')[1]
+                seniority = user_profile.get('seniority_level', '')
+                if seniority != expected_seniority:
+                    all_met = False
+                    break
+            
+            # High privilege check
+            elif cond.startswith('high_privilege:'):
+                expected = cond.split(':')[1] == 'true'
+                has_privilege = activity_data.get('requires_high_privilege', False)
+                if has_privilege != expected:
+                    all_met = False
+                    break
         
-        # Maintenance window check
-        if 'is_maintenance_window()' in condition:
-            day_of_week = activity_data.get('day_of_week', 2)
-            hour = activity_data.get('hour', 12)
-            return (day_of_week in self.business_calendar['maintenance_windows']['days'] or
-                   hour in self.business_calendar['maintenance_windows']['hours'])
-        
-        # Business hours check
-        if 'is_business_hours()' in condition:
-            hour = activity_data.get('hour', 12)
-            day_of_week = activity_data.get('day_of_week', 2)
-            return (hour >= self.business_calendar['business_hours']['start'] and
-                   hour <= self.business_calendar['business_hours']['end'] and
-                   day_of_week in self.business_calendar['business_hours']['weekdays'])
-        
-        # Department checks
-        if 'user.department' in condition:
-            user_dept = user_profile.get('department', '')
-            if '"Finance"' in condition:
-                return user_dept == 'Finance'
-            elif '"IT"' in condition:
-                return user_dept == 'IT'
-        
-        # Role checks
-        if 'user.role' in condition:
-            user_role = user_profile.get('role', '')
-            if 'System Admin' in condition or 'Security Admin' in condition:
-                return user_role in ['System Admin', 'Security Admin']
-        
-        # Seniority checks
-        if 'user.seniority_level' in condition:
-            seniority = user_profile.get('seniority_level', '')
-            if '"Executive"' in condition:
-                return seniority == 'Executive'
-        
-        # Default: condition not met
-        return False
+        return all_met
     
     def calculate_behavioral_baseline_deviation(self, activity_data: Dict, user_profile: Dict) -> float:
         """Calculate how much the activity deviates from user's behavioral baseline"""
@@ -376,25 +378,25 @@ class ContextualRiskScorer:
         
         if hour < typical_hours[0] or hour > typical_hours[1]:
             time_deviation = min(abs(hour - typical_hours[0]), abs(hour - typical_hours[1]))
-            deviation_score += min(time_deviation * 5, 30)  # Max 30 points for time deviation
+            deviation_score += min(time_deviation * TIME_DEVIATION_MULTIPLIER, MAX_TIME_DEVIATION_SCORE)
         
         # Activity frequency deviation
         activity_type = activity_data.get('activity_type', '')
         user_activity_freq = user_profile.get('activity_frequencies', {})
         typical_freq = user_activity_freq.get(activity_type, 0.5)
         
-        if typical_freq < 0.1:  # Rare activity for this user
+        if typical_freq < RARE_ACTIVITY_THRESHOLD:  # Rare activity for this user
             deviation_score += 20
         
         # Data volume deviation
         data_volume = activity_data.get('file_size', 0) + activity_data.get('bytes_transferred', 0)
         typical_volume = user_profile.get('typical_data_volume', 10*1024*1024)
         
-        if data_volume > typical_volume * 3:
-            volume_ratio = min(data_volume / typical_volume, 10)
-            deviation_score += min(volume_ratio * 5, 25)  # Max 25 points for volume deviation
+        if typical_volume > 0 and data_volume > typical_volume * 3:
+            volume_ratio = min(data_volume / (typical_volume + 1e-8), 10)
+            deviation_score += min(volume_ratio * 5, MAX_VOLUME_DEVIATION_SCORE)
         
-        return min(deviation_score, 50.0)  # Max 50 points from baseline deviation
+        return min(deviation_score, MAX_BASELINE_DEVIATION)
     
     def generate_risk_explanation(self, risk_score: float, triggered_factors: List[str], 
                                 applied_modifiers: List[str], baseline_deviation: float) -> Dict:
@@ -403,9 +405,9 @@ class ContextualRiskScorer:
         risk_level = self._determine_risk_level(risk_score)
         
         explanation = {
-            'risk_score': risk_score,
+            'risk_score': round(risk_score, 2),
             'risk_level': risk_level,
-            'baseline_deviation': baseline_deviation,
+            'baseline_deviation': round(baseline_deviation, 2),
             'triggered_factors': triggered_factors,
             'applied_modifiers': applied_modifiers,
             'summary': self._generate_risk_summary(risk_score, risk_level, triggered_factors),
@@ -416,9 +418,12 @@ class ContextualRiskScorer:
     
     def _determine_risk_level(self, risk_score: float) -> str:
         """Determine risk level based on score"""
-        if risk_score < settings.LOW_RISK_THRESHOLD:
+        low_threshold = getattr(settings, 'LOW_RISK_THRESHOLD', 30)
+        medium_threshold = getattr(settings, 'MEDIUM_RISK_THRESHOLD', 70)
+        
+        if risk_score < low_threshold:
             return "LOW"
-        elif risk_score < settings.MEDIUM_RISK_THRESHOLD:
+        elif risk_score < medium_threshold:
             return "MEDIUM"
         else:
             return "HIGH"
@@ -429,12 +434,15 @@ class ContextualRiskScorer:
         if risk_level == "LOW":
             summary = f"Activity appears normal with minimal risk indicators (Score: {risk_score:.1f})"
         elif risk_level == "MEDIUM":
-            summary = f"Moderate risk detected with {len(triggered_factors)} concerning factors (Score: {risk_score:.1f})"
+            num_factors = len(triggered_factors)
+            summary = f"Moderate risk detected with {num_factors} concerning factor{'s' if num_factors != 1 else ''} (Score: {risk_score:.1f})"
         else:
             summary = f"High risk activity detected with multiple threat indicators (Score: {risk_score:.1f})"
         
         if triggered_factors:
-            summary += f". Primary concerns: {', '.join(triggered_factors[:3])}"
+            # Show top 3 concerns
+            top_concerns = [f.split(' (+')[0] for f in triggered_factors[:3]]
+            summary += f". Primary concerns: {', '.join(top_concerns)}"
         
         return summary
     
@@ -458,17 +466,25 @@ class ContextualRiskScorer:
             recommendations.append("Alert security team and management")
             recommendations.append("Preserve logs and evidence for potential incident response")
         
-        # Add specific recommendations based on triggered factors
-        factor_text = ' '.join(triggered_factors)
+        # Extract risk factor categories
+        triggered_factor_names = set()
+        for factor_text in triggered_factors:
+            for factor_name, factor_obj in self.risk_factors.items():
+                if factor_obj.description in factor_text:
+                    triggered_factor_names.add(factor_name)
         
-        if 'external' in factor_text.lower():
+        # Add specific recommendations based on actual triggered factor names
+        if any('external' in name for name in triggered_factor_names):
             recommendations.append("Review and validate all external data transfers")
         
-        if 'privilege' in factor_text.lower():
+        if any('privilege' in name for name in triggered_factor_names):
             recommendations.append("Audit user permissions and access rights")
         
-        if 'time' in factor_text.lower() or 'hours' in factor_text.lower():
+        if any('time' in name or 'hours' in name for name in triggered_factor_names):
             recommendations.append("Verify business justification for off-hours activity")
+        
+        if any('login' in name for name in triggered_factor_names):
+            recommendations.append("Verify user identity and investigate potential account compromise")
         
         return recommendations
     
@@ -487,7 +503,7 @@ class ContextualRiskScorer:
         baseline_deviation = self.calculate_behavioral_baseline_deviation(activity_data, user_profile)
         
         # Final risk score combines contextual score and baseline deviation
-        final_score = min(contextual_score + (baseline_deviation * 0.5), 100.0)
+        final_score = min(contextual_score + (baseline_deviation * BASELINE_DEVIATION_WEIGHT), 100.0)
         
         # Generate comprehensive explanation
         explanation = self.generate_risk_explanation(
@@ -498,8 +514,9 @@ class ContextualRiskScorer:
 
 def test_risk_scorer():
     """Test the contextual risk scorer"""
-    print("Testing Contextual Risk Scorer")
-    print("=" * 40)
+    logger.info("="*60)
+    logger.info("Testing Contextual Risk Scorer")
+    logger.info("="*60)
     
     scorer = ContextualRiskScorer()
     
@@ -522,8 +539,9 @@ def test_risk_scorer():
     }
     
     result1 = scorer.assess_activity_risk(normal_activity, normal_user)
-    print(f"Normal Activity - Risk Level: {result1['risk_level']}, Score: {result1['risk_score']:.1f}")
-    print(f"Summary: {result1['summary']}\n")
+    logger.info(f"\n📊 Normal Activity:")
+    logger.info(f"   Risk Level: {result1['risk_level']}, Score: {result1['risk_score']:.1f}")
+    logger.info(f"   Summary: {result1['summary']}")
     
     # Test case 2: Suspicious after-hours activity
     suspicious_activity = {
@@ -546,9 +564,10 @@ def test_risk_scorer():
     }
     
     result2 = scorer.assess_activity_risk(suspicious_activity, suspicious_user)
-    print(f"Suspicious Activity - Risk Level: {result2['risk_level']}, Score: {result2['risk_score']:.1f}")
-    print(f"Summary: {result2['summary']}")
-    print(f"Recommendations: {result2['recommendations'][:2]}\n")
+    logger.info(f"\n⚠️ Suspicious Activity:")
+    logger.info(f"   Risk Level: {result2['risk_level']}, Score: {result2['risk_score']:.1f}")
+    logger.info(f"   Summary: {result2['summary']}")
+    logger.info(f"   Recommendations: {result2['recommendations'][:2]}")
     
     # Test case 3: Month-end finance activity (should have reduced risk)
     monthend_activity = {
@@ -570,12 +589,15 @@ def test_risk_scorer():
     }
     
     result3 = scorer.assess_activity_risk(monthend_activity, finance_user)
-    print(f"Month-end Finance Activity - Risk Level: {result3['risk_level']}, Score: {result3['risk_score']:.1f}")
-    print(f"Summary: {result3['summary']}")
+    logger.info(f"\n📈 Month-end Finance Activity:")
+    logger.info(f"   Risk Level: {result3['risk_level']}, Score: {result3['risk_score']:.1f}")
+    logger.info(f"   Summary: {result3['summary']}")
     if result3['applied_modifiers']:
-        print(f"Applied Modifiers: {result3['applied_modifiers']}")
+        logger.info(f"   Applied Modifiers: {result3['applied_modifiers'][:2]}")
     
-    print("\nRisk scorer testing completed!")
+    logger.info("\n✅ Risk scorer testing completed!")
+    
+    return scorer
 
 if __name__ == "__main__":
     test_risk_scorer()
