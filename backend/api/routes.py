@@ -28,244 +28,106 @@ async def get_recent_activities(
     user_id: Optional[str] = None,
     risk_threshold: Optional[float] = None
 ):
-    """Get recent user activities with optional filtering - REAL DATA"""
-    from backend.models.activity_logger import activity_logger
+    """Get recent user activities with optional filtering"""
     
-    try:
-        # Get activities from database
-        all_activities = activity_logger.get_recent_activities(limit=limit)
-        
-        # Filter based on parameters
-        filtered_activities = []
-        
-        for activity in all_activities:
-            # Filter by user_id if provided
-            if user_id and activity.get('user_id') != user_id:
-                continue
-            
-            # Filter by risk threshold if provided
-            if risk_threshold and activity.get('risk_score', 0) < risk_threshold:
-                continue
-            
-            # Only include valid activities
-            if (activity.get('user_id') and 
-                activity.get('user_id') not in ['undefined', 'unknown', ''] and
-                activity.get('username') and
-                activity.get('username') not in ['undefined', 'unknown', ''] and
-                activity.get('full_name') and
-                activity.get('full_name') not in ['undefined', 'unknown', '']):
-                
-                filtered_activities.append({
-                    "activity_id": activity.get('id', f"act_{len(filtered_activities)}"),
-                    "user_id": activity.get('user_id'),
-                    "username": activity.get('username'),
-                    "full_name": activity.get('full_name'),
-                    "timestamp": activity.get('timestamp'),
-                    "activity_type": activity.get('activity_type'),
-                    "risk_score": activity.get('risk_score', 0),
-                    "risk_level": activity.get('risk_level', 'LOW'),
-                    "action": activity.get('action', 'ALLOW'),
-                    "status": "flagged" if activity.get('risk_score', 0) > 70 else "normal",
-                    "bytes_transferred": activity.get('bytes_transferred', 0),
-                    "summary": activity.get('summary', '')
-                })
-        
-        return {
-            "success": True,
-            "total": len(filtered_activities),
-            "activities": filtered_activities
+    # In production, this would query the database
+    # For now, return mock data
+    activities = []
+    
+    for i in range(limit):
+        activity = {
+            "activity_id": f"act_{i}",
+            "user_id": user_id or f"user_{i % 10}",
+            "timestamp": (datetime.now() - timedelta(minutes=i*5)).isoformat(),
+            "activity_type": ["file_access", "login", "network_access"][i % 3],
+            "risk_score": (i * 7) % 100,
+            "status": "flagged" if (i * 7) % 100 > 70 else "normal"
         }
         
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "total": 0,
-            "activities": [],
-            "error": str(e)
-        }
+        if risk_threshold is None or activity["risk_score"] >= risk_threshold:
+            activities.append(activity)
+    
+    return {
+        "total": len(activities),
+        "activities": activities
+    }
 
 @router.get("/users/{user_id}/profile")
 async def get_user_profile(user_id: str):
-    """Get detailed user profile and behavioral patterns - REAL DATA"""
-    from models.user_management import user_manager
-    from backend.models.activity_logger import activity_logger
-    from services.intelligent_risk_engine import intelligent_risk_engine
+    """Get detailed user profile and behavioral patterns"""
     
-    try:
-        # Get user from database
-        user = user_manager.get_user(user_id)
-        
-        if not user:
-            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
-        
-        # Get user's risk profile from intelligent engine
-        risk_profile = intelligent_risk_engine.get_user_risk_profile(user_id)
-        
-        # Get user's recent activities
-        user_activities = activity_logger.get_user_activities(user_id, limit=50)
-        
-        # Calculate behavioral patterns
-        activity_types = {}
-        hours_active = set()
-        
-        for activity in user_activities:
-            # Count activity types
-            act_type = activity.get('activity_type', 'unknown')
-            activity_types[act_type] = activity_types.get(act_type, 0) + 1
-            
-            # Track active hours
-            try:
-                timestamp = datetime.fromisoformat(activity.get('timestamp', ''))
-                hours_active.add(timestamp.hour)
-            except:
-                pass
-        
-        # Get most common activities
-        common_activities = sorted(activity_types.items(), key=lambda x: x[1], reverse=True)[:3]
-        common_activities = [act[0] for act in common_activities]
-        
-        # Build profile response
-        profile = {
-            "user_id": user['user_id'],
-            "username": user['username'],
-            "full_name": user['full_name'],
-            "email": user['email'],
-            "department": user['department'],
-            "role": user['role'],
-            "risk_score": risk_profile.get('current_score', 0),
-            "peak_risk_score": risk_profile.get('peak_score', 0),
-            "risk_level": "LOW" if risk_profile.get('current_score', 0) < 30 else 
-                         "MEDIUM" if risk_profile.get('current_score', 0) < 50 else
-                         "HIGH" if risk_profile.get('current_score', 0) < 75 else "CRITICAL",
-            "account_created": user.get('created_at', datetime.now().isoformat()),
-            "last_activity": user.get('last_activity', datetime.now().isoformat()),
-            "behavioral_patterns": {
-                "typical_login_hours": sorted(list(hours_active))[:5] if hours_active else [9, 17],
-                "total_activities": len(user_activities),
-                "common_activities": common_activities if common_activities else ["file_access"],
-                "recent_events": risk_profile.get('recent_events', 0),
-                "total_threats": user.get('total_threats', 0)
-            },
-            "recent_flags": user.get('total_threats', 0),
-            "total_events": risk_profile.get('total_events', 0)
-        }
-        
-        return profile
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error fetching user profile: {str(e)}")
+    # Mock user profile
+    profile = {
+        "user_id": user_id,
+        "username": f"user_{user_id}",
+        "department": "IT",
+        "role": "Developer",
+        "risk_score": 45,
+        "risk_level": "MEDIUM",
+        "account_created": "2024-01-01T00:00:00",
+        "last_activity": datetime.now().isoformat(),
+        "behavioral_patterns": {
+            "typical_login_hours": [9, 17],
+            "average_session_duration": 480,
+            "common_activities": ["file_access", "code_commit", "network_access"],
+            "file_access_frequency": 150,
+            "external_connections": 12
+        },
+        "recent_flags": 3,
+        "historical_risk": [35, 42, 38, 45, 47]
+    }
+    
+    return profile
 
 @router.get("/threats/active")
 async def get_active_threats():
-    """Get currently active threats requiring attention - REAL DATA"""
-    from backend.models.activity_logger import activity_logger
-    from models.user_management import user_manager
-    from datetime import datetime, timedelta
+    """Get currently active threats requiring attention"""
     
-    try:
-        # Get recent activities (last 24 hours)
-        recent_activities = activity_logger.get_recent_activities(limit=100)
-        
-        # Filter for HIGH and CRITICAL threats only
-        active_threats = []
-        twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
-        
-        for activity in recent_activities:
-            # Only include HIGH/CRITICAL risk activities
-            if activity.get('risk_level') in ['HIGH', 'CRITICAL']:
-                try:
-                    activity_time = datetime.fromisoformat(activity['timestamp'])
-                    
-                    # Only last 24 hours
-                    if activity_time > twenty_four_hours_ago:
-                        # Get user details
-                        user = user_manager.get_user(activity['user_id'])
-                        
-                        # Build indicators based on activity type
-                        indicators = []
-                        recommendations = []
-                        
-                        # Determine indicators based on activity
-                        if activity.get('activity_type') == 'honeypot_access':
-                            indicators = [
-                                f"Unauthorized file access detected",
-                                f"Risk Score: {activity.get('risk_score', 0)}",
-                                f"Action taken: {activity.get('action', 'MONITOR')}"
-                            ]
-                            recommendations = [
-                                "Immediate investigation required",
-                                "Review user access permissions",
-                                "Check for data exfiltration"
-                            ]
-                        elif activity.get('activity_type') == 'network_activity':
-                            bytes_transferred = activity.get('bytes_transferred', 0)
-                            mb_transferred = bytes_transferred / (1024 * 1024)
-                            indicators = [
-                                f"Large data transfer: {mb_transferred:.2f} MB",
-                                f"Risk Score: {activity.get('risk_score', 0)}",
-                                f"Time: {datetime.fromisoformat(activity['timestamp']).strftime('%I:%M %p')}"
-                            ]
-                            recommendations = [
-                                "Monitor network activity",
-                                "Review data transfer logs",
-                                "Verify legitimate business need"
-                            ]
-                        else:
-                            indicators = [
-                                f"{activity.get('activity_type', 'unknown').replace('_', ' ').title()} detected",
-                                f"Risk Score: {activity.get('risk_score', 0)}"
-                            ]
-                            recommendations = [
-                                "Investigate activity",
-                                "Enhanced monitoring recommended"
-                            ]
-                        
-                        # Determine status based on action
-                        status = 'active' if activity.get('action') == 'BLOCK' else 'investigating'
-                        
-                        active_threats.append({
-                            'threat_id': f"thr_{activity.get('id', len(active_threats) + 1)}",
-                            'user_id': activity.get('user_id', 'unknown'),
-                            'username': activity.get('username', 'unknown'),
-                            'full_name': activity.get('full_name', 'Unknown User'),
-                            'threat_type': activity.get('activity_type', 'unknown').replace('_', ' '),
-                            'severity': activity.get('risk_level', 'MEDIUM'),
-                            'risk_score': activity.get('risk_score', 0),
-                            'detected_at': activity['timestamp'],
-                            'status': status,
-                            'indicators': indicators,
-                            'recommended_actions': recommendations
-                        })
-                        
-                except Exception as e:
-                    print(f"Error processing threat activity: {e}")
-                    continue
-        
-        # Sort by risk score (highest first)
-        active_threats.sort(key=lambda x: x['risk_score'], reverse=True)
-        
-        return {
-            "success": True,
-            "active_count": len(active_threats),
-            "threats": active_threats,
-            "last_updated": datetime.now().isoformat()
+    threats = [
+        {
+            "threat_id": "thr_001",
+            "user_id": "user_042",
+            "threat_type": "data_exfiltration",
+            "severity": "HIGH",
+            "risk_score": 92,
+            "detected_at": datetime.now().isoformat(),
+            "status": "active",
+            "indicators": [
+                "Large file download (2.5GB)",
+                "Off-hours activity (3:00 AM)",
+                "External destination",
+                "Encrypted transfer"
+            ],
+            "recommended_actions": [
+                "Block external connections",
+                "Isolate user session",
+                "Alert security team"
+            ]
+        },
+        {
+            "threat_id": "thr_002",
+            "user_id": "user_018",
+            "threat_type": "privilege_abuse",
+            "severity": "MEDIUM",
+            "risk_score": 67,
+            "detected_at": (datetime.now() - timedelta(minutes=15)).isoformat(),
+            "status": "investigating",
+            "indicators": [
+                "Cross-department data access",
+                "50,000 database rows queried",
+                "Sensitive HR data accessed"
+            ],
+            "recommended_actions": [
+                "Restrict database access",
+                "Enhanced monitoring"
+            ]
         }
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {
-            "success": False,
-            "active_count": 0,
-            "threats": [],
-            "error": str(e)
-        }
+    ]
+    
+    return {
+        "active_count": len(threats),
+        "threats": threats
+    }
 
 @router.get("/analytics/trends")
 async def get_analytics_trends(
@@ -365,73 +227,3 @@ async def acknowledge_alert(alert_data: Dict):
         "acknowledged_at": datetime.now().isoformat(),
         "notes": notes
     }
-    
-from fastapi import Request
-from services.report_generator import report_generator
-
-@router.post("/analyze")
-async def analyze_user_activity(request: Request):
-    """
-    Analyze user activity for potential threats using the ML detector,
-    risk scoring, and report generation.
-    """
-    if not ml_detector or not risk_scorer:
-        raise HTTPException(status_code=503, detail="ML components not initialized")
-
-    try:
-        data = await request.json()
-        user_id = data.get("user_id")
-        activities = data.get("activities", [])
-
-        if not user_id or not activities:
-            raise HTTPException(status_code=400, detail="user_id and activities are required")
-
-        # Step 1: Run threat detection
-        detected_threats = ml_detector.analyze(activities)
-
-        # Step 2: Score risk level
-        risk_summary = risk_scorer.calculate_risk_summary(detected_threats)
-
-        # Step 3: Generate PDF report
-        user_info = {
-            "user_id": user_id,
-            "username": data.get("username", "unknown"),
-            "full_name": data.get("full_name", "Unknown User"),
-            "email": data.get("email", "N/A"),
-            "department": data.get("department", "N/A"),
-            "role": data.get("role", "N/A")
-        }
-        pdf_path = report_generator.generate_threat_report(
-            user=user_info,
-            activities=activities,
-            summary=risk_summary
-        )
-
-        return {
-            "success": True,
-            "message": "Analysis and report generation complete",
-            "threats_detected": len(detected_threats),
-            "risk_summary": risk_summary,
-            "report_path": pdf_path
-        }
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error analyzing user activity: {str(e)}")
-
-
-@router.get("/reports/download")
-async def download_report(file: str):
-    """Download generated threat analysis reports"""
-    from fastapi.responses import FileResponse
-    import os
-
-    try:
-        report_dir = report_generator.output_dir
-        file_path = os.path.join(report_dir, file)
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Report not found")
-        return FileResponse(file_path, media_type="application/pdf", filename=file)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error downloading report: {str(e)}")

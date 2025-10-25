@@ -1,5 +1,5 @@
 """
-Advanced Anomaly Detection Engine for IGNISYL
+Advanced Anomaly Detection Engine for IGNISYL-Neo
 Implements multiple ML algorithms for behavioral anomaly detection
 """
 
@@ -38,10 +38,8 @@ class BehavioralAnomalyDetector:
         self.models = {}
         self.scalers = {}
         self.encoders = {}
-        self.scaler = None  # Initialize scaler
         self.feature_columns = []
         self.is_trained = False
-        self.autoencoder_threshold = 0.0  # Initialize threshold
         
         # Model configurations
         self.config = {
@@ -70,29 +68,19 @@ class BehavioralAnomalyDetector:
         print("Loading training data...")
         
         # Load data from CSV
-        csv_path = f"{data_path}/combined_activities.csv"
-        if os.path.exists(csv_path):
-            df = pd.read_csv(csv_path)
-            print(f"Loaded {len(df)} records from {csv_path}")
+        if os.path.exists(f"{data_path}/combined_activities.csv"):
+            df = pd.read_csv(f"{data_path}/combined_activities.csv")
         else:
-            print(f"Training data not found at {csv_path}")
-            print("Generating synthetic training data...")
-            from ml_engine.data_generator import BehavioralDataGenerator
+            print("No training data found. Generating synthetic data...")
+            from .data_generator import BehavioralDataGenerator
             generator = BehavioralDataGenerator()
             normal, anomalous = generator.generate_complete_dataset()
             df = pd.DataFrame(normal + anomalous)
-            
-            # Save generated data for future use
-            os.makedirs(data_path, exist_ok=True)
-            df.to_csv(csv_path, index=False)
-            print(f"Generated and saved {len(df)} training records")
+        
+        print(f"Loaded {len(df)} activity records")
         
         # Convert timestamp
-        if 'timestamp' in df.columns:
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-        else:
-            # Add timestamp if missing
-            df['timestamp'] = pd.Timestamp.now()
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
         
         # Extract temporal features
         df['hour'] = df['timestamp'].dt.hour
@@ -111,8 +99,8 @@ class BehavioralAnomalyDetector:
     def _process_nested_fields(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process nested JSON fields and extract relevant features"""
         
-        # Define numeric columns with defaults
-        numeric_defaults = {
+        # Handle missing values
+        df = df.fillna({
             'file_size': 0,
             'network_bytes': 0,
             'bytes_transferred': 0,
@@ -129,110 +117,54 @@ class BehavioralAnomalyDetector:
             'execution_time_ms': 0,
             'session_duration_minutes': 0,
             'data_transferred_mb': 0,
-            'files_transferred': 0,
-            'confidence_score': 0.5  # Default medium confidence
-        }
-        
-        # Fill missing numeric values
-        for col, default_val in numeric_defaults.items():
-            if col in df.columns:
-                df[col] = df[col].fillna(default_val)
-            else:
-                df[col] = default_val
+            'files_transferred': 0
+        })
         
         # Convert boolean fields
-        bool_columns = ['is_suspicious', 'is_weekend', 'is_business_hours', 
-                       'encryption_used', 'sensitive_data_accessed']
+        bool_columns = ['is_suspicious', 'is_weekend', 'is_business_hours', 'encryption_used', 'sensitive_data_accessed']
         for col in bool_columns:
             if col in df.columns:
-                df[col] = df[col].fillna(False).astype(bool)
-            else:
-                df[col] = False
-        
-        # Ensure categorical columns exist
-        categorical_defaults = {
-            'activity_type': 'unknown',
-            'department': 'unknown',
-            'protocol': 'unknown'
-        }
-        
-        for col, default_val in categorical_defaults.items():
-            if col not in df.columns:
-                df[col] = default_val
-            else:
-                df[col] = df[col].fillna(default_val).astype(str)
+                df[col] = df[col].astype(bool)
         
         return df
     
     def _engineer_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Engineer additional features for better anomaly detection"""
         
-        # Check if user_id exists
-        if 'user_id' not in df.columns:
-            df['user_id'] = 'unknown_user'
+        # User-based aggregation features
+        user_stats = df.groupby('user_id').agg({
+            'file_size': ['mean', 'std', 'max'],
+            'network_bytes': ['mean', 'std', 'max'],
+            'hour': ['mean', 'std'],
+            'day_of_week': ['mean'],
+            'activity_type': 'count'
+        }).fillna(0)
         
-        # User-based aggregation features (only if multiple users exist)
-        if df['user_id'].nunique() > 1:
-            user_stats = df.groupby('user_id').agg({
-                'file_size': ['mean', 'std', 'max'],
-                'network_bytes': ['mean', 'std', 'max'],
-                'hour': ['mean', 'std'],
-                'day_of_week': ['mean'],
-                'activity_type': 'count'
-            }).fillna(0)
-            
-            # Flatten column names
-            user_stats.columns = ['_'.join(col).strip() for col in user_stats.columns]
-            user_stats = user_stats.add_prefix('user_')
-            
-            # Merge back to main dataframe
-            df = df.merge(user_stats, left_on='user_id', right_index=True, how='left')
-        else:
-            # Single user - use global stats
-            df['user_file_size_mean'] = df['file_size'].mean()
-            df['user_file_size_std'] = df['file_size'].std() if len(df) > 1 else 0
-            df['user_file_size_max'] = df['file_size'].max()
-            df['user_network_bytes_mean'] = df['network_bytes'].mean()
-            df['user_network_bytes_std'] = df['network_bytes'].std() if len(df) > 1 else 0
-            df['user_network_bytes_max'] = df['network_bytes'].max()
-            df['user_hour_mean'] = df['hour'].mean()
-            df['user_hour_std'] = df['hour'].std() if len(df) > 1 else 0
-            df['user_activity_type_count'] = len(df)
+        # Flatten column names
+        user_stats.columns = ['_'.join(col).strip() for col in user_stats.columns]
+        user_stats = user_stats.add_prefix('user_')
         
-        # Fill any remaining NaN values in user stats
-        user_stat_cols = [col for col in df.columns if col.startswith('user_')]
-        for col in user_stat_cols:
-            df[col] = df[col].fillna(0)
+        # Merge back to main dataframe
+        df = df.merge(user_stats, left_on='user_id', right_index=True, how='left')
         
         # Activity frequency features
-        if len(df) > 1:
-            df['activities_per_day'] = df.groupby(['user_id', df['timestamp'].dt.date])['activity_type'].transform('count')
-        else:
-            df['activities_per_day'] = 1
+        df['activities_per_day'] = df.groupby(['user_id', df['timestamp'].dt.date])['activity_type'].transform('count')
         
-        # Time-based cyclical features
+        # Time-based features
         df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
         df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
         df['day_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
         df['day_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
         
-        # Log-transformed size features (avoid log(0))
+        # Size ratios and anomaly indicators
         df['file_size_log'] = np.log1p(df['file_size'])
         df['network_bytes_log'] = np.log1p(df['network_bytes'])
         
         # Risk indicators
         df['off_hours_activity'] = ~df['is_business_hours']
         df['weekend_activity'] = df['is_weekend']
-        
-        # Anomaly indicators (avoid division by zero)
-        df['large_file_indicator'] = (
-            (df['file_size'] > df['user_file_size_mean'] + 2 * df['user_file_size_std']) & 
-            (df['user_file_size_std'] > 0)
-        )
-        df['high_network_indicator'] = (
-            (df['network_bytes'] > df['user_network_bytes_mean'] + 2 * df['user_network_bytes_std']) &
-            (df['user_network_bytes_std'] > 0)
-        )
+        df['large_file_indicator'] = df['file_size'] > df['user_file_size_mean'] + 2 * df['user_file_size_std']
+        df['high_network_indicator'] = df['network_bytes'] > df['user_network_bytes_mean'] + 2 * df['user_network_bytes_std']
         
         return df
     
@@ -271,21 +203,19 @@ class BehavioralAnomalyDetector:
                     df[f'{col}_encoded'] = self.encoders[col].fit_transform(df[col].astype(str))
                 else:
                     # Handle unseen categories during prediction
-                    known_categories = set(self.encoders[col].classes_)
+                    known_categories = self.encoders[col].classes_
                     df[col] = df[col].astype(str)
-                    
-                    # Map unknown categories to 'unknown'
                     df[col] = df[col].apply(lambda x: x if x in known_categories else 'unknown')
                     
-                    # Add 'unknown' to encoder if not present
                     if 'unknown' not in known_categories:
-                        self.encoders[col].classes_ = np.append(self.encoders[col].classes_, 'unknown')
+                        # Add unknown category
+                        self.encoders[col].classes_ = np.append(known_categories, 'unknown')
                     
                     df[f'{col}_encoded'] = self.encoders[col].transform(df[col])
                 
                 feature_columns.append(f'{col}_encoded')
         
-        # Filter to available columns only
+        # Filter available columns
         available_columns = [col for col in feature_columns if col in df.columns]
         self.feature_columns = available_columns
         
@@ -293,7 +223,7 @@ class BehavioralAnomalyDetector:
         X = df[available_columns].fillna(0)
         
         # Scale features
-        if self.scaler is None:
+        if not hasattr(self, 'scaler') or self.scaler is None:
             self.scaler = StandardScaler()
             X_scaled = self.scaler.fit_transform(X)
         else:
@@ -302,36 +232,28 @@ class BehavioralAnomalyDetector:
         return X_scaled
     
     def train_isolation_forest(self, X: np.ndarray, y: np.ndarray) -> None:
-        """Train Isolation Forest model (unsupervised anomaly detection)"""
+        """Train Isolation Forest model"""
         print("Training Isolation Forest...")
         
-        # Isolation Forest works on unlabeled data
-        # Train on normal data only (y == 0 means normal behavior)
+        # Isolation Forest works on unlabeled data (unsupervised)
+        # We train on normal data only
         X_normal = X[y == 0]
-        
-        if len(X_normal) == 0:
-            print("⚠️ No normal samples found. Training on all data.")
-            X_normal = X
         
         model = IsolationForest(**self.config['isolation_forest'])
         model.fit(X_normal)
         
         self.models['isolation_forest'] = model
-        print(f"✅ Isolation Forest trained on {len(X_normal)} normal samples")
+        print(f"Isolation Forest trained on {len(X_normal)} normal samples")
     
     def train_autoencoder(self, X: np.ndarray, y: np.ndarray) -> None:
-        """Train Autoencoder for anomaly detection via reconstruction error"""
+        """Train Autoencoder for anomaly detection"""
         print("Training Autoencoder...")
         
-        # Train autoencoder on normal data only (y == 0 means normal)
+        # Train autoencoder on normal data only
         X_normal = X[y == 0]
         
-        if len(X_normal) < 10:
-            print("⚠️ Insufficient normal samples. Training on all data.")
-            X_normal = X
-        
         input_dim = X.shape[1]
-        encoding_dim = min(self.config['autoencoder']['encoding_dim'], input_dim // 2)
+        encoding_dim = self.config['autoencoder']['encoding_dim']
         
         # Build autoencoder architecture
         input_layer = Input(shape=(input_dim,))
@@ -345,23 +267,13 @@ class BehavioralAnomalyDetector:
         decoder = Dense(input_dim, activation='sigmoid')(decoder)
         
         autoencoder = Model(inputs=input_layer, outputs=decoder)
-        autoencoder.compile(
-            optimizer=Adam(learning_rate=self.config['autoencoder']['learning_rate']),
-            loss='mse'
-        )
+        autoencoder.compile(optimizer=Adam(learning_rate=self.config['autoencoder']['learning_rate']),
+                          loss='mse')
         
         # Train the autoencoder
-        early_stopping = EarlyStopping(
-            monitor='val_loss', 
-            patience=10, 
-            restore_best_weights=True
-        )
+        early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
         
-        # Split into train/validation
-        if len(X_normal) > 10:
-            X_train, X_val = train_test_split(X_normal, test_size=0.2, random_state=42)
-        else:
-            X_train = X_val = X_normal
+        X_train, X_val = train_test_split(X_normal, test_size=0.2, random_state=42)
         
         history = autoencoder.fit(
             X_train, X_train,
@@ -375,23 +287,15 @@ class BehavioralAnomalyDetector:
         self.models['autoencoder'] = autoencoder
         
         # Calculate reconstruction threshold
-        train_predictions = autoencoder.predict(X_train, verbose=0)
+        train_predictions = autoencoder.predict(X_train)
         train_mse = np.mean(np.power(X_train - train_predictions, 2), axis=1)
         self.autoencoder_threshold = np.percentile(train_mse, 95)  # 95th percentile
         
-        print(f"✅ Autoencoder trained. Reconstruction threshold: {self.autoencoder_threshold:.4f}")
+        print(f"Autoencoder trained. Reconstruction threshold: {self.autoencoder_threshold:.4f}")
     
     def train_xgboost(self, X: np.ndarray, y: np.ndarray) -> None:
-        """Train XGBoost classifier for supervised anomaly detection"""
+        """Train XGBoost classifier"""
         print("Training XGBoost...")
-        
-        # Check if we have both classes
-        unique_classes = np.unique(y)
-        if len(unique_classes) < 2:
-            print("⚠️ Only one class present. Cannot train classifier.")
-            # Create a dummy classifier
-            self.models['xgboost'] = None
-            return
         
         # Split data for training
         X_train, X_test, y_train, y_test = train_test_split(
@@ -410,42 +314,28 @@ class BehavioralAnomalyDetector:
         print(f"ROC AUC Score: {roc_auc_score(y_test, y_pred_proba):.4f}")
         
         self.models['xgboost'] = model
-        print("✅ XGBoost trained successfully")
     
     def train_models(self, data_path: str) -> None:
         """Train all anomaly detection models"""
-        print("\n" + "="*60)
-        print("IGNISYL ML Model Training")
-        print("="*60)
+        print("Starting model training...")
         
         # Load and preprocess data
         df = self.load_and_preprocess_data(data_path)
         
         # Prepare features
         X = self.prepare_features(df)
+        y = df['is_suspicious'].astype(int).values
         
-        # Get labels (is_suspicious column)
-        if 'is_suspicious' in df.columns:
-            y = df['is_suspicious'].astype(int).values
-        else:
-            print("⚠️ No labels found. Assuming all data is normal.")
-            y = np.zeros(len(df), dtype=int)
-        
-        print(f"\n📊 Training Dataset:")
-        print(f"   - Total samples: {len(X)}")
-        print(f"   - Features: {X.shape[1]}")
-        print(f"   - Normal samples: {np.sum(y == 0)}")
-        print(f"   - Anomalous samples: {np.sum(y == 1)}")
+        print(f"Training on {len(X)} samples with {X.shape[1]} features")
+        print(f"Class distribution: {np.bincount(y)}")
         
         # Train individual models
-        print("\n🔧 Training Models:")
         self.train_isolation_forest(X, y)
         self.train_autoencoder(X, y)
         self.train_xgboost(X, y)
         
         self.is_trained = True
-        print("\n✅ All models trained successfully!")
-        print("="*60 + "\n")
+        print("All models trained successfully!")
     
     def predict_anomaly_scores(self, X: np.ndarray) -> Dict[str, np.ndarray]:
         """Get anomaly scores from all models"""
@@ -457,31 +347,24 @@ class BehavioralAnomalyDetector:
         # Isolation Forest scores
         if_scores = self.models['isolation_forest'].decision_function(X)
         # Convert to 0-1 scale (lower scores = more anomalous)
-        if len(if_scores) > 1:
-            if_scores_normalized = (if_scores - if_scores.min()) / (if_scores.max() - if_scores.min() + 1e-8)
-        else:
-            if_scores_normalized = np.array([0.5])
+        if_scores_normalized = (if_scores - if_scores.min()) / (if_scores.max() - if_scores.min())
         scores['isolation_forest'] = 1 - if_scores_normalized  # Invert so higher = more anomalous
         
         # Autoencoder reconstruction error
         ae_predictions = self.models['autoencoder'].predict(X, verbose=0)
         ae_mse = np.mean(np.power(X - ae_predictions, 2), axis=1)
         # Normalize reconstruction error
-        ae_scores_normalized = np.clip(ae_mse / (self.autoencoder_threshold + 1e-8), 0, 1)
+        ae_scores_normalized = np.clip(ae_mse / self.autoencoder_threshold, 0, 1)
         scores['autoencoder'] = ae_scores_normalized
         
         # XGBoost probability scores
-        if self.models['xgboost'] is not None:
-            xgb_proba = self.models['xgboost'].predict_proba(X)[:, 1]
-            scores['xgboost'] = xgb_proba
-        else:
-            # No XGBoost model - use neutral score
-            scores['xgboost'] = np.full(len(X), 0.5)
+        xgb_proba = self.models['xgboost'].predict_proba(X)[:, 1]
+        scores['xgboost'] = xgb_proba
         
         return scores
     
     def ensemble_prediction(self, X: np.ndarray, weights: Dict[str, float] = None) -> Tuple[np.ndarray, Dict]:
-        """Combine predictions from multiple models using weighted ensemble"""
+        """Combine predictions from multiple models"""
         if weights is None:
             weights = {
                 'isolation_forest': 0.3,
@@ -497,16 +380,13 @@ class BehavioralAnomalyDetector:
         for model_name, score in individual_scores.items():
             ensemble_scores += weights[model_name] * score
         
-        # Convert to risk scores (0-100 scale)
+        # Convert to risk scores (0-100)
         risk_scores = np.clip(ensemble_scores * 100, 0, 100)
         
         return risk_scores, individual_scores
     
     def predict_single_activity(self, activity_data: Dict) -> Dict:
-        """Predict anomaly score for a single activity"""
-        if not self.is_trained:
-            raise ValueError("Models must be trained before prediction. Call train_models() first.")
-        
+        """Predict anomaly for a single activity"""
         # Convert to DataFrame
         df = pd.DataFrame([activity_data])
         
@@ -514,16 +394,11 @@ class BehavioralAnomalyDetector:
         if 'timestamp' in activity_data:
             if isinstance(activity_data['timestamp'], str):
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
-            elif not isinstance(df['timestamp'].iloc[0], pd.Timestamp):
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-        else:
-            df['timestamp'] = pd.Timestamp.now()
-        
-        # Extract temporal features
-        df['hour'] = df['timestamp'].dt.hour
-        df['day_of_week'] = df['timestamp'].dt.dayofweek
-        df['is_weekend'] = df['day_of_week'].isin([5, 6])
-        df['is_business_hours'] = df['hour'].between(9, 17)
+            
+            df['hour'] = df['timestamp'].dt.hour
+            df['day_of_week'] = df['timestamp'].dt.dayofweek
+            df['is_weekend'] = df['day_of_week'].isin([5, 6])
+            df['is_business_hours'] = df['hour'].between(9, 17)
         
         # Process and engineer features
         df = self._process_nested_fields(df)
@@ -546,19 +421,14 @@ class BehavioralAnomalyDetector:
             'risk_level': risk_level,
             'individual_scores': {k: float(v[0]) for k, v in individual_scores.items()},
             'explanation': explanation,
-            'models_used': list(self.models.keys()),
             'timestamp': datetime.now().isoformat()
         }
     
     def _get_risk_level(self, risk_score: float) -> str:
-        """Convert risk score to risk level category"""
-        # Use settings if available, otherwise use defaults
-        low_threshold = getattr(settings, 'LOW_RISK_THRESHOLD', 30)
-        medium_threshold = getattr(settings, 'MEDIUM_RISK_THRESHOLD', 70)
-        
-        if risk_score < low_threshold:
+        """Convert risk score to risk level"""
+        if risk_score < settings.LOW_RISK_THRESHOLD:
             return "LOW"
-        elif risk_score < medium_threshold:
+        elif risk_score < settings.MEDIUM_RISK_THRESHOLD:
             return "MEDIUM"
         else:
             return "HIGH"
@@ -596,40 +466,27 @@ class BehavioralAnomalyDetector:
         # File size checks
         file_size = activity_data.get('file_size', 0)
         if file_size > 100 * 1024 * 1024:  # 100MB
-            explanations.append(f"Large file transfer detected ({file_size / (1024*1024):.1f} MB)")
+            explanations.append("Large file transfer detected")
         
         # External access checks
-        destination = str(activity_data.get('destination', '')).lower()
-        if 'external' in destination or 'internet' in destination:
+        if 'external' in str(activity_data.get('destination', '')).lower():
             explanations.append("External data transfer detected")
         
-        # If no specific risks identified
         if not explanations:
-            if risk_score < 30:
-                explanations.append("Activity appears normal based on behavioral patterns")
-            else:
-                explanations.append("Activity flagged for review based on combined risk factors")
+            explanations.append("Activity appears normal based on behavioral patterns")
         
         return explanations
     
     def save_models(self, model_path: str) -> None:
-        """Save all trained models to disk"""
-        if not self.is_trained:
-            print("⚠️ No trained models to save")
-            return
-        
+        """Save trained models to disk"""
         os.makedirs(model_path, exist_ok=True)
-        
-        print(f"💾 Saving models to {model_path}...")
         
         # Save sklearn models
         joblib.dump(self.models['isolation_forest'], f"{model_path}/isolation_forest.pkl")
+        joblib.dump(self.models['xgboost'], f"{model_path}/xgboost_model.pkl")
         
-        if self.models.get('xgboost') is not None:
-            joblib.dump(self.models['xgboost'], f"{model_path}/xgboost_model.pkl")
-        
-        # Save Keras model in new format
-        self.models['autoencoder'].save(f"{model_path}/autoencoder.keras")
+        # Save Keras model
+        self.models['autoencoder'].save(f"{model_path}/autoencoder.h5")
         
         # Save preprocessors
         joblib.dump(self.scaler, f"{model_path}/scaler.pkl")
@@ -638,103 +495,58 @@ class BehavioralAnomalyDetector:
         # Save configuration
         config_data = {
             'feature_columns': self.feature_columns,
-            'autoencoder_threshold': float(self.autoencoder_threshold),
-            'is_trained': self.is_trained,
-            'model_config': self.config,
-            'saved_at': datetime.now().isoformat()
+            'autoencoder_threshold': self.autoencoder_threshold,
+            'is_trained': self.is_trained
         }
         
         with open(f"{model_path}/config.json", 'w') as f:
             json.dump(config_data, f, indent=2)
         
-        print(f"✅ Models saved successfully to {model_path}")
+        print(f"Models saved to {model_path}")
     
-    def load_models(self, model_path: str) -> bool:
+    def load_models(self, model_path: str) -> None:
         """Load trained models from disk"""
-        config_file = f"{model_path}/config.json"
-        
-        if not os.path.exists(config_file):
-            print(f"⚠️ No trained models found at {model_path}")
-            print("   Please train models first using train_models()")
+        if not os.path.exists(f"{model_path}/config.json"):
+            print("No trained models found. Please train models first.")
             return False
         
-        print(f"📂 Loading models from {model_path}...")
+        # Load configuration
+        with open(f"{model_path}/config.json", 'r') as f:
+            config_data = json.load(f)
         
-        try:
-            # Load configuration
-            with open(config_file, 'r') as f:
-                config_data = json.load(f)
-            
-            self.feature_columns = config_data['feature_columns']
-            self.autoencoder_threshold = config_data['autoencoder_threshold']
-            self.is_trained = config_data['is_trained']
-            
-            # Load models
-            self.models['isolation_forest'] = joblib.load(f"{model_path}/isolation_forest.pkl")
-            
-            # Load XGBoost if exists
-            xgb_path = f"{model_path}/xgboost_model.pkl"
-            if os.path.exists(xgb_path):
-                self.models['xgboost'] = joblib.load(xgb_path)
-            else:
-                self.models['xgboost'] = None
-            
-            # Load Keras model
-            self.models['autoencoder'] = tf.keras.models.load_model(f"{model_path}/autoencoder.keras")
-            
-            # Load preprocessors
-            self.scaler = joblib.load(f"{model_path}/scaler.pkl")
-            self.encoders = joblib.load(f"{model_path}/encoders.pkl")
-            
-            print("✅ Models loaded successfully!")
-            print(f"   - Loaded at: {config_data.get('saved_at', 'Unknown')}")
-            print(f"   - Features: {len(self.feature_columns)}")
-            
-            return True
-            
-        except Exception as e:
-            print(f"❌ Error loading models: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+        self.feature_columns = config_data['feature_columns']
+        self.autoencoder_threshold = config_data['autoencoder_threshold']
+        self.is_trained = config_data['is_trained']
+        
+        # Load models
+        self.models['isolation_forest'] = joblib.load(f"{model_path}/isolation_forest.pkl")
+        self.models['xgboost'] = joblib.load(f"{model_path}/xgboost_model.pkl")
+        self.models['autoencoder'] = tf.keras.models.load_model(f"{model_path}/autoencoder.h5")
+        
+        # Load preprocessors
+        self.scaler = joblib.load(f"{model_path}/scaler.pkl")
+        self.encoders = joblib.load(f"{model_path}/encoders.pkl")
+        
+        print("Models loaded successfully!")
+        return True
 
 def main():
-    """Main function for model training"""
-    print("\n" + "="*60)
-    print("IGNISYL Anomaly Detection Training")
-    print("="*60 + "\n")
+    """Main function for training models"""
+    print("IGNISYL-Neo Anomaly Detection Training")
+    print("=" * 50)
     
     # Initialize detector
     detector = BehavioralAnomalyDetector()
     
-    # Ensure data and model directories exist
-    data_path = os.path.join(settings.DATA_PATH, "synthetic")
-    model_path = settings.MODEL_PATH
-    
-    os.makedirs(data_path, exist_ok=True)
-    os.makedirs(model_path, exist_ok=True)
-    
     # Train models
-    try:
-        detector.train_models(data_path)
-        
-        # Save models
-        detector.save_models(model_path)
-        
-        print("\n" + "="*60)
-        print("✅ Training Complete!")
-        print("="*60)
-        print(f"\n📁 Models saved to: {model_path}")
-        print("🚀 Models ready for deployment\n")
-        
-    except Exception as e:
-        print(f"\n❌ Training failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+    data_path = settings.DATA_PATH + "/synthetic"
+    detector.train_models(data_path)
     
-    return True
+    # Save models
+    model_path = settings.MODEL_PATH
+    detector.save_models(model_path)
+    
+    print("Training complete! Models ready for deployment.")
 
 if __name__ == "__main__":
-    success = main()
-    sys.exit(0 if success else 1)
+    main()

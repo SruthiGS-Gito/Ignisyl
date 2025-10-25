@@ -92,7 +92,7 @@ class HoneypotWatcher(FileSystemEventHandler):
 async def handle_honeypot_alert(alert_data: dict):
     """Handle honeypot alert - log to DB and broadcast"""
     try:
-        from backend.models.activity_logger import activity_logger
+        from models.activity_log import activity_logger
         from models.user_management import user_manager
         from api.websocket import notify_threat_detected
         

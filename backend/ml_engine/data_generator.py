@@ -1,6 +1,6 @@
 """
-Synthetic Data Generator for IGNISYL
-Generates realistic user behavior patterns with embedded anomalies for ML training
+Advanced Synthetic Data Generator for IGNISYL-Neo
+Generates realistic user behavior patterns with embedded anomalies for training
 """
 
 import pandas as pd
@@ -20,12 +20,6 @@ from config.config import settings, ACTIVITY_TYPES, MONITORED_PROTOCOLS
 
 fake = Faker()
 
-# Configuration constants
-SUSPICION_BOOST_OFF_HOURS = 0.6
-SUSPICION_BOOST_BUSINESS_HOURS = 0.3
-NORMAL_ACTIVITY_SUSPICION_RANGE = (0.1, 0.3)
-ANOMALY_BASE_CONFIDENCE_RANGE = (0.6, 0.9)
-
 class BehavioralDataGenerator:
     """Generate realistic user behavior data with anomalies for ML training"""
     
@@ -38,25 +32,18 @@ class BehavioralDataGenerator:
         
         # Business context patterns
         self.business_cycles = {
-            'month_end': [28, 29, 30, 31, 1, 2, 3],
-            'quarter_end': [89, 90, 91, 1, 2, 3],
-            'maintenance_windows': [0, 6],  # Sunday, Saturday
+            'month_end': [28, 29, 30, 31, 1, 2, 3],  # Days when finance is busy
+            'quarter_end': [89, 90, 91, 1, 2, 3],    # Quarter end activities
+            'maintenance_windows': [0, 6],            # Sunday, Saturday
         }
         
-        # Threat scenarios for anomaly injection (configurable percentages)
+        # Threat scenarios for anomaly injection
         self.threat_scenarios = {
-            'data_exfiltration': 0.02,      # 2% of users
-            'privilege_abuse': 0.03,        # 3% of users  
+            'data_exfiltration': 0.02,     # 2% of users
+            'privilege_abuse': 0.03,       # 3% of users  
             'credential_compromise': 0.01,  # 1% of users
-            'insider_sabotage': 0.005,      # 0.5% of users
+            'insider_sabotage': 0.005,     # 0.5% of users
         }
-        
-        # Business domains (common enterprise services)
-        self.business_domains = [
-            'salesforce.com', 'microsoft.com', 'google.com', 'amazonaws.com',
-            'office365.com', 'github.com', 'slack.com', 'zoom.us', 'dropbox.com',
-            'atlassian.com', 'adobe.com', 'servicenow.com', 'workday.com'
-        ]
         
     def generate_user_profiles(self) -> List[Dict]:
         """Generate diverse user profiles with realistic behavioral patterns"""
@@ -75,11 +62,8 @@ class BehavioralDataGenerator:
             dept = random.choice(departments)
             role = random.choice(roles[dept])
             
-            # Generate proper user ID format
-            user_id = f"user_{str(i + 1).zfill(3)}"
-            
             user = {
-                'user_id': user_id,
+                'user_id': i + 1,
                 'username': fake.user_name(),
                 'email': fake.email(),
                 'full_name': fake.name(),
@@ -115,8 +99,7 @@ class BehavioralDataGenerator:
         pattern = base_patterns[dept].copy()
         
         # Executives work longer and more flexible hours
-        executive_titles = ['VP', 'CEO', 'CFO', 'COO', 'CMO', 'CHRO', 'CTO', 'Chief']
-        if any(title in role for title in executive_titles):
+        if 'VP' in role or 'CEO' in role or 'CFO' in role or 'COO' in role or 'CMO' in role or 'CHRO' in role:
             pattern['start'] -= 1
             pattern['end'] += 2
             pattern['flexibility'] += 1
@@ -134,17 +117,17 @@ class BehavioralDataGenerator:
             'secondary_devices': random.sample(devices, random.randint(1, 3)),
             'os_preference': primary_device.split('-')[0],
             'browser_preference': random.choice(['Chrome', 'Firefox', 'Safari', 'Edge']),
-            'mobile_usage': random.uniform(0.1, 0.4)
+            'mobile_usage': random.uniform(0.1, 0.4)  # 10-40% of activities from mobile
         }
     
     def _generate_network_profile(self, dept: str) -> Dict:
         """Generate network usage patterns by department"""
         base_bandwidth = {
-            'IT': random.uniform(2000, 10000),
-            'Finance': random.uniform(500, 2000),
-            'HR': random.uniform(300, 1000),
-            'Sales': random.uniform(800, 3000),
-            'Marketing': random.uniform(1000, 5000),
+            'IT': random.uniform(2000, 10000),      # Higher bandwidth usage
+            'Finance': random.uniform(500, 2000),   # Moderate usage
+            'HR': random.uniform(300, 1000),        # Lower usage
+            'Sales': random.uniform(800, 3000),     # Variable usage
+            'Marketing': random.uniform(1000, 5000), # High for content
             'Operations': random.uniform(600, 2500),
             'Legal': random.uniform(400, 1500)
         }
@@ -259,25 +242,26 @@ class BehavioralDataGenerator:
             'user_agent': self._generate_user_agent(user),
             'device_info': self._generate_device_info(user),
             'is_suspicious': False,
-            'confidence_score': random.uniform(*NORMAL_ACTIVITY_SUSPICION_RANGE)
+            'confidence_score': random.uniform(0.1, 0.3)  # Low suspicion for normal activities
         }
         
         # Add activity-specific details
-        activity_generators = {
-            'file_access': self._generate_file_activity,
-            'network_access': self._generate_network_activity,
-            'email_sent': self._generate_email_activity,
-            'file_download': lambda u: self._generate_file_transfer_activity(u, 'download'),
-            'file_upload': lambda u: self._generate_file_transfer_activity(u, 'upload'),
-            'database_query': self._generate_database_activity,
-            'system_command': self._generate_system_activity,
-            'application_launch': self._generate_application_activity,
-            'usb_access': self._generate_usb_activity
-        }
-        
-        generator = activity_generators.get(activity_type)
-        if generator:
-            base_activity.update(generator(user))
+        if activity_type == 'file_access':
+            base_activity.update(self._generate_file_activity(user))
+        elif activity_type == 'network_access':
+            base_activity.update(self._generate_network_activity(user))
+        elif activity_type == 'email_sent':
+            base_activity.update(self._generate_email_activity(user))
+        elif activity_type in ['file_download', 'file_upload']:
+            base_activity.update(self._generate_file_transfer_activity(user, activity_type))
+        elif activity_type == 'database_query':
+            base_activity.update(self._generate_database_activity(user))
+        elif activity_type == 'system_command':
+            base_activity.update(self._generate_system_activity(user))
+        elif activity_type == 'application_launch':
+            base_activity.update(self._generate_application_activity(user))
+        elif activity_type == 'usb_access':
+            base_activity.update(self._generate_usb_activity(user))
             
         if extra_data:
             base_activity.update(extra_data)
@@ -300,10 +284,10 @@ class BehavioralDataGenerator:
     def _generate_user_agent(self, user: Dict) -> str:
         """Generate realistic user agent strings"""
         browsers = {
-            'Chrome': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Firefox': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-            'Safari': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-            'Edge': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0'
+            'Chrome': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Firefox': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Safari': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Version/14.1.1 Safari/537.36',
+            'Edge': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36 Edg/91.0.864.59'
         }
         
         browser = user['device_preferences']['browser_preference']
@@ -315,28 +299,9 @@ class BehavioralDataGenerator:
         return f"{device}_{random.randint(1000, 9999)}"
     
     def _generate_file_activity(self, user: Dict) -> Dict:
-        """Generate file access activity details with realistic file sizes per type"""
+        """Generate file access activity details"""
         file_patterns = user['file_access_patterns']
         file_type = random.choice(file_patterns['file_types'])
-        
-        # Realistic file size ranges by type
-        file_size_ranges = {
-            '.xlsx': (10 * 1024, 5 * 1024 * 1024),      # 10KB to 5MB
-            '.csv': (1024, 50 * 1024 * 1024),          # 1KB to 50MB
-            '.pdf': (50 * 1024, 10 * 1024 * 1024),     # 50KB to 10MB
-            '.docx': (10 * 1024, 2 * 1024 * 1024),     # 10KB to 2MB
-            '.pptx': (100 * 1024, 20 * 1024 * 1024),   # 100KB to 20MB
-            '.jpg': (100 * 1024, 5 * 1024 * 1024),     # 100KB to 5MB
-            '.png': (50 * 1024, 10 * 1024 * 1024),     # 50KB to 10MB
-            '.mp4': (1024 * 1024, 500 * 1024 * 1024),  # 1MB to 500MB
-            '.py': (1024, 100 * 1024),                 # 1KB to 100KB
-            '.js': (1024, 500 * 1024),                 # 1KB to 500KB
-            '.log': (1024, 10 * 1024 * 1024),          # 1KB to 10MB
-            '.sql': (512, 50 * 1024),                  # 512B to 50KB
-        }
-        
-        size_range = file_size_ranges.get(file_type, (1024, 5 * 1024 * 1024))
-        file_size = random.randint(*size_range)
         
         # Generate realistic file paths
         file_paths = {
@@ -353,7 +318,7 @@ class BehavioralDataGenerator:
         
         return {
             'file_path': file_path,
-            'file_size': file_size,
+            'file_size': random.randint(1024, 50 * 1024 * 1024),  # 1KB to 50MB
             'action': random.choice(['read', 'write', 'delete', 'copy', 'move']),
             'permission_level': random.choice(['read', 'write', 'admin'])
         }
@@ -362,12 +327,18 @@ class BehavioralDataGenerator:
         """Generate network access activity details"""
         protocols = random.choice(MONITORED_PROTOCOLS)
         
+        # Common business domains
+        domains = [
+            'salesforce.com', 'microsoft.com', 'google.com', 'amazonaws.com',
+            'office365.com', 'github.com', 'slack.com', 'zoom.us', 'dropbox.com'
+        ]
+        
         return {
             'destination_ip': fake.ipv4(),
-            'destination_domain': random.choice(self.business_domains),
+            'destination_domain': random.choice(domains),
             'protocol': protocols,
             'port': random.choice([80, 443, 22, 21, 25, 53, 993, 995]),
-            'bytes_transferred': random.randint(1024, 10 * 1024 * 1024),
+            'bytes_transferred': random.randint(1024, 10 * 1024 * 1024),  # 1KB to 10MB
             'duration_seconds': random.randint(1, 3600),
             'connection_status': random.choice(['established', 'closed', 'timeout'])
         }
@@ -378,7 +349,7 @@ class BehavioralDataGenerator:
             'recipient_count': random.randint(1, 20),
             'external_recipients': random.randint(0, 5),
             'attachment_count': random.randint(0, 3),
-            'total_attachment_size': random.randint(0, 25 * 1024 * 1024),
+            'total_attachment_size': random.randint(0, 25 * 1024 * 1024),  # Up to 25MB
             'subject_classification': random.choice(['business', 'personal', 'marketing', 'security']),
             'sender_reputation': random.uniform(0.8, 1.0)
         }
@@ -387,7 +358,7 @@ class BehavioralDataGenerator:
         """Generate file upload/download activity details"""
         return {
             'file_count': random.randint(1, 10),
-            'total_size': random.randint(1024, 100 * 1024 * 1024),
+            'total_size': random.randint(1024, 100 * 1024 * 1024),  # 1KB to 100MB
             'destination': random.choice(['cloud_storage', 'external_server', 'local_drive', 'network_share']),
             'transfer_speed_mbps': random.uniform(1, 100),
             'encryption_used': random.choice([True, False]),
@@ -396,26 +367,10 @@ class BehavioralDataGenerator:
     
     def _generate_database_activity(self, user: Dict) -> Dict:
         """Generate database query activity details"""
-        databases = ['customer_db', 'financial_db', 'hr_db', 'inventory_db', 'analytics_db']
-        
-        # Users typically access databases relevant to their department
-        dept_databases = {
-            'IT': ['customer_db', 'analytics_db', 'inventory_db'],
-            'Finance': ['financial_db', 'customer_db'],
-            'HR': ['hr_db'],
-            'Sales': ['customer_db', 'analytics_db'],
-            'Marketing': ['customer_db', 'analytics_db'],
-            'Operations': ['inventory_db', 'customer_db'],
-            'Legal': ['customer_db', 'hr_db']
-        }
-        
-        dept = user.get('department', 'IT')
-        typical_dbs = dept_databases.get(dept, databases)
-        
         return {
-            'database_name': random.choice(typical_dbs),
+            'database_name': random.choice(['customer_db', 'financial_db', 'hr_db', 'inventory_db']),
             'query_type': random.choice(['SELECT', 'INSERT', 'UPDATE', 'DELETE']),
-            'rows_affected': random.randint(1, 1000),  # Normal queries
+            'rows_affected': random.randint(1, 10000),
             'execution_time_ms': random.randint(10, 5000),
             'tables_accessed': random.randint(1, 5),
             'sensitive_data_accessed': random.choice([True, False])
@@ -423,24 +378,17 @@ class BehavioralDataGenerator:
     
     def _generate_system_activity(self, user: Dict) -> Dict:
         """Generate system command activity details"""
-        # Separate normal vs privileged commands
-        normal_commands = ['ls', 'cd', 'cp', 'mv', 'ps', 'top', 'netstat', 'ping', 'wget', 'curl']
-        privileged_commands = ['sudo', 'systemctl', 'chmod', 'chown', 'rm', 'ssh', 'scp']
-        
-        # High-privilege users can use privileged commands
-        if user.get('is_high_privilege', False) and random.random() < 0.3:
-            command = random.choice(privileged_commands)
-            privilege = random.choice(['admin', 'root'])
-        else:
-            command = random.choice(normal_commands)
-            privilege = 'user'
+        commands = [
+            'ls', 'cd', 'cp', 'mv', 'rm', 'chmod', 'ps', 'top', 'netstat',
+            'ping', 'wget', 'curl', 'ssh', 'scp', 'sudo', 'systemctl'
+        ]
         
         return {
-            'command': command,
+            'command': random.choice(commands),
             'arguments': f"--{fake.word()} {fake.file_path()}",
             'exit_code': random.choice([0, 0, 0, 1, 2]),  # Mostly successful
             'execution_time_ms': random.randint(100, 10000),
-            'privilege_level': privilege,
+            'privilege_level': random.choice(['user', 'admin', 'root']),
             'output_size_bytes': random.randint(0, 1024 * 1024)
         }
     
@@ -454,8 +402,8 @@ class BehavioralDataGenerator:
         
         return {
             'application_name': random.choice(applications),
-            'version': f"{random.randint(1, 15)}.{random.randint(0, 9)}.{random.randint(0, 9)}",
-            'session_duration_minutes': random.randint(5, 480),
+            'version': f"{random.randint(1, 10)}.{random.randint(0, 9)}.{random.randint(0, 9)}",
+            'session_duration_minutes': random.randint(5, 480),  # 5 minutes to 8 hours
             'memory_usage_mb': random.randint(50, 2048),
             'cpu_usage_percent': random.uniform(1, 95),
             'files_opened': random.randint(0, 10)
@@ -481,16 +429,22 @@ class BehavioralDataGenerator:
         total_users = len(self.users)
         
         # Data exfiltration anomalies
-        exfil_count = max(1, int(total_users * self.threat_scenarios['data_exfiltration']))
-        exfil_users = random.sample(self.users, exfil_count)
+        exfil_users = random.sample(
+            self.users, 
+            max(1, int(total_users * self.threat_scenarios['data_exfiltration']))
+        )
         
         # Privilege abuse anomalies
-        privilege_count = max(1, int(total_users * self.threat_scenarios['privilege_abuse']))
-        privilege_users = random.sample(self.users, privilege_count)
+        privilege_users = random.sample(
+            self.users,
+            max(1, int(total_users * self.threat_scenarios['privilege_abuse']))
+        )
         
         # Credential compromise anomalies
-        compromise_count = max(1, int(total_users * self.threat_scenarios['credential_compromise']))
-        compromise_users = random.sample(self.users, compromise_count)
+        compromise_users = random.sample(
+            self.users,
+            max(1, int(total_users * self.threat_scenarios['credential_compromise']))
+        )
         
         # Generate anomalous activities
         for activities_batch in [activities[i:i+1000] for i in range(0, len(activities), 1000)]:
@@ -519,13 +473,14 @@ class BehavioralDataGenerator:
     
     def _create_exfiltration_anomaly(self, user: Dict, activities_batch: List[Dict]) -> Dict:
         """Create data exfiltration anomaly"""
+        # Large file downloads at unusual times
         anomaly_time = fake.date_time_between(start_date='-30d', end_date='now')
         
-        # Off-hours activities are more suspicious
+        # Make it happen during off-hours (high suspicion)
         if anomaly_time.hour < 6 or anomaly_time.hour > 22:
-            suspicion_boost = SUSPICION_BOOST_OFF_HOURS
+            suspicion_boost = 0.6
         else:
-            suspicion_boost = SUSPICION_BOOST_BUSINESS_HOURS
+            suspicion_boost = 0.3
             
         anomaly = self._create_activity(user, 'file_download', anomaly_time)
         anomaly.update({
@@ -535,41 +490,25 @@ class BehavioralDataGenerator:
             'destination': 'external_server',
             'file_count': random.randint(50, 500),
             'transfer_method': 'encrypted_tunnel',
-            'encryption_used': True,
             'anomaly_type': 'data_exfiltration',
-            'risk_factors': ['large_transfer', 'off_hours', 'external_destination', 'encrypted']
+            'risk_factors': ['large_transfer', 'off_hours', 'external_destination']
         })
         
         return anomaly
     
     def _create_privilege_anomaly(self, user: Dict, activities_batch: List[Dict]) -> Dict:
-        """Create privilege abuse anomaly (cross-department database access)"""
+        """Create privilege abuse anomaly"""
         anomaly_time = fake.date_time_between(start_date='-30d', end_date='now')
-        
-        # Select database user shouldn't normally access
-        dept = user.get('department', 'IT')
-        unauthorized_dbs = {
-            'IT': ['hr_db', 'financial_db'],
-            'Finance': ['hr_db'],
-            'HR': ['financial_db'],
-            'Sales': ['hr_db', 'financial_db'],
-            'Marketing': ['hr_db', 'financial_db'],
-            'Operations': ['hr_db', 'financial_db'],
-            'Legal': ['financial_db']
-        }
-        
-        target_db = random.choice(unauthorized_dbs.get(dept, ['hr_db']))
         
         anomaly = self._create_activity(user, 'database_query', anomaly_time)
         anomaly.update({
             'is_suspicious': True,
-            'confidence_score': random.uniform(*ANOMALY_BASE_CONFIDENCE_RANGE),
+            'confidence_score': random.uniform(0.6, 0.9),
             'query_type': 'SELECT',
             'rows_affected': random.randint(10000, 100000),  # Massive data access
             'tables_accessed': random.randint(10, 50),
             'sensitive_data_accessed': True,
-            'database_name': target_db,
-            'execution_time_ms': random.randint(5000, 30000),
+            'database_name': 'hr_db',  # Accessing HR data when not in HR
             'anomaly_type': 'privilege_abuse',
             'risk_factors': ['cross_department_access', 'large_data_query', 'sensitive_data']
         })
@@ -577,7 +516,7 @@ class BehavioralDataGenerator:
         return anomaly
     
     def _create_compromise_anomaly(self, user: Dict, activities_batch: List[Dict]) -> Dict:
-        """Create credential compromise anomaly (unusual login location/device)"""
+        """Create credential compromise anomaly"""
         anomaly_time = fake.date_time_between(start_date='-30d', end_date='now')
         
         # Login from unusual location/device
@@ -586,13 +525,12 @@ class BehavioralDataGenerator:
             'is_suspicious': True,
             'confidence_score': random.uniform(0.5, 0.8),
             'source_ip': fake.ipv4(),  # External IP
-            'device_info': f"Unknown_Device_{random.randint(1000, 9999)}",
+            'device_info': 'Unknown_Device_' + str(random.randint(1000, 9999)),
             'user_agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36',  # Different OS
             'location': fake.country(),
             'login_attempts': random.randint(3, 10),
-            'success': True,
             'anomaly_type': 'credential_compromise',
-            'risk_factors': ['unusual_location', 'new_device', 'multiple_attempts', 'suspicious_os']
+            'risk_factors': ['unusual_location', 'new_device', 'multiple_attempts']
         })
         
         return anomaly
@@ -605,54 +543,38 @@ class BehavioralDataGenerator:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         
         # Convert timestamp to string for CSV compatibility
-        if 'timestamp' in df.columns:
-            # Check if timestamp is datetime object
-            if pd.api.types.is_datetime64_any_dtype(df['timestamp']):
-                df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
-            elif isinstance(df['timestamp'].iloc[0], datetime):
-                df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
         
         df.to_csv(filename, index=False)
         print(f"✅ Saved {len(activities)} activities to {filename}")
     
     def generate_complete_dataset(self) -> Tuple[List[Dict], List[Dict]]:
         """Generate complete dataset with normal and anomalous activities"""
-        print("\n" + "="*60)
-        print("IGNISYL Synthetic Data Generation")
-        print("="*60 + "\n")
-        
         print("🚀 Generating user profiles...")
         self.generate_user_profiles()
-        print(f"   Created {len(self.users)} user profiles")
         
-        print("\n📊 Generating normal activities...")
+        print("Generating normal activities...")
         start_date = datetime.now() - timedelta(days=self.num_days)
         end_date = datetime.now()
         
         normal_activities = self.generate_normal_activities(start_date, end_date)
-        print(f"   Generated {len(normal_activities)} normal activities")
+        print(f"Generated {len(normal_activities)} normal activities")
         
-        print("\n⚠️ Injecting anomalies...")
+        print("Injecting anomalies...")
         all_activities = self.inject_anomalies(normal_activities)
         
         # Separate normal and anomalous activities
         normal = [a for a in all_activities if not a.get('is_suspicious', False)]
         anomalous = [a for a in all_activities if a.get('is_suspicious', False)]
         
-        print(f"   Injected {len(anomalous)} anomalous activities")
-        
-        print(f"\n📈 Dataset Summary:")
-        print(f"   - Normal activities: {len(normal)} ({len(normal)/len(all_activities)*100:.1f}%)")
-        print(f"   - Anomalous activities: {len(anomalous)} ({len(anomalous)/len(all_activities)*100:.1f}%)")
-        print(f"   - Total: {len(all_activities)} activities")
+        print(f"Final dataset: {len(normal)} normal, {len(anomalous)} anomalous activities")
         
         return normal, anomalous
 
 def main():
     """Main function to generate synthetic dataset"""
-    print("\n" + "="*60)
-    print("IGNISYL Synthetic Data Generator")
-    print("="*60)
+    print("IGNISYL-Neo Data Generator")
+    print("=" * 50)
     
     # Initialize generator
     generator = BehavioralDataGenerator(num_users=50, num_days=30)
@@ -660,36 +582,28 @@ def main():
     # Generate complete dataset
     normal_activities, anomalous_activities = generator.generate_complete_dataset()
     
-    # Prepare data directory using cross-platform path joining
-    data_dir = os.path.join(settings.DATA_PATH, "synthetic")
-    os.makedirs(data_dir, exist_ok=True)
-    
-    print("\n💾 Saving datasets...")
+    # Save to files
+    data_dir = settings.DATA_PATH + "/synthetic"
     
     # Save user profiles
     users_df = pd.DataFrame(generator.users)
-    users_file = os.path.join(data_dir, "user_profiles.csv")
-    users_df.to_csv(users_file, index=False)
-    print(f"   User profiles: {users_file}")
+    users_df.to_csv(f"{data_dir}/user_profiles.csv", index=False)
+    print(f"Saved {len(generator.users)} user profiles")
     
     # Save activities
-    normal_file = os.path.join(data_dir, "normal_activities.csv")
-    anomalous_file = os.path.join(data_dir, "anomalous_activities.csv")
-    combined_file = os.path.join(data_dir, "combined_activities.csv")
-    
-    generator.save_to_csv(normal_activities, normal_file)
-    generator.save_to_csv(anomalous_activities, anomalous_file)
+    generator.save_to_csv(normal_activities, f"{data_dir}/normal_activities.csv")
+    generator.save_to_csv(anomalous_activities, f"{data_dir}/anomalous_activities.csv")
     
     # Combine all activities for training
     all_activities = normal_activities + anomalous_activities
-    generator.save_to_csv(all_activities, combined_file)
+    generator.save_to_csv(all_activities, f"{data_dir}/combined_activities.csv")
     
-    # Generate detailed statistics
-    print("\n" + "="*60)
-    print("📊 Dataset Statistics")
-    print("="*60)
-    
-    print(f"\n👥 Users: {len(generator.users)} total")
+    # Generate summary statistics
+    print("\nDataset Summary:")
+    print(f"Total Users: {len(generator.users)}")
+    print(f"Total Activities: {len(all_activities)}")
+    print(f"Normal Activities: {len(normal_activities)} ({len(normal_activities)/len(all_activities)*100:.1f}%)")
+    print(f"Anomalous Activities: {len(anomalous_activities)} ({len(anomalous_activities)/len(all_activities)*100:.1f}%)")
     
     # Department breakdown
     dept_counts = {}
@@ -697,9 +611,9 @@ def main():
         dept = user['department']
         dept_counts[dept] = dept_counts.get(dept, 0) + 1
     
-    print(f"\n📋 Users by Department:")
+    print(f"\nUsers by Department:")
     for dept, count in sorted(dept_counts.items()):
-        print(f"   {dept:15} {count:3} users ({count/len(generator.users)*100:5.1f}%)")
+        print(f"  {dept}: {count} users")
     
     # Activity type breakdown
     activity_counts = {}
@@ -707,35 +621,11 @@ def main():
         act_type = activity['activity_type']
         activity_counts[act_type] = activity_counts.get(act_type, 0) + 1
     
-    print(f"\n📂 Activities by Type:")
-    for act_type, count in sorted(activity_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
-        print(f"   {act_type:20} {count:6} activities ({count/len(all_activities)*100:5.1f}%)")
+    print(f"\nActivities by Type:")
+    for act_type, count in sorted(activity_counts.items(), key=lambda x: x[1], reverse=True):
+        print(f"  {act_type}: {count} activities")
     
-    # Anomaly breakdown
-    anomaly_types = {}
-    for activity in anomalous_activities:
-        anom_type = activity.get('anomaly_type', 'unknown')
-        anomaly_types[anom_type] = anomaly_types.get(anom_type, 0) + 1
+    print("\nDataset generation complete! Ready for ML training.")
     
-    if anomaly_types:
-        print(f"\n⚠️ Anomalies by Type:")
-        for anom_type, count in sorted(anomaly_types.items(), key=lambda x: x[1], reverse=True):
-            print(f"   {anom_type:25} {count:4} anomalies ({count/len(anomalous_activities)*100:5.1f}%)")
-    
-    print("\n" + "="*60)
-    print("✅ Dataset Generation Complete!")
-    print("="*60)
-    print(f"\n📁 Files saved to: {data_dir}")
-    print("🚀 Ready for ML model training\n")
-    
-    return True
-
 if __name__ == "__main__":
-    try:
-        success = main()
-        sys.exit(0 if success else 1)
-    except Exception as e:
-        print(f"\n❌ Error during data generation: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    main()
