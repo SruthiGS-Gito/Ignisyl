@@ -5,7 +5,7 @@ SQLAlchemy ORM models for user activities, risk assessments, and system logs
 # This file : Defines the database structure using SQLAlchemy
 # - Creates tables for users, activities, risk assessments, alerts
 # - Establishes relationships between different data entities
-# - Provides functions to initialize database with sample data
+# - Provides functions to initialize database (NO hardcoded users)
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -30,6 +30,7 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255))  # For authentication
     email = Column(String(100), unique=True, index=True)
     full_name = Column(String(100))
     department = Column(String(50))
@@ -39,8 +40,8 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    activities = relationship("UserActivity", back_populates="user")
-    risk_assessments = relationship("RiskAssessment", back_populates="user")
+    activities = relationship("UserActivity", back_populates="user", cascade="all, delete-orphan")
+    risk_assessments = relationship("RiskAssessment", back_populates="user", cascade="all, delete-orphan")
 
 class UserActivity(Base):
     """Model for tracking user activities and behaviors"""
@@ -57,7 +58,7 @@ class UserActivity(Base):
     file_size = Column(Integer)  # File size in bytes
     network_bytes = Column(Integer)  # Network traffic in bytes
     protocol = Column(String(20))  # HTTP, FTP, SSH, etc.
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)  # Indexed for faster queries
     is_suspicious = Column(Boolean, default=False)
     confidence_score = Column(Float, default=0.0)  # ML model confidence
     
@@ -71,7 +72,7 @@ class RiskAssessment(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     risk_score = Column(Float, nullable=False)  # 0-100 risk score
-    risk_level = Column(String(20), nullable=False)  # LOW, MEDIUM, HIGH
+    risk_level = Column(String(20), nullable=False)  # LOW, MEDIUM, HIGH, CRITICAL
     assessment_details = Column(Text)  # JSON with detailed analysis
     anomaly_factors = Column(Text)  # What made this risky
     firewall_action = Column(String(20))  # ALLOW, RESTRICT, BLOCK
@@ -160,61 +161,115 @@ def create_tables():
     print("✅ Database tables created successfully")
 
 def init_sample_data():
-    """Initialize database with sample data for demonstration"""
+    """Initialize database - ready for production use
+    
+    NOTE: This function does NOT create sample users.
+    In production, users are registered via:
+    - POST /api/v1/users/register endpoint
+    - Or imported from company directory (LDAP/Active Directory)
+    
+    For testing/demo, you can:
+    1. Use Swagger UI at /docs to register test users
+    2. Call the user registration API programmatically
+    3. Enable DEBUG mode in config.py to auto-create demo users
+    """
+    from config.config import settings
+    
     db = SessionLocal()
     try:
-        # Check if data already exists
-        if db.query(User).count() > 0:
-            print("📊 Sample data already exists")
+        existing_users = db.query(User).count()
+        
+        if existing_users > 0:
+            print(f"📊 Database has {existing_users} registered users")
             return
         
-        # Create sample users
-        sample_users = [
-            User(
-                username="john.doe",
-                email="john.doe@company.com",
-                full_name="John Doe",
-                department="IT",
-                role="Software Engineer"
-            ),
-            User(
-                username="jane.smith",
-                email="jane.smith@company.com", 
-                full_name="Jane Smith",
-                department="Finance",
-                role="Financial Analyst"
-            ),
-            User(
-                username="mike.wilson",
-                email="mike.wilson@company.com",
-                full_name="Mike Wilson", 
-                department="HR",
-                role="HR Manager"
-            ),
-            User(
-                username="sarah.johnson",
-                email="sarah.johnson@company.com",
-                full_name="Sarah Johnson",
-                department="Sales",
-                role="Sales Representative"
-            ),
-            User(
-                username="admin",
-                email="admin@company.com",
-                full_name="System Administrator",
-                department="IT",
-                role="Admin"
-            )
-        ]
+        # Production mode - no sample data
+        if not settings.DEBUG:
+            print("✅ Production mode - Database initialized")
+            print("💡 Register users via POST /api/v1/users/register")
+            print("💡 Or integrate with company directory (LDAP/AD)")
+            return
         
-        for user in sample_users:
-            db.add(user)
+        # Development/Demo mode - create sample users for testing
+        print("🎭 DEBUG mode - Creating sample users for testing...")
         
-        db.commit()
-        print("✅ Sample users created successfully")
+        try:
+            from api.auth import auth_manager
+            
+            sample_users = [
+                User(
+                    username="john.doe",
+                    password_hash=auth_manager.hash_password("password123"),
+                    email="john.doe@company.com",
+                    full_name="John Doe",
+                    department="IT",
+                    role="Software Engineer"
+                ),
+                User(
+                    username="jane.smith",
+                    password_hash=auth_manager.hash_password("password123"),
+                    email="jane.smith@company.com", 
+                    full_name="Jane Smith",
+                    department="Finance",
+                    role="Financial Analyst"
+                ),
+                User(
+                    username="admin",
+                    password_hash=auth_manager.hash_password("admin123"),
+                    email="admin@company.com",
+                    full_name="System Administrator",
+                    department="IT",
+                    role="Admin"
+                )
+            ]
+            
+            for user in sample_users:
+                db.add(user)
+            
+            db.commit()
+            print("✅ Sample users created for testing:")
+            print("   • john.doe / password123 (IT - Software Engineer)")
+            print("   • jane.smith / password123 (Finance - Financial Analyst)")
+            print("   • admin / admin123 (IT - Administrator)")
+            print("\n💡 These users are for TESTING ONLY")
+            print("💡 Set DEBUG=False in config.py for production deployment")
+            
+        except ImportError:
+            print("⚠️ Could not import auth_manager - skipping password hashing")
+            print("💡 Sample users will be created without passwords")
+            
+            sample_users = [
+                User(
+                    username="john.doe",
+                    email="john.doe@company.com",
+                    full_name="John Doe",
+                    department="IT",
+                    role="Software Engineer"
+                ),
+                User(
+                    username="jane.smith",
+                    email="jane.smith@company.com", 
+                    full_name="Jane Smith",
+                    department="Finance",
+                    role="Financial Analyst"
+                ),
+                User(
+                    username="admin",
+                    email="admin@company.com",
+                    full_name="System Administrator",
+                    department="IT",
+                    role="Admin"
+                )
+            ]
+            
+            for user in sample_users:
+                db.add(user)
+            
+            db.commit()
+            print("✅ Sample users created (without passwords)")
         
     except Exception as e:
-        print(f"❌ Error creating sample data: {e}")
+        print(f"❌ Error initializing database: {e}")
         db.rollback()
     finally:
         db.close()
