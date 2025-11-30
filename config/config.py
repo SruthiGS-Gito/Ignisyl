@@ -132,7 +132,10 @@ def ensure_directories():
         PROJECT_ROOT / "data",
         PROJECT_ROOT / "data" / "models",
         PROJECT_ROOT / "data" / "logs",
-        PROJECT_ROOT / "data" / "synthetic"
+        PROJECT_ROOT / "data" / "synthetic",
+        PROJECT_ROOT / "data" / "reports",
+        PROJECT_ROOT / "data" / "honeypots",
+        PROJECT_ROOT / "data" / "sessions"
     ]
     
     for directory in directories:
