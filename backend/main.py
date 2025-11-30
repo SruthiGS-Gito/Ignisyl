@@ -17,6 +17,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 import json
+import numpy as np  # Required for np.log1p() in extract_features()
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -96,9 +97,9 @@ async def startup_event():
         
         # Extract and engineer features from the generated data
         def extract_features(df):
-            """Extract numerical features from activity data"""
+            """Extract numerical features from activity data - aligned with hybrid_detector"""
             features = pd.DataFrame()
-    
+
             # Time-based features
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -107,13 +108,24 @@ async def startup_event():
             else:
                 features['hour'] = 12
                 features['day_of_week'] = 2
+
+            # File size feature (use log scale to match anomaly_detector)
+            file_size = df.get('file_size', 0).fillna(0)
+            features['file_size'] = file_size
+            features['file_size_log'] = np.log1p(file_size)  # Log transformation
+
+            # Network bytes transferred (use log scale)
+            bytes_transferred = df.get('bytes_transferred', 0).fillna(0)
+            features['bytes_transferred'] = bytes_transferred
+            features['network_bytes_log'] = np.log1p(bytes_transferred)  # Log transformation
     
-            # File size feature
-            features['file_size'] = df.get('file_size', 0).fillna(0)
+            # Boolean features
+            features['is_weekend'] = df['timestamp'].dt.dayofweek.isin([5, 6]) if 'timestamp' in df.columns else False
+            features['is_business_hours'] = df['timestamp'].dt.hour.between(9, 17) if 'timestamp' in df.columns else True
     
-            # Network bytes transferred
-            features['bytes_transferred'] = df.get('bytes_transferred', 0).fillna(0)
-    
+            # Confidence score (default for normal activities)
+            features['confidence_score'] = df.get('confidence_score', 0.2).fillna(0.2)
+
             return features
 
         X = extract_features(df).values
@@ -127,6 +139,18 @@ async def startup_event():
             
     except Exception as e:
         print(f"⚠️ ML training error: {e}. Using fallback configuration.")
+        
+        # Initialize models with defaults even if training fails
+        if ml_detector is None:
+            ml_detector = AdvancedHybridDetector()
+            ml_detector.is_trained = False
+            print("⚠️ ML detector initialized in untrained mode")
+        if risk_scorer is None:
+            risk_scorer = ContextualRiskScorer()
+            print("⚠️ Risk scorer initialized with defaults")
+        if data_generator is None:
+            data_generator = BehavioralDataGenerator()
+            print("⚠️ Data generator initialized with defaults")
     
     # Initialize API routes with ML components
     routes.init_routes(ml_detector, risk_scorer, data_generator)
