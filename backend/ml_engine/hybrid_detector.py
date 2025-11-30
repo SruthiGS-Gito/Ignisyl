@@ -109,15 +109,16 @@ class HybridIsolationForest:
         self.implementation = detector.get_best_implementation('isolation_forest')
         self.model = None
         self.kwargs = kwargs
-        
-        if self.implementation == 'sklearn':
-            from sklearn.ensemble import IsolationForest
-            self.model = IsolationForest(**kwargs)
-            print("Using scikit-learn Isolation Forest")
-        else:
-            from .custom_algorithms import CustomIsolationForest
-            self.model = CustomIsolationForest(**kwargs)
-            print("Using custom Isolation Forest implementation")
+    
+        if self.implementation == 'sklearn' or self.implementation == 'custom':
+            # Always use sklearn if available, otherwise error
+            try:
+                from sklearn.ensemble import IsolationForest
+                self.model = IsolationForest(**kwargs)
+                self.implementation = 'sklearn'
+                print("Using scikit-learn Isolation Forest")
+            except ImportError:
+                raise ImportError("scikit-learn is required for Isolation Forest. Install with: pip install scikit-learn")
     
     def fit(self, X):
         return self.model.fit(X)
@@ -144,15 +145,15 @@ class HybridAutoencoder:
         self.implementation = detector.get_best_implementation('autoencoder')
         self.model = None
         self.kwargs = kwargs
-        
+    
         if self.implementation == 'tensorflow':
             self._create_tensorflow_model(**kwargs)
         elif self.implementation == 'torch':
             self._create_torch_model(**kwargs)
-        else:
-            from .custom_algorithms import CustomAutoencoder
-            self.model = CustomAutoencoder(**kwargs)
-            print("Using custom Autoencoder implementation")
+        elif self.implementation == 'custom':
+            # Fallback to simple numpy-based autoencoder
+            self._create_tensorflow_model(**kwargs)  # Try tensorflow first
+            print("⚠️ Using TensorFlow as fallback for custom implementation")
     
     def _create_tensorflow_model(self, encoding_dim=32, **kwargs):
         """Create TensorFlow/Keras autoencoder"""
@@ -270,19 +271,17 @@ class HybridXGBoost:
         self.implementation = detector.get_best_implementation('gradient_boosting')
         self.model = None
         self.kwargs = kwargs
-        
+    
         if self.implementation == 'xgboost':
             import xgboost as xgb
             self.model = xgb.XGBClassifier(**kwargs)
             print("Using XGBoost implementation")
-        elif self.implementation == 'sklearn':
+        elif self.implementation == 'sklearn' or self.implementation == 'custom':
+            # Use sklearn as fallback
             from sklearn.ensemble import GradientBoostingClassifier
             self.model = GradientBoostingClassifier(**kwargs)
+            self.implementation = 'sklearn'
             print("Using scikit-learn Gradient Boosting")
-        else:
-            from .custom_algorithms import CustomXGBoostClassifier
-            self.model = CustomXGBoostClassifier(**kwargs)
-            print("Using custom XGBoost implementation")
     
     def fit(self, X, y):
         return self.model.fit(X, y)
