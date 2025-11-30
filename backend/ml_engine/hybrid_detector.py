@@ -174,9 +174,9 @@ class HybridAutoencoder:
             self.model_type = 'tensorflow'
             
         except Exception as e:
-            print(f"TensorFlow model creation failed: {e}")
-            from .custom_algorithms import CustomAutoencoder
-            self.model = CustomAutoencoder(**kwargs)
+            print(f"⚠️ TensorFlow model creation failed: {e}")
+            print("⚠️ Autoencoder will be unavailable")
+            self.model = None
             self.implementation = 'custom'
     
     def _create_torch_model(self, **kwargs):
@@ -190,9 +190,9 @@ class HybridAutoencoder:
             self.model_type = 'torch'
             
         except Exception as e:
-            print(f"PyTorch model creation failed: {e}")
-            from .custom_algorithms import CustomAutoencoder
-            self.model = CustomAutoencoder(**kwargs)
+            print(f"⚠️ PyTorch model creation failed: {e}")
+            print("⚠️ Autoencoder will be unavailable")
+            self.model = None
             self.implementation = 'custom'
     
     def fit(self, X):
