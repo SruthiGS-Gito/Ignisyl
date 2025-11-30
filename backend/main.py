@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import json
 import numpy as np  # Required for np.log1p() in extract_features()
-
+import time  
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -706,7 +706,7 @@ async def register_user(user_data: Dict):
 @app.get("/api/v1/users/list")
 async def list_users():
     """Get all registered users"""
-    from backend.models.user_management import user_manager
+    from models.user_management import user_manager
     
     users = user_manager.get_all_users()
     return {
