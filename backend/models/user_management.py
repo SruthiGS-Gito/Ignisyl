@@ -24,6 +24,7 @@ class UserManager:
             CREATE TABLE IF NOT EXISTS users (
                 user_id TEXT PRIMARY KEY,
                 username TEXT NOT NULL,
+                password_hash TEXT,
                 full_name TEXT NOT NULL,
                 department TEXT NOT NULL,
                 role TEXT NOT NULL,
@@ -41,19 +42,19 @@ class UserManager:
         print("✅ User database initialized")
     
     def register_user(self, username: str, full_name: str, department: str, 
-                     role: str, email: str = None) -> Dict:
+                 role: str, email: str = None, password_hash: str = None) -> Dict:
         """Register a new user"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+    
         # Generate user_id
         user_id = f"user_{username.lower().replace(' ', '_')}"
-        
+    
         try:
             cursor.execute("""
-                INSERT INTO users (user_id, username, full_name, department, role, email, registered_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, username, full_name, department, role, email, datetime.now().isoformat()))
+                INSERT INTO users (user_id, username, password_hash, full_name, department, role, email, registered_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, username, password_hash, full_name, department, role, email, datetime.now().isoformat()))
             
             conn.commit()
             print(f"✅ User registered: {full_name} ({user_id})")
@@ -87,15 +88,16 @@ class UserManager:
             return {
                 "user_id": row[0],
                 "username": row[1],
-                "full_name": row[2],
-                "department": row[3],
-                "role": row[4],
-                "email": row[5],
-                "registered_at": row[6],
-                "last_activity": row[7],
-                "total_threats": row[8],
-                "current_risk_score": row[9],
-                "status": row[10]
+                "password_hash": row[2],
+                "full_name": row[3],
+                "department": row[4],
+                "role": row[5],
+                "email": row[6],
+                "registered_at": row[7],
+                "last_activity": row[8],
+                "total_threats": row[9],
+                "current_risk_score": row[10],
+                "status": row[11]
             }
         return None
     
@@ -113,15 +115,16 @@ class UserManager:
             users.append({
                 "user_id": row[0],
                 "username": row[1],
-                "full_name": row[2],
-                "department": row[3],
-                "role": row[4],
-                "email": row[5],
-                "registered_at": row[6],
-                "last_activity": row[7],
-                "total_threats": row[8],
-                "current_risk_score": row[9],
-                "status": row[10]
+                "password_hash": row[2],
+                "full_name": row[3],
+                "department": row[4],
+                "role": row[5],
+                "email": row[6],
+                "registered_at": row[7],
+                "last_activity": row[8],
+                "total_threats": row[9],
+                "current_risk_score": row[10],
+                "status": row[11]
             })
         
         return users
