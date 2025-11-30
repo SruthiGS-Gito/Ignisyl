@@ -13,13 +13,14 @@ from typing import Callable
 class HoneypotWatcher(FileSystemEventHandler):
     """Watches honeypot files for access in real-time"""
     
-    def __init__(self, honeypot_dir: str, callback: Callable):
+    def __init__(self, honeypot_dir: str, callback: Callable, loop=None):
         super().__init__()
         self.honeypot_dir = Path(honeypot_dir)
         self.callback = callback
         self.observer = Observer()
         self.running = False
-        
+        self.loop = loop or asyncio.get_event_loop()
+    
         print(f"🔍 Honeypot Watcher initialized for: {self.honeypot_dir}")
     
     def on_any_event(self, event: FileSystemEvent):
@@ -64,8 +65,8 @@ class HoneypotWatcher(FileSystemEventHandler):
             print(f"Path: {filepath}")
             print(f"{'='*70}\n")
             
-            # Call callback function (for logging to DB, broadcasting, etc.)
-            asyncio.run(self.callback(alert_data))
+           # Schedule callback in the event loop (thread-safe)
+           asyncio.run_coroutine_threadsafe(self.callback(alert_data), self.loop)
     
     def start_watching(self):
         """Start real-time monitoring"""
@@ -148,7 +149,13 @@ def start_honeypot_monitoring():
     global honeypot_watcher
     
     honeypot_dir = "data/honeypots"
-    honeypot_watcher = HoneypotWatcher(honeypot_dir, handle_honeypot_alert)
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    honeypot_watcher = HoneypotWatcher(honeypot_dir, handle_honeypot_alert, loop=loop)
     honeypot_watcher.start_watching()
     
     return honeypot_watcher
