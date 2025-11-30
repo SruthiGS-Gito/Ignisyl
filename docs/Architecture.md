@@ -29,29 +29,29 @@ IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System
 ## High-Level Architecture
 
 ### System Overview Diagram
-┌────────────────────────────────────────────────────────────┐\n
-│                      IGNISYL SYSTEM                        │\n
-├────────────────────────────────────────────────────────────┤\n
-│                                                            │\n
-│  ┌──────────────┐      ┌──────────────┐                    │\n
-│  │   Frontend   │◄────►│   Backend    │                    │\n
-│  │  (React.js)  │      │  (FastAPI)   │                    │\n
-│  └──────────────┘      └──────┬───────┘                    │\n
-│                               │                            │\n
-│                    ┌──────────┼──────────┐                 │\n
-│                    │          │          │                 │\n
-│             ┌──────▼────┐ ┌───▼────┐ ┌──▼─────┐            │\n
-│             │ ML Engine │ │Database│ │Services│            │\n
-│             └───────────┘ └────────┘ └────────┘            │\n
-│                                                            │\n
-│  ┌──────────────────────────────────────────────────────┐  │\n
-│  │          Employee Laptops (Network Monitor)          │  │\n
-│  │  • Monitors network activity                         │  │\n
-│  │  • Sends data to central API                         │  │\n
-│  │  • Receives adaptive firewall commands               │  │\n
-│  └──────────────────────────────────────────────────────┘  │\n
-│                                                            │\n
-└────────────────────────────────────────────────────────────┘\n
+┌────────────────────────────────────────────────────────────┐
+│                      IGNISYL SYSTEM                        │
+├────────────────────────────────────────────────────────────┤
+│                                                            │
+│  ┌──────────────┐      ┌──────────────┐                    │
+│  │   Frontend   │◄────►│   Backend    │                    │
+│  │  (React.js)  │      │  (FastAPI)   │                    │
+│  └──────────────┘      └──────┬───────┘                    │
+│                               │                            │
+│                    ┌──────────┼──────────┐                 │
+│                    │          │          │                 │
+│             ┌──────▼────┐ ┌───▼────┐ ┌──▼─────┐            │
+│             │ ML Engine │ │Database│ │Services│            │
+│             └───────────┘ └────────┘ └────────┘            │
+│                                                            │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │          Employee Laptops (Network Monitor)          │  │
+│  │  • Monitors network activity                         │  │
+│  │  • Sends data to central API                         │  │
+│  │  • Receives adaptive firewall commands               │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                            │
+└────────────────────────────────────────────────────────────┘
 
 ---
 
@@ -571,5 +571,6 @@ For architecture questions or deployment support:
 - **Documentation**: https://docs.ignisyl.com
 - **GitHub**: https://github.com/company/ignisyl
 <<<END Architecture.md>>>
+
 
 
