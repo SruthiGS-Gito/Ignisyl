@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Production)
+  database:
+    image: postgres:15-alpine
+    container_name: ignisyl-db
+    environment:
+      POSTGRES_USER: ignisyl
+      POSTGRES_PASSWORD: ignisyl_secure_password
+      POSTGRES_DB: ignisyl
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - ignisyl-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ignisyl"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ignisyl-backend
+    environment:
+      - DATABASE_URL=postgresql://ignisyl:ignisyl_secure_password@database:5432/ignisyl
+      - SECRET_KEY=your-secret-key-here-change-in-production
+      - ENVIRONMENT=production
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - ignisyl-network
+    command: uvicorn backend.core.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ignisyl-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - ignisyl-network
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: ignisyl-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ignisyl-network
+    volumes:
+      - redis_data:/data
+
+networks:
+  ignisyl-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
