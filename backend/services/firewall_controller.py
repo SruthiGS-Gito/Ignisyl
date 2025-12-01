@@ -578,6 +578,41 @@ class FirewallController:
         # Store to pending_analyst_decisions table
         logger.info(f"Stored pending decision: {pending_decision}")
         pass
+
+    # ============================================================================
+    # NETWORK OPERATION HELPER METHODS
+    # ============================================================================
+    
+    def _block_external_for_ip(self, ip_address: str):
+        """Block external internet for specific IP"""
+        command = self._get_restrict_external_command(ip_address)
+        logger.info(f"Blocking external access for {ip_address}: {command}")
+        # In production, execute the actual command, IMPORTANT !
+        pass
+    
+    def _apply_rate_limit(self, ip_address: str, rate_limit_mbps: int):
+        """Apply bandwidth rate limiting"""
+        command = self._get_rate_limit_command(ip_address, rate_limit_mbps)
+        logger.info(f"Applying rate limit for {ip_address}: {command}")
+        # In production, execute the actual command
+        pass
+    
+    def _block_port_for_ip(self, ip_address: str, port: int):
+        """Block specific port for IP"""
+        command = self._get_block_ports_command(ip_address, [port])
+        logger.info(f"Blocking port {port} for {ip_address}: {command}")
+        # In production, execute the actual command
+        pass
+    
+    def _allow_internal_for_ip(self, ip_address: str):
+        """Allow internal network access"""
+        # This would use OS-specific commands to allow internal subnet
+        logger.info(f"Allowing internal network for {ip_address}")
+        pass
+    
+    def block_user(self, user_id: str, ip_address: str, duration_minutes: int = 60):
+        """Wrapper for apply_block to maintain compatibility"""
+        return self.apply_block(user_id, ip_address, duration_minutes)
     
     async def auto_cleanup_loop(self):
         """Background task to automatically cleanup expired rules"""
