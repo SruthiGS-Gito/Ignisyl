@@ -424,6 +424,309 @@ View system-wide alert statistics:
 - Priority Breakdown (graph)
 
 ---
+## Analyst Remote Threat Control
+
+### Overview
+
+When a HIGH-risk threat is detected (risk score 50-69), the system **does not automatically block**. Instead, it sends the threat to the **Analyst Decision Queue** for human review.
+
+This graduated approach prevents false positives while ensuring real threats are addressed.
+
+### Accessing Pending Decisions
+
+1. Navigate to **Dashboard** → **Pending Decisions**
+2. Or click the **notification badge** when new threats appear
+3. You'll see threats sorted by risk score (highest first)
+
+### Threat Analysis Screen
+
+Each pending threat shows:
+- **User Information:** Name, department, role
+- **Activity Details:** What they did, when, where
+- **Risk Breakdown:**
+  - ML model scores (Isolation Forest, Autoencoder, XGBoost)
+  - Triggered risk factors (e.g., "outside_business_hours", "large_file_transfer")
+  - Contextual modifiers applied
+- **Recommended Action:** System suggestion
+- **Recent History:** User's last 10 activities
+
+### Available Actions
+
+#### Option 1: ALLOW (False Positive)
+**Use When:** Activity is legitimate despite high risk score
+
+**Example Scenario:**
+- CFO accessing payroll data at 11 PM for board meeting next morning
+- Developer downloading large codebase for urgent hotfix
+
+**Steps:**
+1. Click **ALLOW** button
+2. Enter reason: "Legitimate business need - board meeting preparation"
+3. Optionally: Add to user's baseline behavior
+4. Click **Confirm**
+
+**Result:** Alert cleared, no restrictions applied
+
+---
+
+#### Option 2: RESTRICT (Limit Access)
+**Use When:** Suspicious activity that needs investigation
+
+**Example Scenario:**
+- Employee accessing HR files outside their department
+- Large data transfer to personal cloud storage
+
+**Custom Restrictions:**
+```
+☐ Block external internet only
+☐ Block file transfers (FTP, SMB, SSH)
+☐ Rate limit to 1 Mbps
+☐ Disable USB devices
+☐ Force logout after 10 minutes
+☐ Send warning notification to user
+```
+
+**Duration Options:**
+- 30 minutes
+- 1 hour (default)
+- 4 hours
+- 8 hours
+- Until analyst review
+
+**Steps:**
+1. Click **RESTRICT** button
+2. Select custom restrictions (checkboxes)
+3. Choose duration
+4. Enter reason: "Accessing confidential files outside normal hours - verifying with manager"
+5. Optional: Send notification to user
+6. Click **Apply Restrictions**
+
+**Result:** User can access internal resources but limited external access
+
+---
+
+#### Option 3: ISOLATE (Network Quarantine)
+**Use When:** High confidence of malicious activity
+
+**Example Scenario:**
+- Multiple honeypot file accesses
+- Attempting privilege escalation
+- Large data exfiltration in progress
+
+**Restrictions Applied:**
+```
+✓ Block all external network
+✓ Allow internal corporate network only
+✓ Disconnect VPN
+✓ Disable USB ports
+✓ Log all local file operations
+✓ Require admin unlock
+```
+
+**Steps:**
+1. Click **ISOLATE** button
+2. Confirm action (this is severe)
+3. Enter detailed reason
+4. Click **Quarantine User**
+
+**Result:** User completely isolated, investigation begins immediately
+
+---
+
+#### Option 4: CONTACT USER
+**Use When:** Need user explanation before taking action
+
+**Steps:**
+1. Click **Contact User** button
+2. Select method:
+   - Desktop notification (instant)
+   - Email (within 5 min)
+   - SMS (if configured)
+3. Enter message:
+```
+   We've detected unusual activity on your account.
+   Please call Security at ext. 1234 immediately.
+```
+4. Click **Send Message**
+
+**Result:** User receives notification, analyst waits for response
+
+---
+
+#### Option 5: ESCALATE
+**Use When:** Decision requires higher authority
+
+**Escalation Targets:**
+- **Admin:** For policy decisions
+- **Manager:** For department-specific context
+- **Incident Team:** For serious threats
+
+**Steps:**
+1. Click **Escalate** button
+2. Select escalation target
+3. Enter notes:
+```
+   User accessing multiple honeypot files.
+   Need executive decision on whether to involve HR.
+   Possible insider threat investigation required.
+```
+4. Click **Escalate**
+
+**Result:** Notification sent to target, they take over decision
+
+---
+
+### Real-World Examples
+
+#### Example 1: Finance Employee Accessing HR Files
+
+**Alert:**
+```
+User: jane_smith
+Risk Score: 62 (HIGH)
+Activity: Accessed employee_salaries.xlsx
+Time: 2:47 AM
+Location: Home IP
+```
+
+**Analyst Analysis:**
+- Finance employee, but HR files are outside scope
+- Very unusual time (2:47 AM)
+- Working from home (not corporate network)
+- No recent approval for HR data access
+
+**Decision: RESTRICT**
+```
+Custom Actions:
+  ✓ Block external internet
+  ✓ Send warning notification
+  ✗ Allow internal network (for legitimate work)
+Duration: 1 hour
+Reason: "Verifying legitimate business need with HR director"
+```
+
+**Follow-up:**
+- Contacted user via notification
+- User responded: "Working on merger analysis, need salary data"
+- Contacted HR director: Confirmed approval exists
+- Released restriction after 30 minutes
+- Updated user profile: "Authorized for HR data access"
+
+---
+
+#### Example 2: Developer with Large Data Transfer
+
+**Alert:**
+```
+User: bob_developer
+Risk Score: 71 (CRITICAL - auto-isolated)
+Activity: Uploading 5GB to external cloud
+Time: 6:15 PM
+Location: Office
+```
+
+**Analyst Analysis:**
+- System auto-isolated (risk > 70)
+- Developer transferring large amount of data
+- To personal Dropbox account
+- No business justification visible
+
+**Decision: Review Isolation → ALLOW**
+```
+Actions Taken:
+  1. Contacted user immediately
+  2. User explained: "Uploading product release to cloud for distribution"
+  3. Verified: Weekly release schedule, this is normal
+  4. Released isolation
+  5. Updated baseline: "Weekly 5GB uploads on Friday evenings"
+  
+Reason: "Legitimate release process, updated user profile"
+```
+
+**Lesson:** Auto-isolation for CRITICAL threats, but analyst can override with justification
+
+---
+
+#### Example 3: Honeypot Access (Confirmed Threat)
+
+**Alert:**
+```
+User: john_contractor
+Risk Score: 95 (CRITICAL - auto-blocked)
+Activity: Accessed admin_passwords.txt (honeypot)
+Time: 11:32 PM
+Location: Unknown IP
+```
+
+**Analyst Analysis:**
+- Honeypot file (decoy trap)
+- Any access is malicious
+- Unknown IP (not corporate network)
+- Late night activity
+- Contractor, not full employee
+
+**Decision: Keep BLOCK + Escalate to Incident Team**
+```
+Actions Taken:
+  1. Keep full network block (already applied)
+  2. Contacted user's manager
+  3. Escalated to Incident Response Team
+  4. Started forensic investigation
+  5. Notified HR for contract review
+  
+Reason: "Confirmed insider threat - honeypot access indicates malicious intent"
+```
+
+**Result:** Full investigation launched, contractor's access revoked
+
+---
+
+### Best Practices for Analysts
+
+#### 1. Always Investigate Context
+- Check user's normal behavior patterns
+- Review recent activities (last 24 hours)
+- Consider business context (month-end, audits, releases)
+- Contact user's manager if unsure
+
+#### 2. Document Everything
+- Always provide detailed reasons
+- Note any contact made with user/manager
+- Document follow-up actions
+- Update user baselines when patterns change
+
+#### 3. Response Time Targets
+- **CRITICAL (90-100):** Already auto-handled, review within 30 min
+- **HIGH (70-89):** Review within 1 hour
+- **MEDIUM-HIGH (50-69):** Review within 4 hours
+
+#### 4. Communication
+- Use **Contact User** for quick clarification
+- Use **Escalate** when you need more authority
+- Always notify users when applying restrictions
+- Follow up after restrictions expire
+
+#### 5. False Positive Handling
+- If ALLOW, update user's baseline behavior
+- Document why it was flagged (for model improvement)
+- Add notes for future analysts
+
+---
+
+### Audit Trail
+
+All analyst actions are logged for compliance:
+- What action was taken
+- Who took it
+- When it was taken
+- Why (justification required)
+- Result of action
+
+**View Your Actions:**
+1. Navigate to **Profile** → **My Actions**
+2. See complete history of your decisions
+3. Export for compliance reporting
+---
 
 ## Report Generation
 
@@ -754,5 +1057,6 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 **Version:** 1.0  
 **Document:** User Manual
 <<<END User_Manual.md>>>
+
 
 
