@@ -270,6 +270,221 @@ Authorization: Bearer <access_token>
   }
 }
 ```
+---
+
+## Analyst Threat Control Endpoints
+
+### 1. Apply Analyst Action
+**Endpoint:** `POST /api/v1/analyst/threat/{threat_id}/action`
+
+**Description:** Analyst manually controls firewall response for a specific threat.
+
+**Authentication:** Required (Admin or Analyst role)
+
+**Request Body:**
+```json
+{
+  "action": "RESTRICT",
+  "custom_restrictions": {
+    "block_external_internet": true,
+    "rate_limit_mbps": 1,
+    "block_ports": [21, 22, 445],
+    "duration_minutes": 60,
+    "notify_user": true
+  },
+  "reason": "Employee accessing confidential files outside business hours",
+  "duration_minutes": 60
+}
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| threat_id | string | Yes | User ID of the threat |
+| action | string | Yes | ALLOW, RESTRICT, ISOLATE, or BLOCK |
+| custom_restrictions | object | Yes | Custom firewall restrictions |
+| reason | string | Yes | Justification for action |
+| duration_minutes | integer | No | Duration (default: 60) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "result": {
+    "status": "RESTRICTED",
+    "action_applied": "RESTRICT",
+    "analyst": "security_analyst",
+    "timestamp": "2025-01-01T14:30:00",
+    "reason": "Employee accessing confidential files outside business hours"
+  },
+  "message": "Action RESTRICT applied successfully by security_analyst"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` - Invalid action type
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - User not found
+- `500 Internal Server Error` - Failed to apply action
+
+---
+
+### 2. Get Pending Decisions
+**Endpoint:** `GET /api/v1/analyst/pending-decisions`
+
+**Description:** Get all threats waiting for analyst decision (risk score 50-69).
+
+**Authentication:** Required (Admin or Analyst role)
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "count": 5,
+  "pending_decisions": [
+    {
+      "id": 12345,
+      "user_id": "john_doe",
+      "username": "john_doe",
+      "full_name": "John Doe",
+      "activity_type": "file_access",
+      "risk_score": 62,
+      "risk_level": "HIGH",
+      "timestamp": "2025-01-01T14:25:00",
+      "summary": "Accessed confidential_salary_data.xlsx outside business hours",
+      "recommended_action": "RESTRICT"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `403 Forbidden` - Insufficient permissions
+- `500 Internal Server Error` - Failed to get pending decisions
+
+---
+
+### 3. Contact User
+**Endpoint:** `POST /api/v1/analyst/threat/{threat_id}/contact-user`
+
+**Description:** Analyst sends message to user about suspicious activity.
+
+**Authentication:** Required (Admin or Analyst role)
+
+**Request Body:**
+```json
+{
+  "message": "We've detected unusual activity on your account. Please contact Security immediately.",
+  "method": "notification"
+}
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| threat_id | string | Yes | User ID to contact |
+| message | string | Yes | Message to send |
+| method | string | No | notification, email, or sms (default: notification) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "status": "message_sent",
+  "method": "notification",
+  "target_user": "john_doe",
+  "timestamp": "2025-01-01T14:30:00",
+  "message": "Message sent to John Doe via notification"
+}
+```
+
+**Error Responses:**
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - User not found
+- `500 Internal Server Error` - Failed to contact user
+
+---
+
+### 4. Escalate Threat
+**Endpoint:** `POST /api/v1/analyst/threat/{threat_id}/escalate`
+
+**Description:** Escalate threat to higher authority (admin, manager, incident team).
+
+**Authentication:** Required (Admin or Analyst role)
+
+**Request Body:**
+```json
+{
+  "escalate_to": "incident_team",
+  "notes": "Suspected insider threat - multiple honeypot accesses and large data transfer"
+}
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| threat_id | string | Yes | User ID of threat |
+| escalate_to | string | Yes | admin, manager, or incident_team |
+| notes | string | Yes | Escalation notes |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "escalated_to": "incident_team",
+  "target_user": "john_doe",
+  "analyst": "security_analyst",
+  "timestamp": "2025-01-01T14:35:00",
+  "message": "Threat escalated to incident_team"
+}
+```
+
+**Error Responses:**
+- `403 Forbidden` - Insufficient permissions
+- `404 Not Found` - User not found
+- `500 Internal Server Error` - Failed to escalate
+
+---
+
+### 5. Get Analyst Actions (Audit Trail)
+**Endpoint:** `GET /api/v1/analyst/my-actions`
+
+**Description:** Get analyst's recent actions for audit trail.
+
+**Authentication:** Required (Admin or Analyst role)
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| limit | integer | 50 | Number of actions to return (1-200) |
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "analyst": "security_analyst",
+  "count": 3,
+  "actions": [
+    {
+      "action_id": 12345,
+      "action_type": "analyst_action",
+      "target_user": "john_doe",
+      "timestamp": "2025-01-01T14:30:00",
+      "details": {
+        "action": "RESTRICT",
+        "reason": "Suspicious activity detected"
+      },
+      "summary": "Applied RESTRICT action to john_doe"
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `403 Forbidden` - Insufficient permissions
+- `500 Internal Server Error` - Failed to get actions
+
+---
 
 ---
 
@@ -410,3 +625,4 @@ console.log(`Action: ${result.action}`);
 
 For API support, contact: security@company.com
 <<<END API_Documentation.md>>>
+
