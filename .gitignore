@@ -1,0 +1,125 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+data/logs/*.log
+
+# ML Models (optional - uncomment if models are large)
+# data/models/*.pkl
+# data/models/*.h5
+
+# Reports (generated PDFs)
+data/reports/*.pdf
+
+# Synthetic data (optional - can regenerate)
+# data/synthetic/*.json
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Production build
+frontend/build/
+frontend/dist/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Package files
+*.tar.gz
+*.zip
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+
+# Lock files (keep package-lock.json but ignore others)
+# package-lock.json
+yarn.lock
+poetry.lock
+
+# Sensitive data
+*_secret.json
+*_credentials.json
+config/secrets.json
+
+# Large data files
+*.csv
+*.xlsx
+data/raw/*
+!data/raw/.gitkeep
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# System files
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
