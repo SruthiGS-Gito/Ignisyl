@@ -52,8 +52,6 @@
 
 ---
 
-[Keep the rest: Architecture, Quick Start, Login Credentials, Usage Guide, Graduated Response Levels table]
-
 ---
 
 ## 🔬 Research Contribution
@@ -106,8 +104,6 @@ This project explores a **graduated response framework** specifically for inside
 
 ---
 
-[Keep the rest: Contact, Acknowledgments, Project Status]
-
 ---
 
 ## 📈 Project Status
@@ -124,3 +120,4 @@ This project explores a **graduated response framework** specifically for inside
 **Made with ❤️ for cybersecurity research and academic innovation**
 
 🛡️ **IGNISYL** - Exploring graduated response frameworks for insider threat detection
+
