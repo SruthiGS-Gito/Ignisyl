@@ -263,6 +263,8 @@ async def execute_firewall_action(action_data: Dict):
 @router.get("/ml/model-info")
 async def get_ml_model_info():
     """Get information about ML models"""
+
+    
     
     if not ml_detector:
         raise HTTPException(status_code=503, detail="ML detector not initialized")
@@ -302,4 +304,315 @@ async def acknowledge_alert(alert_data: Dict):
         "acknowledged_at": datetime.now().isoformat(),
         "notes": notes
     }
+
+# ============================================================================
+# ANALYST THREAT CONTROL ENDPOINTS
+# ============================================================================
+
+@router.post("/analyst/threat/{threat_id}/action")
+async def analyst_take_action(
+    threat_id: str,
+    action: str,
+    custom_restrictions: dict,
+    reason: str,
+    duration_minutes: int = 60,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Analyst manually controls threat response
+    
+    Args:
+        threat_id: User ID of the threat
+        action: ALLOW, RESTRICT, ISOLATE, or BLOCK
+        custom_restrictions: Custom firewall restrictions
+        reason: Justification for action
+        duration_minutes: How long to apply restriction
+        current_user: Authenticated analyst
+        
+    Returns:
+        Result of action taken
+    """
+    try:
+        from services.firewall_controller import firewall
+        
+        # Verify analyst has permission
+        if current_user.get('role') not in ['admin', 'analyst']:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Verify user exists
+        user = user_manager.get_user(threat_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Add duration to restrictions
+        custom_restrictions["duration_minutes"] = duration_minutes
+        
+        # Apply firewall action
+        result = firewall.analyst_override_action(
+            user_id=threat_id,
+            action=action,
+            custom_restrictions=custom_restrictions,
+            analyst_id=current_user.get('username'),
+            reason=reason
+        )
+        
+        # Log the analyst action
+        activity_logger.log_activity({
+            "user_id": current_user.get('username'),
+            "activity_type": "analyst_action",
+            "target_user": threat_id,
+            "action": action,
+            "reason": reason,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        return {
+            "success": True,
+            "result": result,
+            "message": f"Action {action} applied successfully by {current_user.get('username')}"
+        }
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error in analyst action: {e}")
+        raise HTTPException(status_code=500, detail="Failed to apply action")
+
+
+@router.get("/analyst/pending-decisions")
+async def get_pending_decisions(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all threats waiting for analyst decision
+    
+    Returns:
+        List of pending threats requiring analyst review (risk score 50-69)
+    """
+    try:
+        # Verify analyst permission
+        if current_user.get('role') not in ['admin', 'analyst']:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Get recent high-risk activities that need analyst review
+        all_activities = activity_logger.get_recent_activities(limit=200)
+        
+        # Filter for RESTRICT level (risk 50-69) that need review
+        pending = [
+            activity for activity in all_activities
+            if 50 <= activity['risk_score'] < 70
+            and activity['action'] not in ['BLOCK', 'ISOLATE']  # Not already handled
+        ]
+        
+        pending_list = []
+        for activity in pending[:50]:  # Limit to 50 most recent
+            pending_list.append({
+                "id": activity['id'],
+                "user_id": activity['user_id'],
+                "username": activity['username'],
+                "full_name": activity['full_name'],
+                "activity_type": activity['activity_type'],
+                "risk_score": activity['risk_score'],
+                "risk_level": activity['risk_level'],
+                "timestamp": activity['timestamp'],
+                "summary": activity['summary'],
+                "action": activity['action'],
+                "recommended_action": "RESTRICT",
+                "details": activity.get('details', {})
+            })
+        
+        return {
+            "success": True,
+            "count": len(pending_list),
+            "pending_decisions": pending_list
+        }
+        
+    except Exception as e:
+        print(f"Error getting pending decisions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get pending decisions")
+
+
+@router.post("/analyst/threat/{threat_id}/contact-user")
+async def contact_user(
+    threat_id: str,
+    message: str,
+    method: str = "notification",  # notification, email, or sms
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Analyst sends message to user about suspicious activity
+    
+    Args:
+        threat_id: User ID to contact
+        message: Message to send
+        method: Communication method (notification, email, sms)
+        current_user: Authenticated analyst
+        
+    Returns:
+        Confirmation of message sent
+    """
+    try:
+        # Verify analyst permission
+        if current_user.get('role') not in ['admin', 'analyst']:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Verify user exists
+        user = user_manager.get_user(threat_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Log the contact attempt
+        print(f"📧 Analyst {current_user.get('username')} contacting user {threat_id}")
+        
+        contact_log = {
+            "analyst_id": current_user.get('username'),
+            "user_id": threat_id,
+            "message": message,
+            "method": method,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # In production, send actual notification via email/SMS/app notification
+        # For now, log it
+        activity_logger.log_activity({
+            "user_id": current_user.get('username'),
+            "activity_type": "analyst_contact",
+            "target_user": threat_id,
+            "message": message,
+            "method": method,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        print(f"User contact logged: {contact_log}")
+        
+        return {
+            "success": True,
+            "status": "message_sent",
+            "method": method,
+            "target_user": user['username'],
+            "timestamp": datetime.now().isoformat(),
+            "message": f"Message sent to {user['full_name']} via {method}"
+        }
+        
+    except Exception as e:
+        print(f"Error contacting user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to contact user")
+
+
+@router.post("/analyst/threat/{threat_id}/escalate")
+async def escalate_threat(
+    threat_id: str,
+    escalate_to: str,  # admin, manager, incident_team
+    notes: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Escalate threat to higher authority
+    
+    Args:
+        threat_id: User ID of threat
+        escalate_to: Who to escalate to (admin, manager, incident_team)
+        notes: Escalation notes
+        current_user: Authenticated analyst
+        
+    Returns:
+        Escalation confirmation
+    """
+    try:
+        # Verify analyst permission
+        if current_user.get('role') not in ['admin', 'analyst']:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Verify user exists
+        user = user_manager.get_user(threat_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        escalation = {
+            "analyst_id": current_user.get('username'),
+            "user_id": threat_id,
+            "escalated_to": escalate_to,
+            "notes": notes,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        print(f"⚠️ Threat escalated: {escalation}")
+        
+        # Log escalation
+        activity_logger.log_activity({
+            "user_id": current_user.get('username'),
+            "activity_type": "threat_escalation",
+            "target_user": threat_id,
+            "escalated_to": escalate_to,
+            "notes": notes,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # In production, send notifications to escalation target
+        
+        return {
+            "success": True,
+            "escalated_to": escalate_to,
+            "target_user": user['username'],
+            "analyst": current_user.get('username'),
+            "timestamp": datetime.now().isoformat(),
+            "message": f"Threat escalated to {escalate_to}"
+        }
+        
+    except Exception as e:
+        print(f"Error escalating threat: {e}")
+        raise HTTPException(status_code=500, detail="Failed to escalate")
+
+
+@router.get("/analyst/my-actions")
+async def get_analyst_actions(
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get analyst's recent actions for audit trail
+    
+    Returns:
+        List of actions taken by this analyst
+    """
+    try:
+        # Verify analyst permission
+        if current_user.get('role') not in ['admin', 'analyst']:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+        # Get analyst's actions from activity log
+        analyst_id = current_user.get('username')
+        all_activities = activity_logger.get_user_activities(analyst_id, limit=limit)
+        
+        # Filter for analyst-specific actions
+        analyst_actions = [
+            activity for activity in all_activities
+            if activity['activity_type'] in [
+                'analyst_action', 
+                'analyst_contact', 
+                'threat_escalation'
+            ]
+        ]
+        
+        actions = []
+        for activity in analyst_actions:
+            actions.append({
+                "action_id": activity['id'],
+                "action_type": activity['activity_type'],
+                "target_user": activity.get('target_user', 'N/A'),
+                "timestamp": activity['timestamp'],
+                "details": activity.get('details', {}),
+                "summary": activity['summary']
+            })
+        
+        return {
+            "success": True,
+            "analyst": analyst_id,
+            "count": len(actions),
+            "actions": actions
+        }
+        
+    except Exception as e:
+        print(f"Error getting analyst actions: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get actions")
 
