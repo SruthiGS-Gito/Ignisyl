@@ -57,18 +57,133 @@
 - ✅ View all activities and alerts
 - ✅ Generate all types of reports
 - ✅ Configure system settings
-- ✅ Apply firewall rules
+- ✅ Override ANY firewall action (all 5 levels)
 - ✅ Manage ML models
+- ✅ Remote shutdown capability
 
-### 2. Analyst
+### 2. Security Analyst
 **Permissions:**
-- ✅ View dashboard
-- ✅ Monitor activities
-- ✅ View alerts
+- ✅ View dashboard and all activities
+- ✅ Monitor real-time threats
+- ✅ **REMOTE THREAT CONTROL:**
+  - ✅ Make decisions on RESTRICT level threats (50-69 risk)
+  - ✅ Apply custom firewall restrictions
+  - ✅ Contact users directly
+  - ✅ Escalate to manager/admin
+  - ✅ Override auto-restrictions with justification
 - ✅ Generate user-specific reports
+- ✅ Acknowledge and resolve alerts
 - ❌ Cannot create/delete users
-- ❌ Cannot modify system settings
-- ❌ Limited firewall control
+- ❌ Cannot modify global system settings
+- ⚠️ Limited to Level 3-4 actions (cannot force shutdown)
+
+## Analyst Remote Control Capabilities
+
+### Real-Time Threat Response Dashboard
+
+When a HIGH-risk threat is detected (risk score 50-69), the system **does not automatically block**. Instead, it sends the threat to the **Analyst Decision Queue**.
+
+### Analyst Decision Workflow
+
+1. **Threat Notification**
+   - Alert appears in "Pending Decisions" section
+   - Desktop notification (if enabled)
+   - Email alert for URGENT threats
+
+2. **Threat Analysis**
+   - View complete activity context
+   - See user's recent behavior history
+   - Review ML model reasoning
+   - Check if user is on-site or remote
+
+3. **Available Actions**
+
+#### Option 1: ALLOW (False Positive)
+```
+Use Case: Legitimate unusual activity
+Example: CFO accessing payroll data at night for audit
+Action: Clear alert, add to user baseline
+```
+
+#### Option 2: RESTRICT (Limit Access)
+```
+Use Case: Suspicious but not critical
+Example: Employee accessing confidential files outside normal hours
+Custom Restrictions:
+  ☐ Block external internet only
+  ☐ Block file transfers (FTP, SMB, SSH)
+  ☐ Rate limit to 1 Mbps
+  ☐ Disable USB devices
+  ☐ Force logout after 10 minutes
+  ☐ Send warning notification to user
+Duration: 30 min / 1 hr / 4 hrs / Until review
+```
+
+#### Option 3: ISOLATE (Network Quarantine)
+```
+Use Case: High-confidence threat
+Example: Large data exfiltration attempt
+Restrictions:
+  ✓ Block all external network
+  ✓ Allow internal corporate network only
+  ✓ Disconnect VPN
+  ✓ Disable USB ports
+  ✓ Log all local file operations
+Duration: Until analyst manually releases
+```
+
+#### Option 4: ESCALATE
+```
+Use Case: Need admin/management decision
+Action: Forward to admin with notes
+Notification: Immediate alert to admin
+```
+
+#### Option 5: CONTACT USER
+```
+Use Case: Need user explanation
+Action: Send message to user's device
+Message: "We've detected unusual activity on your account.
+         Please call Security at ext. 1234 immediately."
+```
+
+### Custom Restriction Examples
+
+**Scenario 1: Finance employee accessing HR files**
+```
+Risk Score: 62 (HIGH)
+Analyst Decision: RESTRICT
+Custom Actions:
+  ✓ Block external internet
+  ✓ Send warning notification
+  ✗ Allow internal network (for legitimate work)
+Duration: 30 minutes
+Reason: "Verify legitimate business need with manager"
+```
+
+**Scenario 2: Developer with sudden large data transfer**
+```
+Risk Score: 71 (CRITICAL - auto-isolated)
+Analyst Review: ISOLATE → ALLOW
+Custom Actions:
+  ✓ Contact user first
+  ✓ User confirmed: "Uploading product release to cloud"
+  ✓ Release isolation
+  ✓ Add to baseline: "Weekly release uploads"
+Reason: "Legitimate release process, updated user profile"
+```
+
+**Scenario 3: Honeypot access detected**
+```
+Risk Score: 95 (CRITICAL - auto-blocked)
+Analyst Review: Confirm block
+Actions:
+  ✓ Keep blocked
+  ✓ Contact user's manager
+  ✓ Initiate incident investigation
+  ✓ Preserve forensic evidence
+Reason: "Confirmed insider threat - investigating"
+```
 
 ---
 
@@ -639,3 +754,4 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 **Version:** 1.0  
 **Document:** User Manual
 <<<END User_Manual.md>>>
+
