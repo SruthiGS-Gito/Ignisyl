@@ -9,6 +9,9 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__) 
 
 class FirewallController:
     """
@@ -206,6 +209,410 @@ class FirewallController:
             return f'pfctl -t blocklist -T delete {ip_address}'
         else:
             return f'# Remove rule for {ip_address}'
+
+    # ============================================================================
+    # GRADUATED RESPONSE FRAMEWORK - NEW FUNCTIONS
+    # ============================================================================
+    
+    def apply_graduated_response(self, user_id: str, risk_score: float, 
+                                 analyst_override: bool = False):
+        """
+        Apply graduated response based on risk score and analyst decision
+        
+        Args:
+            user_id: User identifier
+            risk_score: Risk score (0-100)
+            analyst_override: If True, wait for analyst decision on RESTRICT level
+            
+        Returns:
+            dict: Action taken and restrictions applied
+        """
+        logger.info(f"Applying graduated response for {user_id} - Risk: {risk_score}")
+        
+        if risk_score < 30:
+            return self._allow(user_id)
+        elif risk_score < 50:
+            return self._monitor(user_id)
+        elif risk_score < 70:
+            if analyst_override:
+                return self._wait_for_analyst_decision(user_id, risk_score)
+            return self._auto_restrict(user_id)
+        elif risk_score < 90:
+            self._auto_isolate(user_id)
+            return self._alert_analyst_urgent(user_id)
+        else:
+            return self._critical_block_shutdown(user_id)
+    
+    def _allow(self, user_id: str):
+        """Level 1: Normal operations with logging"""
+        logger.info(f"ALLOW action for {user_id}")
+        return {
+            "action": "ALLOW",
+            "level": 1,
+            "log_level": "NORMAL",
+            "restrictions": None,
+            "analyst_required": False
+        }
+    
+    def _monitor(self, user_id: str):
+        """Level 2: Enhanced monitoring"""
+        logger.info(f"MONITOR action for {user_id}")
+        
+        # Increase logging detail
+        monitoring_config = {
+            "detailed_logging": True,
+            "screenshot_capture": False,  # Optional: enable if needed
+            "keystroke_logging": False,   # Optional: enable if needed
+            "network_packet_capture": True
+        }
+        
+        return {
+            "action": "MONITOR",
+            "level": 2,
+            "log_level": "DETAILED",
+            "analyst_notification": True,
+            "restrictions": None,
+            "monitoring_config": monitoring_config
+        }
+    
+    def _auto_restrict(self, user_id: str):
+        """Level 3: Automatic restriction with analyst notification"""
+        logger.warning(f"RESTRICT action for {user_id}")
+        
+        restrictions = {
+            "block_external_internet": True,
+            "rate_limit_mbps": 1,
+            "block_ports": [21, 22, 445, 3389],  # FTP, SSH, SMB, RDP
+            "allow_internal_network": True,
+            "duration_minutes": 60,
+            "notify_user": True
+        }
+        
+        # Apply restrictions via existing methods
+        ip_address = self._get_user_ip(user_id)
+        if ip_address:
+            self._apply_network_restrictions(ip_address, restrictions)
+        
+        # Send to analyst queue for review
+        self._send_to_analyst_queue(user_id, "RESTRICT", restrictions)
+        
+        return {
+            "action": "RESTRICT",
+            "level": 3,
+            "restrictions": restrictions,
+            "analyst_review_required": True,
+            "auto_expire": True
+        }
+    
+    def _wait_for_analyst_decision(self, user_id: str, risk_score: float):
+        """Hold threat in queue waiting for analyst decision"""
+        logger.info(f"Waiting for analyst decision: {user_id} - Risk: {risk_score}")
+        
+        # Create pending decision record
+        pending_decision = {
+            "user_id": user_id,
+            "risk_score": risk_score,
+            "timestamp": datetime.now().isoformat(),
+            "status": "PENDING_ANALYST",
+            "recommended_action": "RESTRICT"
+        }
+        
+        # Store in database (you'll need to create this table)
+        self._store_pending_decision(pending_decision)
+        
+        # Send urgent notification to analysts
+        self._notify_analysts_decision_needed(user_id, risk_score)
+        
+        return {
+            "action": "PENDING",
+            "level": 3,
+            "status": "WAITING_FOR_ANALYST",
+            "risk_score": risk_score,
+            "timeout_minutes": 15  # Auto-escalate if no decision in 15 min
+        }
+    
+    def _auto_isolate(self, user_id: str):
+        """Level 4: Network isolation"""
+        logger.error(f"ISOLATE action for {user_id}")
+        
+        restrictions = {
+            "block_all_external": True,
+            "allow_internal_only": True,
+            "disconnect_vpn": True,
+            "disable_usb": True,
+            "force_local_logging": True,
+            "require_admin_unlock": True
+        }
+        
+        # Immediate isolation
+        ip_address = self._get_user_ip(user_id)
+        if ip_address:
+            self._apply_full_isolation(ip_address, restrictions)
+        
+        # Alert analysts urgently
+        self._alert_analyst_urgent(user_id, "ISOLATION_APPLIED")
+        
+        return {
+            "action": "ISOLATE",
+            "level": 4,
+            "restrictions": restrictions,
+            "analyst_intervention": "REQUIRED",
+            "auto_expire": False
+        }
+    
+    def _critical_block_shutdown(self, user_id: str):
+        """Level 5: Critical threat response"""
+        logger.critical(f"CRITICAL BLOCK for {user_id}")
+        
+        restrictions = {
+            "complete_network_disconnect": True,
+            "system_lock": True,
+            "optional_shutdown": False,  # Set True for automatic shutdown
+            "require_admin_unlock": True,
+            "forensics_capture": True
+        }
+        
+        # Immediate action
+        ip_address = self._get_user_ip(user_id)
+        if ip_address:
+            self.block_user(user_id, ip_address, duration_minutes=0)  # Indefinite
+        
+        # Alert entire security team
+        self._alert_security_team_critical(user_id)
+        self._activate_incident_response(user_id)
+        
+        return {
+            "action": "BLOCK",
+            "level": 5,
+            "restrictions": restrictions,
+            "incident_response": "ACTIVATED",
+            "require_admin_review": True
+        }
+    
+    def analyst_override_action(self, user_id: str, action: str, 
+                                custom_restrictions: dict, 
+                                analyst_id: str, reason: str):
+        """
+        Allow analyst to manually control firewall actions
+        
+        Args:
+            user_id: Target user
+            action: One of ALLOW, RESTRICT, ISOLATE, BLOCK
+            custom_restrictions: Custom restriction settings
+            analyst_id: Analyst making the decision
+            reason: Justification for action
+            
+        Returns:
+            dict: Result of action
+        """
+        valid_actions = ["ALLOW", "RESTRICT", "ISOLATE", "BLOCK"]
+        
+        if action not in valid_actions:
+            raise ValueError(f"Invalid action. Must be one of {valid_actions}")
+        
+        logger.info(f"Analyst {analyst_id} taking action {action} on {user_id}: {reason}")
+        
+        # Log analyst decision to database
+        self._log_analyst_action(
+            user_id=user_id,
+            analyst_id=analyst_id,
+            action=action,
+            reason=reason,
+            restrictions=custom_restrictions,
+            timestamp=datetime.now()
+        )
+        
+        # Apply analyst's custom restrictions
+        ip_address = self._get_user_ip(user_id)
+        
+        if action == "ALLOW":
+            self._clear_restrictions(user_id, ip_address)
+            result = {"status": "CLEARED", "message": "All restrictions removed"}
+            
+        elif action == "RESTRICT":
+            self._apply_custom_restrictions(user_id, ip_address, custom_restrictions)
+            result = {"status": "RESTRICTED", "restrictions": custom_restrictions}
+            
+        elif action == "ISOLATE":
+            self._apply_isolation(user_id, ip_address, custom_restrictions)
+            result = {"status": "ISOLATED", "restrictions": custom_restrictions}
+            
+        elif action == "BLOCK":
+            self._apply_full_block(user_id, ip_address, custom_restrictions)
+            result = {"status": "BLOCKED", "restrictions": custom_restrictions}
+        
+        # Notify user if configured
+        if custom_restrictions.get("notify_user"):
+            self._send_user_notification(user_id, action, reason)
+        
+        result.update({
+            "action_applied": action,
+            "analyst": analyst_id,
+            "timestamp": datetime.now().isoformat(),
+            "reason": reason
+        })
+        
+        return result
+    
+    # ============================================================================
+    # HELPER METHODS FOR GRADUATED RESPONSE
+    # ============================================================================
+    
+    def _get_user_ip(self, user_id: str) -> str:
+        """Get user's current IP address from activity logs"""
+        # Query recent activity to get IP
+        # You'll need to implement this based on your database
+        try:
+            from models.user_activity import UserActivity
+            recent = UserActivity.query.filter_by(user_id=user_id)\
+                .order_by(UserActivity.timestamp.desc()).first()
+            return recent.source_ip if recent else None
+        except Exception as e:
+            logger.error(f"Error getting user IP: {e}")
+            return None
+    
+    def _apply_network_restrictions(self, ip_address: str, restrictions: dict):
+        """Apply custom network restrictions"""
+        if restrictions.get("block_external_internet"):
+            # Block all external traffic, allow internal only
+            self._block_external_for_ip(ip_address)
+        
+        if restrictions.get("rate_limit_mbps"):
+            # Apply rate limiting
+            rate_limit = restrictions["rate_limit_mbps"]
+            self._apply_rate_limit(ip_address, rate_limit)
+        
+        if restrictions.get("block_ports"):
+            # Block specific ports
+            for port in restrictions["block_ports"]:
+                self._block_port_for_ip(ip_address, port)
+    
+    def _apply_full_isolation(self, ip_address: str, restrictions: dict):
+        """Apply complete network isolation"""
+        # Block all external
+        self._block_external_for_ip(ip_address)
+        
+        # Keep internal network access
+        if not restrictions.get("block_all_internal"):
+            self._allow_internal_for_ip(ip_address)
+    
+    def _send_to_analyst_queue(self, user_id: str, action: str, restrictions: dict):
+        """Add threat to analyst decision queue"""
+        # This should store to database table for analysts to review
+        logger.info(f"Sending {user_id} to analyst queue: {action}")
+        # Implementation depends on your database structure
+        pass
+    
+    def _notify_analysts_decision_needed(self, user_id: str, risk_score: float):
+        """Send notification to analysts that decision is needed"""
+        logger.warning(f"Analyst decision needed for {user_id} - Risk: {risk_score}")
+        # Implement notification system (email, Slack, etc.)
+        pass
+    
+    def _alert_analyst_urgent(self, user_id: str, message: str = ""):
+        """Send urgent alert to analysts"""
+        logger.warning(f"URGENT: Analyst attention needed for {user_id} - {message}")
+        # Implement urgent notification
+        return {"alert_sent": True, "level": "URGENT"}
+    
+    def _alert_security_team_critical(self, user_id: str):
+        """Alert entire security team of critical incident"""
+        logger.critical(f"CRITICAL INCIDENT: {user_id}")
+        # Implement team-wide alert
+        pass
+    
+    def _activate_incident_response(self, user_id: str):
+        """Activate incident response protocol"""
+        logger.critical(f"Activating incident response for {user_id}")
+        # Trigger incident response workflow
+        pass
+    
+    def _log_analyst_action(self, user_id: str, analyst_id: str, action: str, 
+                           reason: str, restrictions: dict, timestamp: datetime):
+        """Log analyst decision to audit trail"""
+        log_entry = {
+            "user_id": user_id,
+            "analyst_id": analyst_id,
+            "action": action,
+            "reason": reason,
+            "restrictions": json.dumps(restrictions),
+            "timestamp": timestamp.isoformat()
+        }
+        logger.info(f"Analyst action logged: {log_entry}")
+        # Store to database
+        pass
+    
+    def _clear_restrictions(self, user_id: str, ip_address: str):
+        """Clear all restrictions for user"""
+        if ip_address:
+            self._get_remove_command(ip_address)
+        logger.info(f"Cleared all restrictions for {user_id}")
+    
+    def _apply_custom_restrictions(self, user_id: str, ip_address: str, restrictions: dict):
+        """Apply analyst's custom restrictions"""
+        if ip_address:
+            self._apply_network_restrictions(ip_address, restrictions)
+        logger.info(f"Applied custom restrictions for {user_id}: {restrictions}")
+    
+    def _apply_isolation(self, user_id: str, ip_address: str, restrictions: dict):
+        """Apply isolation with custom settings"""
+        if ip_address:
+            self._apply_full_isolation(ip_address, restrictions)
+        logger.info(f"Applied isolation for {user_id}")
+    
+    def _apply_full_block(self, user_id: str, ip_address: str, restrictions: dict):
+        """Apply complete block"""
+        if ip_address:
+            duration = restrictions.get("duration_minutes", 0)
+            self.block_user(user_id, ip_address, duration)
+        logger.info(f"Applied full block for {user_id}")
+    
+    def _send_user_notification(self, user_id: str, action: str, reason: str):
+        """Send notification to user about action taken"""
+        logger.info(f"Sending notification to {user_id}: {action} - {reason}")
+        # Implement user notification
+        pass
+    
+    def _store_pending_decision(self, pending_decision: dict):
+        """Store pending decision in database"""
+        # Store to pending_analyst_decisions table
+        logger.info(f"Stored pending decision: {pending_decision}")
+        pass
+
+    # ============================================================================
+    # NETWORK OPERATION HELPER METHODS
+    # ============================================================================
+    
+    def _block_external_for_ip(self, ip_address: str):
+        """Block external internet for specific IP"""
+        command = self._get_restrict_external_command(ip_address)
+        logger.info(f"Blocking external access for {ip_address}: {command}")
+        # In production, execute the actual command
+        pass
+    
+    def _apply_rate_limit(self, ip_address: str, rate_limit_mbps: int):
+        """Apply bandwidth rate limiting"""
+        command = self._get_rate_limit_command(ip_address, rate_limit_mbps)
+        logger.info(f"Applying rate limit for {ip_address}: {command}")
+        # In production, execute the actual command
+        pass
+    
+    def _block_port_for_ip(self, ip_address: str, port: int):
+        """Block specific port for IP"""
+        command = self._get_block_ports_command(ip_address, [port])
+        logger.info(f"Blocking port {port} for {ip_address}: {command}")
+        # In production, execute the actual command
+        pass
+    
+    def _allow_internal_for_ip(self, ip_address: str):
+        """Allow internal network access"""
+        # This would use OS-specific commands to allow internal subnet
+        logger.info(f"Allowing internal network for {ip_address}")
+        pass
+    
+    def block_user(self, user_id: str, ip_address: str, duration_minutes: int = 60):
+        """Wrapper for apply_block to maintain compatibility"""
+        return self.apply_block(user_id, ip_address, duration_minutes)
     
     async def auto_cleanup_loop(self):
         """Background task to automatically cleanup expired rules"""
