@@ -82,18 +82,19 @@ graph TB
 | `model_trainer.py` | Training pipeline |
 
 #### Services (`backend/services/`)
-| File | Purpose |
-|------|---------|
-| `intelligent_risk_engine.py` | Real-time risk assessment |
-| `system_monitor.py` | CPU/RAM/Disk monitoring |
-| `ml_performance_tracker.py` | Model accuracy tracking |
-| `honeypot_watcher.py` | Decoy file monitoring |
-| `comprehensive_monitor.py` | Multi-vector threat detection |
-| `report_generator.py` | PDF report generation |
-| `alert_manager.py` | Alert lifecycle management |
-| `firewall_controller.py` | Adaptive firewall rules |
-| `log_processor.py` | SIEM-style log analysis |
-| `network_monitor.py` | Network activity monitoring |
+
+| File | Purpose | New Features |
+|------|---------|--------------|
+| `intelligent_risk_engine.py` | Real-time risk assessment | |
+| `system_monitor.py` | CPU/RAM/Disk monitoring | |
+| `ml_performance_tracker.py` | Model accuracy tracking | |
+| `honeypot_watcher.py` | Decoy file monitoring | |
+| `comprehensive_monitor.py` | Multi-vector threat detection | |
+| `report_generator.py` | PDF report generation | |
+| `alert_manager.py` | Alert lifecycle management | |
+| `firewall_controller.py` | Adaptive firewall rules | **✨ Graduated Response Framework (5 levels)**<br>**✨ Analyst Override Controls**<br>**✨ Custom Restriction Management** |
+| `log_processor.py` | SIEM-style log analysis | |
+| `network_monitor.py` | Network activity monitoring | |
 
 #### Utilities (`backend/utils/`)
 - **`helpers.py`**: Common functions (formatting, hashing, time windows)
@@ -449,3 +450,4 @@ For architecture questions or deployment support:
 - **Documentation:** https://docs.ignisyl.com
 - **GitHub:** https://github.com/company/ignisyl
 <<<END Architecture.md>>>
+
