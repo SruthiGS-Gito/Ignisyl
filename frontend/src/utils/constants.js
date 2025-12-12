@@ -111,5 +111,5 @@ export const DURATION_OPTIONS = [
   { value: 1440, label: '24 hours' },
 ];
 
-export const API_BASE_URL = 'http://127.0.0.1:8000';
+export const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 export const WS_BASE_URL = 'ws://127.0.0.1:8000';

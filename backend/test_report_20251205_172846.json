@@ -1,0 +1,116 @@
+{
+  "timestamp": "2025-12-05T17:28:46.903484",
+  "summary": {
+    "total": 15,
+    "passed": 0,
+    "failed": 15,
+    "pass_rate": 0.0
+  },
+  "results": [
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "description": "Root endpoint",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/health",
+      "method": "GET",
+      "description": "Health check",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/dashboard/stats",
+      "method": "GET",
+      "description": "Dashboard statistics",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/users/risk",
+      "method": "GET",
+      "description": "User risk data",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/activities/recent",
+      "method": "GET",
+      "description": "Recent activities",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/activities/recent?limit=10",
+      "method": "GET",
+      "description": "Recent activities (limited)",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/users/list",
+      "method": "GET",
+      "description": "List all users",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/users/risk",
+      "method": "GET",
+      "description": "Get users for testing",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/threats/active",
+      "method": "GET",
+      "description": "Active threats",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/analytics/trends",
+      "method": "GET",
+      "description": "Analytics trends",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/ml/model-info",
+      "method": "GET",
+      "description": "ML model info",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/debug/users",
+      "method": "GET",
+      "description": "Debug user list",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/debug/simulate-activity",
+      "method": "POST",
+      "description": "Simulate activity",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/firewall/action",
+      "method": "POST",
+      "description": "Firewall action",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    },
+    {
+      "endpoint": "/api/v1/reports/user",
+      "method": "POST",
+      "description": "Generate user report",
+      "success": false,
+      "error": "HTTPConnectionPool(host='127.0.0.1', port=8000): Read timed out. (read timeout=5)"
+    }
+  ]
+}

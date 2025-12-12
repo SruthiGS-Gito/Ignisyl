@@ -11,7 +11,7 @@ import json
 class UserManager:
     """Manages users being monitored by IGNISYL"""
     
-    def __init__(self, db_path: str = "data/users.db"):
+    def __init__(self, db_path: str = "../data/users.db"):
         self.db_path = db_path
         self._init_database()
     

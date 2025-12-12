@@ -41,12 +41,22 @@ def prepare_features(data):
     }
     
     for sample in data:
+        # Extract 9 features matching prediction pipeline
         features = [
-            sample['hour'],
-            sample['day_of_week'],
-            int(sample['is_weekend']),
-            np.log1p(sample['bytes_transferred']),  # Log transform
-            activity_types.get(sample['activity_type'], 0)
+            sample['hour'],                                      # 1
+            sample['day_of_week'],                              # 2
+            sample.get('file_size', 0),                         # 3
+            np.log1p(sample.get('file_size', 0)),              # 4
+            sample['bytes_transferred'],                        # 5
+            np.log1p(sample['bytes_transferred']),             # 6
+            int(sample['is_weekend']),                         # 7
+            int(sample.get('is_business_hours', 0)),          # 8
+            sample.get('confidence_score', 0.2),               # 9
+            sample.get('failed_login_count', 0),               # 10 NEW
+            sample.get('access_frequency', 1.0),               # 11 NEW
+            int(sample.get('unusual_location', False)),        # 12 NEW
+            sample.get('file_type_risk', 0),                   # 13 NEW
+            sample.get('time_since_last', 60)                  # 14 NEW
         ]
         X.append(features)
         y.append(int(sample['is_malicious']))
@@ -109,23 +119,38 @@ def train_autoencoder(X):
     return model, scaler
 
 def train_xgboost(X, y):
-    """Train XGBoost"""
-    print("\n🚀 Training XGBoost...")
+    """Train XGBoost with class balancing"""
+    print("🚀 Training XGBoost...")
     
-    model = xgb.XGBClassifier(
-        n_estimators=100,
+    # Calculate class weights for imbalanced data
+    n_samples = len(y)
+    n_positive = int(sum(y))
+    n_negative = n_samples - n_positive
+    scale_pos_weight = n_negative / n_positive if n_positive > 0 else 1.0
+    
+    print(f"   Total samples: {n_samples}")
+    print(f"   Normal (0): {n_negative} ({n_negative/n_samples*100:.1f}%)")
+    print(f"   Malicious (1): {n_positive} ({n_positive/n_samples*100:.1f}%)")
+    print(f"   Scale pos weight: {scale_pos_weight:.2f}")
+    
+    # Train XGBoost with class balancing
+    xgb_model = xgb.XGBClassifier(
+        n_estimators=200,
         max_depth=6,
         learning_rate=0.1,
-        random_state=42
+        scale_pos_weight=scale_pos_weight,
+        random_state=42,
+        use_label_encoder=False,
+        eval_metric='logloss'
     )
     
-    model.fit(X, y)
+    xgb_model.fit(X, y)
     
-    # Calculate accuracy
-    train_acc = model.score(X, y)
+    # Calculate training accuracy
+    train_acc = xgb_model.score(X, y)
     print(f"✅ XGBoost trained - Training Accuracy: {train_acc*100:.2f}%")
     
-    return model
+    return xgb_model
 
 def save_models(isolation_forest, autoencoder, scaler, xgboost, output_dir='data/models'):
     """Save trained models"""

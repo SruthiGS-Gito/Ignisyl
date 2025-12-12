@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"\nimport sys\nsys.path.append(''scripts'')\nfrom train_models import load_training_data, prepare_features\n\n# Load data\ndata = load_training_data(''data/synthetic/training_data.json'')\nX, y = prepare_features(data)\n\nprint(''Feature matrix shape:'', X.shape)\nprint(''Labels shape:'', y.shape)\nprint(f''\\nClass distribution:'')\nprint(f''  Normal (0): {sum(y == 0)} samples'')\nprint(f''  Malicious (1): {sum(y == 1)} samples'')\n\n# Check feature statistics\nimport numpy as np\nprint(f''\\nFeature statistics (all samples):'')\nfeature_names = [''hour'', ''day_of_week'', ''file_size'', ''file_size_log'', \n                 ''bytes_transferred'', ''bytes_log'', ''is_weekend'', ''is_business_hours'', ''confidence'']\nfor i, name in enumerate(feature_names):\n    print(f''  {name}: min={X[:, i].min():.2f}, max={X[:, i].max():.2f}, mean={X[:, i].mean():.2f}'')\n\nprint(f''\\nMalicious samples (first 3):'')\nmalicious_idx = np.where(y == 1)[0][:3]\nfor idx in malicious_idx:\n    print(f''  {X[idx]}'')\n\nprint(f''\\nNormal samples (first 3):'')\nnormal_idx = np.where(y == 0)[0][:3]\nfor idx in normal_idx:\n    print(f''  {X[idx]}'')\n\")"
+    ]
+  }
+}

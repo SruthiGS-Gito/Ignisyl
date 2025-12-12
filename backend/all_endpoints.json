@@ -1,0 +1,443 @@
+{
+  "total": 34,
+  "categories": {
+    "Core": [
+      {
+        "method": "GET",
+        "path": "/",
+        "summary": "Root",
+        "operationId": "root__get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/health",
+        "summary": "Health Check",
+        "operationId": "health_check_api_v1_health_get"
+      }
+    ],
+    "Dashboard": [
+      {
+        "method": "GET",
+        "path": "/api/v1/dashboard/stats",
+        "summary": "Dashboard Stats",
+        "operationId": "dashboard_stats_api_v1_dashboard_stats_get"
+      }
+    ],
+    "Users": [
+      {
+        "method": "GET",
+        "path": "/api/v1/debug/users",
+        "summary": "Debug Users",
+        "operationId": "debug_users_api_v1_debug_users_get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/users/list",
+        "summary": "List Users",
+        "operationId": "list_users_api_v1_users_list_get"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/users/register",
+        "summary": "Register User",
+        "operationId": "register_user_api_v1_users_register_post"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/users/risk",
+        "summary": "Get User Risks",
+        "operationId": "get_user_risks_api_v1_users_risk_get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/users/{user_id}/profile",
+        "summary": "Get User Profile",
+        "operationId": "get_user_profile_api_v1_users__user_id__profile_get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/users/{user_id}/risk-profile",
+        "summary": "Get User Risk Profile",
+        "operationId": "get_user_risk_profile_api_v1_users__user_id__risk_profile_get"
+      }
+    ],
+    "Activities": [
+      {
+        "method": "GET",
+        "path": "/api/v1/activities/recent",
+        "summary": "Get Recent Activities",
+        "operationId": "get_recent_activities_api_v1_activities_recent_get"
+      }
+    ],
+    "Threats": [
+      {
+        "method": "POST",
+        "path": "/api/v1/analyst/threat/{threat_id}/action",
+        "summary": "Analyst Take Action",
+        "operationId": "analyst_take_action_api_v1_analyst_threat__threat_id__action_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/analyst/threat/{threat_id}/contact-user",
+        "summary": "Contact User",
+        "operationId": "contact_user_api_v1_analyst_threat__threat_id__contact_user_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/analyst/threat/{threat_id}/escalate",
+        "summary": "Escalate Threat",
+        "operationId": "escalate_threat_api_v1_analyst_threat__threat_id__escalate_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/broadcast/threat",
+        "summary": "Broadcast Threat",
+        "operationId": "broadcast_threat_api_v1_broadcast_threat_post"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/threats/active",
+        "summary": "Get Active Threats",
+        "operationId": "get_active_threats_api_v1_threats_active_get"
+      }
+    ],
+    "Analytics": [
+      {
+        "method": "GET",
+        "path": "/api/v1/analytics/trends",
+        "summary": "Get Analytics Trends",
+        "operationId": "get_analytics_trends_api_v1_analytics_trends_get"
+      }
+    ],
+    "Analyst": [
+      {
+        "method": "GET",
+        "path": "/api/v1/analyst/my-actions",
+        "summary": "Get Analyst Actions",
+        "operationId": "get_analyst_actions_api_v1_analyst_my_actions_get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/analyst/pending-decisions",
+        "summary": "Get Pending Decisions",
+        "operationId": "get_pending_decisions_api_v1_analyst_pending_decisions_get"
+      }
+    ],
+    "Firewall": [
+      {
+        "method": "POST",
+        "path": "/api/v1/firewall/action",
+        "summary": "Execute Firewall Action",
+        "operationId": "execute_firewall_action_api_v1_firewall_action_post"
+      }
+    ],
+    "Reports": [
+      {
+        "method": "GET",
+        "path": "/api/v1/reports/download/{filename}",
+        "summary": "Download Report",
+        "operationId": "download_report_api_v1_reports_download__filename__get"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/reports/system",
+        "summary": "Generate System Report",
+        "operationId": "generate_system_report_api_v1_reports_system_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/reports/user",
+        "summary": "Generate User Report",
+        "operationId": "generate_user_report_api_v1_reports_user_post"
+      }
+    ],
+    "Monitoring": [
+      {
+        "method": "POST",
+        "path": "/api/v1/monitoring/file-access",
+        "summary": "Log File Access",
+        "operationId": "log_file_access_api_v1_monitoring_file_access_post"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/monitoring/honeypots",
+        "summary": "Check Honeypots",
+        "operationId": "check_honeypots_api_v1_monitoring_honeypots_get"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/monitoring/login",
+        "summary": "Log Login Attempt",
+        "operationId": "log_login_attempt_api_v1_monitoring_login_post"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/monitoring/suspicious",
+        "summary": "Get Suspicious Activities",
+        "operationId": "get_suspicious_activities_api_v1_monitoring_suspicious_get"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/monitoring/usb",
+        "summary": "Check Usb Devices",
+        "operationId": "check_usb_devices_api_v1_monitoring_usb_get"
+      }
+    ],
+    "ML": [
+      {
+        "method": "GET",
+        "path": "/api/v1/ml/model-info",
+        "summary": "Get Ml Model Info",
+        "operationId": "get_ml_model_info_api_v1_ml_model_info_get"
+      }
+    ],
+    "Auth": [
+      {
+        "method": "POST",
+        "path": "/api/v1/auth/login",
+        "summary": "Login",
+        "operationId": "login_api_v1_auth_login_post"
+      }
+    ],
+    "Debug": [
+      {
+        "method": "POST",
+        "path": "/api/v1/debug/simulate-activity",
+        "summary": "Simulate Activity",
+        "operationId": "simulate_activity_api_v1_debug_simulate_activity_post"
+      }
+    ],
+    "Other": [
+      {
+        "method": "POST",
+        "path": "/api/v1/alerts/acknowledge",
+        "summary": "Acknowledge Alert",
+        "operationId": "acknowledge_alert_api_v1_alerts_acknowledge_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/analyze",
+        "summary": "Analyze Activity",
+        "operationId": "analyze_activity_api_v1_analyze_post"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/simulate",
+        "summary": "Simulate Threat",
+        "operationId": "simulate_threat_api_v1_simulate_post"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/websocket/stats",
+        "summary": "Websocket Stats",
+        "operationId": "websocket_stats_api_v1_websocket_stats_get"
+      }
+    ]
+  },
+  "all_endpoints": [
+    {
+      "method": "GET",
+      "path": "/",
+      "summary": "Root",
+      "operationId": "root__get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/activities/recent",
+      "summary": "Get Recent Activities",
+      "operationId": "get_recent_activities_api_v1_activities_recent_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/alerts/acknowledge",
+      "summary": "Acknowledge Alert",
+      "operationId": "acknowledge_alert_api_v1_alerts_acknowledge_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analyst/my-actions",
+      "summary": "Get Analyst Actions",
+      "operationId": "get_analyst_actions_api_v1_analyst_my_actions_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analyst/pending-decisions",
+      "summary": "Get Pending Decisions",
+      "operationId": "get_pending_decisions_api_v1_analyst_pending_decisions_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/analyst/threat/{threat_id}/action",
+      "summary": "Analyst Take Action",
+      "operationId": "analyst_take_action_api_v1_analyst_threat__threat_id__action_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/analyst/threat/{threat_id}/contact-user",
+      "summary": "Contact User",
+      "operationId": "contact_user_api_v1_analyst_threat__threat_id__contact_user_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/analyst/threat/{threat_id}/escalate",
+      "summary": "Escalate Threat",
+      "operationId": "escalate_threat_api_v1_analyst_threat__threat_id__escalate_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/trends",
+      "summary": "Get Analytics Trends",
+      "operationId": "get_analytics_trends_api_v1_analytics_trends_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/analyze",
+      "summary": "Analyze Activity",
+      "operationId": "analyze_activity_api_v1_analyze_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "summary": "Login",
+      "operationId": "login_api_v1_auth_login_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/broadcast/threat",
+      "summary": "Broadcast Threat",
+      "operationId": "broadcast_threat_api_v1_broadcast_threat_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/stats",
+      "summary": "Dashboard Stats",
+      "operationId": "dashboard_stats_api_v1_dashboard_stats_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/debug/simulate-activity",
+      "summary": "Simulate Activity",
+      "operationId": "simulate_activity_api_v1_debug_simulate_activity_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/debug/users",
+      "summary": "Debug Users",
+      "operationId": "debug_users_api_v1_debug_users_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/firewall/action",
+      "summary": "Execute Firewall Action",
+      "operationId": "execute_firewall_action_api_v1_firewall_action_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "summary": "Health Check",
+      "operationId": "health_check_api_v1_health_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ml/model-info",
+      "summary": "Get Ml Model Info",
+      "operationId": "get_ml_model_info_api_v1_ml_model_info_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monitoring/file-access",
+      "summary": "Log File Access",
+      "operationId": "log_file_access_api_v1_monitoring_file_access_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monitoring/honeypots",
+      "summary": "Check Honeypots",
+      "operationId": "check_honeypots_api_v1_monitoring_honeypots_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/monitoring/login",
+      "summary": "Log Login Attempt",
+      "operationId": "log_login_attempt_api_v1_monitoring_login_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monitoring/suspicious",
+      "summary": "Get Suspicious Activities",
+      "operationId": "get_suspicious_activities_api_v1_monitoring_suspicious_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/monitoring/usb",
+      "summary": "Check Usb Devices",
+      "operationId": "check_usb_devices_api_v1_monitoring_usb_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reports/download/{filename}",
+      "summary": "Download Report",
+      "operationId": "download_report_api_v1_reports_download__filename__get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/reports/system",
+      "summary": "Generate System Report",
+      "operationId": "generate_system_report_api_v1_reports_system_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/reports/user",
+      "summary": "Generate User Report",
+      "operationId": "generate_user_report_api_v1_reports_user_post"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/simulate",
+      "summary": "Simulate Threat",
+      "operationId": "simulate_threat_api_v1_simulate_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/threats/active",
+      "summary": "Get Active Threats",
+      "operationId": "get_active_threats_api_v1_threats_active_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/list",
+      "summary": "List Users",
+      "operationId": "list_users_api_v1_users_list_get"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/register",
+      "summary": "Register User",
+      "operationId": "register_user_api_v1_users_register_post"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/risk",
+      "summary": "Get User Risks",
+      "operationId": "get_user_risks_api_v1_users_risk_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{user_id}/profile",
+      "summary": "Get User Profile",
+      "operationId": "get_user_profile_api_v1_users__user_id__profile_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{user_id}/risk-profile",
+      "summary": "Get User Risk Profile",
+      "operationId": "get_user_risk_profile_api_v1_users__user_id__risk_profile_get"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/websocket/stats",
+      "summary": "Websocket Stats",
+      "operationId": "websocket_stats_api_v1_websocket_stats_get"
+    }
+  ]
+}

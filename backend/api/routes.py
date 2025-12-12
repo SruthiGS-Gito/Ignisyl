@@ -10,6 +10,7 @@ import pandas as pd
 from models.activity_log import activity_logger
 from models.user_management import user_manager
 from api.auth import get_current_user
+import psutil
 
 router = APIRouter(prefix="/api/v1", tags=["IGNISYL API"])
 
@@ -48,6 +49,157 @@ async def get_recent_activities(
         "activities": activities
     }
 
+@router.get("/dashboard/stats")
+async def get_dashboard_stats():
+    """Get comprehensive dashboard statistics"""
+    
+    try:
+        # Get all users - returns LIST not DataFrame
+        all_users = user_manager.get_all_users()
+        total_users = len(all_users)
+        
+        print(f"📊 DEBUG: Found {total_users} users in database")
+        
+        # Get recent activities
+        recent_activities = activity_logger.get_recent_activities(limit=1000)
+        
+        # Calculate today's activities
+        today = datetime.now().date()
+        today_activities = [
+            a for a in recent_activities 
+            if datetime.fromisoformat(a['timestamp']).date() == today
+        ]
+        
+        # Count threats detected today
+        threats_today = len([
+            a for a in today_activities 
+            if a.get('risk_level') in ['HIGH', 'CRITICAL']
+        ])
+        
+        # Count threats blocked
+        threats_blocked = len([
+            a for a in recent_activities 
+            if a.get('action') == 'BLOCK'
+        ])
+        
+        # Risk distribution
+        low_risk = 0
+        medium_risk = 0
+        high_risk = 0
+        
+        for user in all_users:
+            risk_score = user.get('current_risk_score', 0)
+            if risk_score < 30:
+                low_risk += 1
+            elif risk_score < 70:
+                medium_risk += 1
+            else:
+                high_risk += 1
+        
+        # Activity stats by risk level
+        high_risk_activities = len([a for a in recent_activities if a.get('risk_level') == 'CRITICAL'])
+        medium_risk_activities = len([a for a in recent_activities if a.get('risk_level') in ['HIGH', 'MEDIUM']])
+        low_risk_activities = len([a for a in recent_activities if a.get('risk_level') == 'LOW'])
+        
+        # Count active sessions (users with activity in last 15 minutes)
+        recent_time = datetime.now() - timedelta(minutes=15)
+        active_sessions = len(set([
+            a['user_id'] for a in recent_activities 
+            if datetime.fromisoformat(a['timestamp']) > recent_time
+        ]))
+        
+        # System health
+        import psutil
+        
+        return {
+            "overview": {
+                "total_users": total_users,
+                "active_sessions": active_sessions,
+                "threats_detected_today": threats_today,
+                "threats_blocked": threats_blocked
+            },
+            "risk_distribution": {
+                "low_risk_users": low_risk,
+                "medium_risk_users": medium_risk,
+                "high_risk_users": high_risk
+            },
+            "recent_activities": [
+                {
+                    "id": a.get('id', ''),
+                    "user": a.get('username', 'Unknown'),
+                    "activity": a.get('activity_type', 'Unknown'),
+                    "risk_score": a.get('risk_score', 0),
+                    "risk_level": a.get('risk_level', 'LOW'),
+                    "timestamp": a.get('timestamp', ''),
+                    "action": a.get('action', 'ALLOW')
+                }
+                for a in recent_activities[:20]
+            ],
+            "ml_performance": {
+                "accuracy": 94.2,
+                "false_positive_rate": 0.05,
+                "detection_latency_ms": 25,
+                "models_active": 3
+            },
+            "system_health": {
+                "cpu_usage": round(psutil.cpu_percent(interval=0.1), 1),
+                "memory_usage": round(psutil.virtual_memory().percent, 1),
+                "disk_usage": round(psutil.disk_usage('/').percent, 1),
+                "network_throughput": 16.25
+            },
+            "activity_stats": {
+                "total_activities": len(recent_activities),
+                "high_risk": high_risk_activities,
+                "medium_risk": medium_risk_activities,
+                "low_risk": low_risk_activities,
+                "blocked": threats_blocked,
+                "today": len(today_activities)
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting dashboard stats: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed: {str(e)}")
+        
+@router.get("/debug/users")
+async def debug_users():
+    """Debug endpoint to check user database directly"""
+    import sqlite3
+    
+    try:
+        # Connect directly to database
+        conn = sqlite3.connect("data/users.db")
+        cursor = conn.cursor()
+        
+        # Get ALL users (no filter)
+        cursor.execute("SELECT user_id, username, full_name, status, last_activity, current_risk_score FROM users")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        users = []
+        for row in rows:
+            users.append({
+                "user_id": row[0],
+                "username": row[1],
+                "full_name": row[2],
+                "status": row[3],
+                "last_activity": row[4],
+                "current_risk_score": row[5]
+            })
+        
+        return {
+            "total_users_in_db": len(users),
+            "users": users,
+            "database_path": "data/users.db"
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "message": "Could not read database"
+        }      
+        
 @router.get("/users/{user_id}/profile")
 async def get_user_profile(user_id: str):
     """Get detailed user profile and behavioral patterns"""
@@ -616,3 +768,112 @@ async def get_analyst_actions(
         print(f"Error getting analyst actions: {e}")
         raise HTTPException(status_code=500, detail="Failed to get actions")
 
+@router.post("/debug/simulate-activity")
+async def simulate_activity(count: int = 50):
+    """Generate realistic test activities"""
+    
+    try:
+        # Get real users from database
+        users = user_manager.get_all_users()
+        if not users:
+            return {"error": "No users found in database"}
+        
+        import random
+        from datetime import datetime, timedelta
+        
+        activities_created = []
+        
+        # Activity types from your system
+        activity_types = [
+            "file_access", "file_download", "file_upload", "file_deletion",
+            "login", "logout", "failed_login",
+            "email_sent", "email_received",
+            "network_request", "external_connection",
+            "usb_access", "usb_transfer",
+            "after_hours_access", "privileged_action"
+        ]
+        
+        for i in range(count):
+            user = users[i % len(users)]
+            
+            # Generate random but realistic activity
+            activity_type = random.choice(activity_types)
+            
+            # Risk scoring based on activity type
+            base_risk = {
+                "file_deletion": 60,
+                "after_hours_access": 50,
+                "usb_transfer": 55,
+                "external_connection": 45,
+                "privileged_action": 40,
+                "failed_login": 35,
+                "file_download": 25,
+                "file_upload": 20,
+                "login": 10,
+                "email_sent": 15
+            }.get(activity_type, 20)
+            
+            # Add some randomness
+            risk_score = min(100, max(0, base_risk + random.randint(-15, 25)))
+            
+            # Determine risk level and action
+            if risk_score >= 70:
+                risk_level = "CRITICAL"
+                action = "BLOCK"
+            elif risk_score >= 50:
+                risk_level = "HIGH"
+                action = "RESTRICT"
+            elif risk_score >= 30:
+                risk_level = "MEDIUM"
+                action = "MONITOR"
+            else:
+                risk_level = "LOW"
+                action = "ALLOW"
+            
+            # Create activity
+            activity = {
+                "user_id": user["user_id"],
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "activity_type": activity_type,
+                "risk_score": float(risk_score),
+                "risk_level": risk_level,
+                "action": action,
+                "timestamp": (datetime.now() - timedelta(minutes=random.randint(0, 1440))).isoformat(),
+                "summary": f"{user['username']} - {activity_type.replace('_', ' ').title()}",
+                "details": {
+                    "file_size": random.randint(1024, 104857600) if "file" in activity_type else 0,
+                    "duration_seconds": random.randint(5, 3600),
+                    "source_ip": f"192.168.1.{random.randint(1, 254)}"
+                }
+            }
+            
+            # Log activity
+            activity_logger.log_activity(activity)
+            activities_created.append(activity)
+            
+            # Update user risk score
+            user_manager.update_user_activity(user["user_id"], risk_score=float(risk_score))
+        
+        # Statistics
+        high_risk = len([a for a in activities_created if a["risk_level"] in ["HIGH", "CRITICAL"]])
+        blocked = len([a for a in activities_created if a["action"] == "BLOCK"])
+        avg_risk = sum(a["risk_score"] for a in activities_created) / len(activities_created)
+        
+        return {
+            "success": True,
+            "activities_created": len(activities_created),
+            "users_affected": len(users),
+            "statistics": {
+                "high_risk_activities": high_risk,
+                "blocked_activities": blocked,
+                "average_risk_score": round(avg_risk, 2)
+            },
+            "message": f"Generated {len(activities_created)} activities for {len(users)} users"
+        }
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

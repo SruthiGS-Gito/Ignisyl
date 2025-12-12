@@ -8,7 +8,7 @@ FastAPI backend for AI-Powered Insider Threat Detection System
 # - Handles incoming requests and returns threat analysis results
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, WebSocket
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 import json
 import numpy as np  # Required for np.log1p() in extract_features()
 import time  
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
@@ -51,7 +52,11 @@ app.include_router(routes.router)
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -76,6 +81,62 @@ async def startup_event():
     # Initialize database
     create_tables()
     init_sample_data()
+    
+    # ✅ Initialize Real Users
+    print("👥 Checking for real database users...")
+    existing_users = user_manager.get_all_users()
+    
+    if len(existing_users) == 0:
+        print("📝 Creating default monitored users...")
+        
+        default_users = [
+            {
+                "username": "john.doe",
+                "full_name": "John Doe",
+                "department": "Engineering",
+                "role": "Senior Developer",
+                "email": "john.doe@company.com"
+            },
+            {
+                "username": "jane.smith", 
+                "full_name": "Jane Smith",
+                "department": "Security",
+                "role": "Security Analyst",
+                "email": "jane.smith@company.com"
+            },
+            {
+                "username": "bob.wilson",
+                "full_name": "Bob Wilson",
+                "department": "Finance",
+                "role": "Financial Controller",
+                "email": "bob.wilson@company.com"
+            },
+            {
+                "username": "alice.johnson",
+                "full_name": "Alice Johnson",
+                "department": "HR",
+                "role": "HR Manager",
+                "email": "alice.johnson@company.com"
+            },
+            {
+                "username": "charlie.brown",
+                "full_name": "Charlie Brown",
+                "department": "Operations",
+                "role": "Operations Lead",
+                "email": "charlie.brown@company.com"
+            }
+        ]
+        
+        for user_data in default_users:
+            result = user_manager.register_user(**user_data)
+            if result["success"]:
+                # Set initial activity time and risk score
+                import random
+                user_manager.update_user_activity(result["user_id"], risk_score=float(random.randint(5, 30)))
+        
+        print(f"✅ Created {len(default_users)} monitored users")
+    else:
+        print(f"📊 Found {len(existing_users)} existing users in database")
     
     # Initialize ML components
     print("🧠 Initializing ML components...")
@@ -289,12 +350,28 @@ async def analyze_activity(activity_data: Dict):
         else:
             activity_timestamp = dt.now()
         
-        # Prepare ML features
+        # Prepare ML features - MUST MATCH TRAINING (9 features)
+        import numpy as np
+
+        # Calculate log-transformed features (same as training)
+        file_size = float(activity_data.get('file_size', 0))
+        bytes_transferred = float(activity_data.get('bytes_transferred', 0))
+
         ml_features = [[
-            float(activity_timestamp.hour),
-            float(activity_timestamp.weekday()),
+            float(activity_data.get('hour', datetime.now().hour)),
+            float(activity_data.get('day_of_week', datetime.now().weekday())),
             float(activity_data.get('file_size', 0)),
-            float(activity_data.get('bytes_transferred', 0))
+            float(np.log1p(activity_data.get('file_size', 0))),
+            float(activity_data.get('bytes_transferred', 0)),
+            float(np.log1p(activity_data.get('bytes_transferred', 0))),
+            float(activity_data.get('is_weekend', 0)),
+            float(activity_data.get('is_business_hours', 0)),
+            float(activity_data.get('confidence_score', 0.2)),
+            float(activity_data.get('failed_login_count', 0)),        # NEW
+            float(activity_data.get('access_frequency', 1.0)),        # NEW
+            float(activity_data.get('unusual_location', False)),      # NEW
+            float(activity_data.get('file_type_risk', 0)),           # NEW
+            float(activity_data.get('time_since_last', 60))          # NEW
         ]]
         
         try:
@@ -1026,7 +1103,7 @@ async def login(login_data: Dict):
     }
 
 @app.get("/api/v1/activities/recent")
-async def get_recent_activities(limit: int = 50, user_id: str = None):
+async def get_recent_activities_direct(limit: int = 50, user_id: str = None):
     """Get recent activities with proper filtering"""
     from models.activity_log import activity_logger
     

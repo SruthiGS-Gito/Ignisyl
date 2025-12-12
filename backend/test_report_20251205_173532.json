@@ -1,0 +1,171 @@
+{
+  "timestamp": "2025-12-05T17:35:32.882377",
+  "summary": {
+    "total": 16,
+    "passed": 13,
+    "failed": 3,
+    "pass_rate": 81.25
+  },
+  "results": [
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "description": "Root endpoint",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.005144,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/health",
+      "method": "GET",
+      "description": "Health check",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.004522,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/dashboard/stats",
+      "method": "GET",
+      "description": "Dashboard statistics",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.111283,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/users/risk",
+      "method": "GET",
+      "description": "User risk data",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.019629,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/activities/recent",
+      "method": "GET",
+      "description": "Recent activities",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.024839,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/activities/recent?limit=10",
+      "method": "GET",
+      "description": "Recent activities (limited)",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.024231,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/users/list",
+      "method": "GET",
+      "description": "List all users",
+      "status": 200,
+      "expected": 404,
+      "success": false,
+      "response_time": 0.022372,
+      "error": "{\"total_users\":5,\"users\":[{\"user_id\":\"user_charlie.brown\",\"username\":\"charlie.brown\",\"password_hash\":null,\"full_name\":\"Charlie Brown\",\"department\":\"Operations\",\"role\":\"Operations Lead\",\"email\":\"charli"
+    },
+    {
+      "endpoint": "/api/v1/users/risk",
+      "method": "GET",
+      "description": "Get users for testing",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.007774,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/users/user_charlie.brown/profile",
+      "method": "GET",
+      "description": "User profile",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.031966,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/threats/active",
+      "method": "GET",
+      "description": "Active threats",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.017829,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/analytics/trends",
+      "method": "GET",
+      "description": "Analytics trends",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.022926,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/ml/model-info",
+      "method": "GET",
+      "description": "ML model info",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.004297,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/debug/users",
+      "method": "GET",
+      "description": "Debug user list",
+      "status": 200,
+      "expected": 404,
+      "success": false,
+      "response_time": 0.030615,
+      "error": "{\"error\":\"no such table: users\",\"message\":\"Could not read database\"}"
+    },
+    {
+      "endpoint": "/api/v1/debug/simulate-activity",
+      "method": "POST",
+      "description": "Simulate activity",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.776987,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/firewall/action",
+      "method": "POST",
+      "description": "Firewall action",
+      "status": 200,
+      "expected": 200,
+      "success": true,
+      "response_time": 0.016939,
+      "error": null
+    },
+    {
+      "endpoint": "/api/v1/reports/user",
+      "method": "POST",
+      "description": "Generate user report",
+      "status": 200,
+      "expected": 404,
+      "success": false,
+      "response_time": 0.323333,
+      "error": "{\"success\":true,\"message\":\"Report generated successfully\",\"filepath\":\"data/reports\\\\threat_report_john.doe_20251205_173532.pdf\",\"filename\":\"threat_report_john.doe_20251205_173532.pdf\",\"user\":\"John Doe"
+    }
+  ]
+}

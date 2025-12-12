@@ -65,8 +65,8 @@ class HoneypotWatcher(FileSystemEventHandler):
             print(f"Path: {filepath}")
             print(f"{'='*70}\n")
             
-           # Schedule callback in the event loop (thread-safe)
-           asyncio.run_coroutine_threadsafe(self.callback(alert_data), self.loop)
+            # Schedule callback in the event loop (thread-safe)
+            asyncio.run_coroutine_threadsafe(self.callback(alert_data), self.loop)
     
     def start_watching(self):
         """Start real-time monitoring"""

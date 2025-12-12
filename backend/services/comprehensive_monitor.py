@@ -224,11 +224,16 @@ class ComprehensiveMonitor:
         Returns:
             File access record
         """
+        
+        if not filepath:
+            filepath = "unknown_file"
+        
         # Determine sensitivity
         sensitive_keywords = ['password', 'secret', 'confidential', 'admin', 
                              'salary', 'financial', 'credit', 'social_security']
         
-        is_sensitive = any(keyword in filepath.lower() for keyword in sensitive_keywords)
+        filepath_str = filepath or ""
+        is_sensitive = any(keyword in filepath_str.lower() for keyword in sensitive_keywords)
         
         # Check if it's a honeypot
         is_honeypot = any(honeypot['path'] in filepath for honeypot in self.honeypots)
@@ -259,14 +264,15 @@ class ComprehensiveMonitor:
     def _generate_file_access_description(self, filepath: str, operation: str, 
                                          is_honeypot: bool, is_sensitive: bool) -> str:
         """Generate description for file access"""
-        filename = Path(filepath).name
-        
+        # Fix: Assign to a variable!
+        filename = Path(filepath).name if filepath else "unknown"
+    
         if is_honeypot:
             return f"🚨 HONEYPOT TRIGGERED: Unauthorized access to decoy file '{filename}'"
-        
+    
         if is_sensitive:
             return f"Access to sensitive file '{filename}' ({operation})"
-        
+    
         return f"File access: '{filename}' ({operation})"
     
     def get_suspicious_activities(self, time_window_minutes: int = 60) -> List[Dict]:

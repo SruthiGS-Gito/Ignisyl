@@ -11,7 +11,7 @@ import json
 class ActivityLogger:
     """Manages activity logs and threat history"""
     
-    def __init__(self, db_path: str = "data/activities.db"):
+    def __init__(self, db_path: str = "../data/activities.db"):
         self.db_path = db_path
         self._init_database()
     

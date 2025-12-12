@@ -6,7 +6,7 @@ Handles user login, session management, and access control
 from fastapi import HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, Optional
-import jwt
+from jose import jwt
 from datetime import datetime, timedelta
 import hashlib
 import secrets

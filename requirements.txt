@@ -13,7 +13,7 @@ xgboost>=1.7.0
 tensorflow>=2.13.0
 keras>=2.13.0
 pandas==2.1.4
-numpy==1.24.4
+numpy>=1.26.0
 scipy>=1.10.0
 
 # Machine Learning - Utilities
@@ -34,7 +34,7 @@ python-multipart==0.0.6
 # Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-cryptography==41.0.8
+cryptography>=43.0.0
 bcrypt>=4.0.0
 
 # HTTP & API
@@ -74,6 +74,9 @@ psutil>=5.9.0
 netifaces>=0.11.0
 # scapy>=2.5.0  # Requires admin/root - comment out if issues
 
+# File System Monitoring
+watchdog>=3.0.0
+
 # Development & Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
@@ -91,3 +94,6 @@ markdown>=3.5
 # Performance (Optional - can be heavy)
 # numba>=0.58.0
 # cython>=3.0.0
+
+psutil>=25.0.1
+requests>=25.0.1
