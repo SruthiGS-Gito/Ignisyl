@@ -54,6 +54,128 @@
 
 ---
 
+## 🔐 Security Setup
+
+### Database Configuration
+
+IGNISYL now supports **SQLite, PostgreSQL, and MySQL** databases with production-ready security features.
+
+#### Quick Start (Development - SQLite)
+
+No additional setup required! IGNISYL uses SQLite by default.
+
+```bash
+# Just run the application
+python backend/main.py
+```
+
+#### Production Setup (PostgreSQL/MySQL)
+
+**IMPORTANT: Never commit credentials to git!**
+
+1. **Copy the environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit .env with your credentials:**
+   ```bash
+   # For PostgreSQL
+   ENVIRONMENT=production
+   DB_TYPE=postgresql
+   DB_HOST=your-database-host.com
+   DB_PORT=5432
+   DB_NAME=ignisyl
+   DB_USER=ignisyl_user
+   DB_PASSWORD=YOUR_SECURE_PASSWORD_HERE
+
+   # For MySQL
+   ENVIRONMENT=production_mysql
+   DB_TYPE=mysql
+   DB_HOST=your-database-host.com
+   DB_PORT=3306
+   DB_NAME=ignisyl
+   DB_USER=ignisyl_user
+   DB_PASSWORD=YOUR_SECURE_PASSWORD_HERE
+   ```
+
+3. **Generate a secure SECRET_KEY:**
+   ```bash
+   python -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+   Add to `.env`:
+   ```
+   SECRET_KEY=<generated-key-here>
+   ```
+
+4. **Verify security:**
+   ```bash
+   python scripts/check_security.py
+   ```
+
+5. **Run database migration:**
+   ```bash
+   python backend/database/migrate.py --env production
+   ```
+
+#### Security Best Practices
+
+✅ **DO:**
+- Use `.env` for all credentials (never commit it!)
+- Keep `.env.example` with only placeholders
+- Use strong, unique passwords (20+ characters)
+- Rotate credentials regularly
+- Enable SSL/TLS for database connections
+- Limit database user privileges
+- Run security checks: `python scripts/check_security.py`
+
+❌ **DON'T:**
+- Commit `.env` to git
+- Use default/weak passwords
+- Hardcode credentials in code
+- Share credentials in chat/email
+- Use production credentials in development
+
+#### Files That Should NEVER Be Committed
+
+The `.gitignore` is configured to exclude:
+- `.env` (contains real credentials)
+- `*.db` files (database files)
+- `*.sqlite` files
+- `__pycache__/` and `*.pyc`
+- Logs and temporary files
+
+**Always verify:** `.env` is in `.gitignore` and not tracked by git!
+
+#### Database Abstraction Layer
+
+IGNISYL uses a production-ready database abstraction layer with:
+- **Multi-database support** (SQLite, PostgreSQL, MySQL)
+- **Connection pooling** (PostgreSQL: 1-10 connections, MySQL: 10 connections)
+- **Thread-safe operations** (SQLite with locking)
+- **Transaction management** (automatic commit/rollback)
+- **Error handling** and comprehensive logging
+
+For detailed documentation, see:
+- [Database Migration Guide](DATABASE_MIGRATION_GUIDE.md)
+- [Database Layer Documentation](backend/database/README.md)
+
+#### Testing Your Setup
+
+```bash
+# Test database layer
+python backend/database/test_db_layer.py
+
+# Run security audit
+python scripts/check_security.py
+
+# Test with example operations
+python backend/database/example_usage.py
+```
+
+---
+
 ## 🔬 Research Contribution
 
 ### Problem Statement

@@ -19,8 +19,45 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config.config import get_database_url, ensure_directories
 
-# Create database engine
-engine = create_engine(get_database_url(), echo=False)
+# Import database factory for multi-database support
+try:
+    from backend.database.db_factory import DatabaseFactory
+    from backend.config.database_config import get_config
+    _DB_FACTORY_AVAILABLE = True
+except ImportError:
+    _DB_FACTORY_AVAILABLE = False
+    print("⚠️ Database factory not available, using direct SQLite connection")
+
+# Create database engine using factory pattern if available
+def get_database_engine():
+    """Get database engine based on environment configuration"""
+    environment = os.getenv('ENVIRONMENT', 'development')
+
+    if _DB_FACTORY_AVAILABLE:
+        try:
+            config = get_config(environment)
+            db_type = config.get('type', 'sqlite')
+
+            if db_type == 'postgresql':
+                # PostgreSQL connection string
+                db_url = f"postgresql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['database']}"
+            elif db_type == 'mysql':
+                # MySQL connection string
+                db_url = f"mysql+mysqlconnector://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['database']}"
+            else:
+                # SQLite connection string (default)
+                db_url = get_database_url()
+
+            print(f"✅ Using {db_type.upper()} database for environment: {environment}")
+            return create_engine(db_url, echo=False)
+        except Exception as e:
+            print(f"⚠️ Factory configuration error: {e}, falling back to SQLite")
+            return create_engine(get_database_url(), echo=False)
+    else:
+        # Fallback to original SQLite implementation
+        return create_engine(get_database_url(), echo=False)
+
+engine = get_database_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

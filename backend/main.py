@@ -18,10 +18,12 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import json
 import numpy as np  # Required for np.log1p() in extract_features()
-import time  
+import time
+from pathlib import Path
 
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+# Add project root to path (works from any directory)
+project_root = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(project_root))
 
 from config.config import settings, ensure_directories
 from models.database import create_tables, init_sample_data

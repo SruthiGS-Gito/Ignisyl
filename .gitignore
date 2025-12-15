@@ -41,15 +41,25 @@ venv.bak/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Environment variables
+# Environment variables (SECURITY: Never commit real credentials!)
 .env
 .env.local
 .env.*.local
+.env.production
+.env.development
+# Keep .env.example for documentation
 
-# Database files
+# Database files (SECURITY: Never commit database files!)
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/*.db
+backend/data/*.db
+data/ignisyl.db
+backend/data/ignisyl.db
 
 # Logs
 *.log
