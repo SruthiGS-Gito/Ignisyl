@@ -98,6 +98,3 @@ markdown>=3.5
 # Performance (Optional - can be heavy)
 # numba>=0.58.0
 # cython>=3.0.0
-
-psutil>=25.0.1
-requests>=25.0.1
