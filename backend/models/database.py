@@ -26,7 +26,7 @@ try:
     _DB_FACTORY_AVAILABLE = True
 except ImportError:
     _DB_FACTORY_AVAILABLE = False
-    print("⚠️ Database factory not available, using direct SQLite connection")
+    print("[WARN] Database factory not available, using direct SQLite connection")
 
 # Create database engine using factory pattern if available
 def get_database_engine():
@@ -48,10 +48,10 @@ def get_database_engine():
                 # SQLite connection string (default)
                 db_url = get_database_url()
 
-            print(f"✅ Using {db_type.upper()} database for environment: {environment}")
+            print(f"[OK] Using {db_type.upper()} database for environment: {environment}")
             return create_engine(db_url, echo=False)
         except Exception as e:
-            print(f"⚠️ Factory configuration error: {e}, falling back to SQLite")
+            print(f"[WARN] Factory configuration error: {e}, falling back to SQLite")
             return create_engine(get_database_url(), echo=False)
     else:
         # Fallback to original SQLite implementation
@@ -195,7 +195,7 @@ def create_tables():
     """Create all database tables"""
     ensure_directories()
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully")
+    print("[OK] Database tables created successfully")
 
 def init_sample_data():
     """Initialize database - ready for production use
@@ -217,18 +217,18 @@ def init_sample_data():
         existing_users = db.query(User).count()
         
         if existing_users > 0:
-            print(f"📊 Database has {existing_users} registered users")
+            print(f"[DATA] Database has {existing_users} registered users")
             return
         
         # Production mode - no sample data
         if not settings.DEBUG:
-            print("✅ Production mode - Database initialized")
-            print("💡 Register users via POST /api/v1/users/register")
-            print("💡 Or integrate with company directory (LDAP/AD)")
+            print("[OK] Production mode - Database initialized")
+            print("[TIP] Register users via POST /api/v1/users/register")
+            print("[TIP] Or integrate with company directory (LDAP/AD)")
             return
         
         # Development/Demo mode - create sample users for testing
-        print("🎭 DEBUG mode - Creating sample users for testing...")
+        print("[DEBUG] DEBUG mode - Creating sample users for testing...")
         
         try:
             from api.auth import auth_manager
@@ -264,16 +264,16 @@ def init_sample_data():
                 db.add(user)
             
             db.commit()
-            print("✅ Sample users created for testing:")
+            print("[OK] Sample users created for testing:")
             print("   • john.doe / password123 (IT - Software Engineer)")
             print("   • jane.smith / password123 (Finance - Financial Analyst)")
             print("   • admin / admin123 (IT - Administrator)")
-            print("\n💡 These users are for TESTING ONLY")
-            print("💡 Set DEBUG=False in config.py for production deployment")
+            print("\n[TIP] These users are for TESTING ONLY")
+            print("[TIP] Set DEBUG=False in config.py for production deployment")
             
         except ImportError:
-            print("⚠️ Could not import auth_manager - skipping password hashing")
-            print("💡 Sample users will be created without passwords")
+            print("[WARN] Could not import auth_manager - skipping password hashing")
+            print("[TIP] Sample users will be created without passwords")
             
             sample_users = [
                 User(
@@ -303,10 +303,10 @@ def init_sample_data():
                 db.add(user)
             
             db.commit()
-            print("✅ Sample users created (without passwords)")
+            print("[OK] Sample users created (without passwords)")
         
     except Exception as e:
-        print(f"❌ Error initializing database: {e}")
+        print(f"[ERROR] Error initializing database: {e}")
         db.rollback()
     finally:
         db.close()
@@ -314,4 +314,4 @@ def init_sample_data():
 if __name__ == "__main__":
     create_tables()
     init_sample_data()
-    print("🚀 Database initialization complete!")
+    print("[START] Database initialization complete!")

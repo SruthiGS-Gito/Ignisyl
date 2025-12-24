@@ -76,7 +76,7 @@ class AlertManager:
         self.active_alerts.append(alert)
         self.alert_history.append(alert)
         
-        print(f"🚨 Alert created: {alert_id} - Priority: {alert['priority']} - User: {alert['username']}")
+        print(f"[ALERT] Alert created: {alert_id} - Priority: {alert['priority']} - User: {alert['username']}")
         
         return alert
     
@@ -126,7 +126,7 @@ class AlertManager:
                 alert["acknowledged"] = True
                 alert["acknowledged_by"] = acknowledged_by
                 alert["acknowledged_at"] = datetime.now().isoformat()
-                print(f"✅ Alert {alert_id} acknowledged by {acknowledged_by}")
+                print(f"[OK] Alert {alert_id} acknowledged by {acknowledged_by}")
                 return True
         return False
     
@@ -149,7 +149,7 @@ class AlertManager:
                 alert["resolved_at"] = datetime.now().isoformat()
                 alert["resolution_notes"] = resolution_notes
                 alert["status"] = "resolved"
-                print(f"✅ Alert {alert_id} resolved by {resolved_by}")
+                print(f"[OK] Alert {alert_id} resolved by {resolved_by}")
                 return True
         return False
     
@@ -230,7 +230,7 @@ class AlertManager:
         cleared_count = initial_count - len(self.active_alerts)
         
         if cleared_count > 0:
-            print(f"🗑️ Cleared {cleared_count} old resolved alerts")
+            print(f"[DEL] Cleared {cleared_count} old resolved alerts")
         
         return cleared_count
 

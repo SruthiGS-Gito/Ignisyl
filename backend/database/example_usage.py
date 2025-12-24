@@ -26,7 +26,7 @@ def example_basic_operations():
             "INSERT INTO users (username, email, full_name, department, role) VALUES (?, ?, ?, ?, ?)",
             ('demo.user', 'demo@example.com', 'Demo User', 'Engineering', 'Developer')
         )
-        print("   ✅ User created successfully")
+        print("   [OK] User created successfully")
 
         # READ - Fetch the user
         print("\n2️⃣ SELECT Operation:")
@@ -42,7 +42,7 @@ def example_basic_operations():
             "UPDATE users SET department = ? WHERE username = ?",
             ('Security', 'demo.user')
         )
-        print("   ✅ User updated successfully")
+        print("   [OK] User updated successfully")
 
         # Verify update
         user = db.fetch_one(
@@ -57,7 +57,7 @@ def example_basic_operations():
             "DELETE FROM users WHERE username = ?",
             ('demo.user',)
         )
-        print("   ✅ User deleted successfully")
+        print("   [OK] User deleted successfully")
 
     finally:
         db.close()
@@ -74,7 +74,7 @@ def example_batch_operations():
 
     try:
         # Batch insert multiple users
-        print("\n📦 Batch inserting 5 users...")
+        print("\n[*] Batch inserting 5 users...")
         users_data = [
             ('alice.johnson', 'alice@example.com', 'Alice Johnson', 'HR', 'Manager'),
             ('bob.smith', 'bob@example.com', 'Bob Smith', 'Finance', 'Analyst'),
@@ -87,19 +87,19 @@ def example_batch_operations():
             "INSERT INTO users (username, email, full_name, department, role) VALUES (?, ?, ?, ?, ?)",
             users_data
         )
-        print("   ✅ All users inserted successfully")
+        print("   [OK] All users inserted successfully")
 
         # Fetch all users
-        print("\n📋 Fetching all users:")
+        print("\n[*] Fetching all users:")
         all_users = db.fetch_all("SELECT username, full_name, department FROM users")
         for idx, user in enumerate(all_users, 1):
             print(f"   {idx}. {user[1]} ({user[0]}) - {user[2]}")
 
         # Cleanup
-        print("\n🧹 Cleaning up...")
+        print("\n[*] Cleaning up...")
         for username, _, _, _, _ in users_data:
             db.execute_query("DELETE FROM users WHERE username = ?", (username,))
-        print("   ✅ Cleanup complete")
+        print("   [OK] Cleanup complete")
 
     finally:
         db.close()
@@ -115,7 +115,7 @@ def example_transactions():
     db = DatabaseFactory.get_database(config)
 
     try:
-        print("\n✅ Successful transaction:")
+        print("\n[OK] Successful transaction:")
         with db.transaction():
             db.execute_query(
                 "INSERT INTO users (username, email, full_name) VALUES (?, ?, ?)",
@@ -132,7 +132,7 @@ def example_transactions():
         count = db.fetch_one("SELECT COUNT(*) FROM users WHERE username LIKE 'trans.%'")
         print(f"   Users created: {count[0]}")
 
-        print("\n❌ Failed transaction (will rollback):")
+        print("\n[ERROR] Failed transaction (will rollback):")
         try:
             with db.transaction():
                 db.execute_query(
@@ -147,7 +147,7 @@ def example_transactions():
                     ('trans.user1', 'trans1@example.com', 'Duplicate User')
                 )
         except Exception as e:
-            print(f"   ⚠️ Transaction failed: {e}")
+            print(f"   [WARN] Transaction failed: {e}")
             print("   Transaction rolled back")
 
         # Verify rollback
@@ -155,9 +155,9 @@ def example_transactions():
         print(f"   Users after rollback: {count[0]} (trans.user3 was not committed)")
 
         # Cleanup
-        print("\n🧹 Cleaning up...")
+        print("\n[*] Cleaning up...")
         db.execute_query("DELETE FROM users WHERE username LIKE 'trans.%'")
-        print("   ✅ Cleanup complete")
+        print("   [OK] Cleanup complete")
 
     finally:
         db.close()
@@ -187,9 +187,9 @@ def example_different_databases():
         result = postgres_db.fetch_one("SELECT 1")
         print(f"   Connection test: {result}")
         postgres_db.close()
-        print("   ✅ PostgreSQL connection successful")
+        print("   [OK] PostgreSQL connection successful")
     except Exception as e:
-        print(f"   ⚠️ PostgreSQL not available: {e}")
+        print(f"   [WARN] PostgreSQL not available: {e}")
 
     # MySQL (Production) - will only work if MySQL is set up
     print("\n3️⃣ MySQL Database:")
@@ -200,9 +200,9 @@ def example_different_databases():
         result = mysql_db.fetch_one("SELECT 1")
         print(f"   Connection test: {result}")
         mysql_db.close()
-        print("   ✅ MySQL connection successful")
+        print("   [OK] MySQL connection successful")
     except Exception as e:
-        print(f"   ⚠️ MySQL not available: {e}")
+        print(f"   [WARN] MySQL not available: {e}")
 
 
 def example_error_handling():
@@ -220,7 +220,7 @@ def example_error_handling():
         try:
             db.execute_query("INVALID SQL QUERY")
         except Exception as e:
-            print(f"   ✅ Caught error: {type(e).__name__}")
+            print(f"   [OK] Caught error: {type(e).__name__}")
 
         # Constraint violation - duplicate key
         print("\n2️⃣ Handling constraint violation:")
@@ -235,7 +235,7 @@ def example_error_handling():
                 ('error.user', 'error@example.com', 'Error User')
             )
         except Exception as e:
-            print(f"   ✅ Caught error: {type(e).__name__}")
+            print(f"   [OK] Caught error: {type(e).__name__}")
 
         # Foreign key violation
         print("\n3️⃣ Handling foreign key violation:")
@@ -245,12 +245,12 @@ def example_error_handling():
                 (99999, 'test_activity')  # Non-existent user_id
             )
         except Exception as e:
-            print(f"   ✅ Caught error: {type(e).__name__}")
+            print(f"   [OK] Caught error: {type(e).__name__}")
 
         # Cleanup
-        print("\n🧹 Cleaning up...")
+        print("\n[*] Cleaning up...")
         db.execute_query("DELETE FROM users WHERE username = 'error.user'")
-        print("   ✅ Cleanup complete")
+        print("   [OK] Cleanup complete")
 
     finally:
         db.close()
@@ -258,7 +258,7 @@ def example_error_handling():
 
 def main():
     """Run all examples"""
-    print("\n🚀 Database Abstraction Layer - Example Usage")
+    print("\n[START] Database Abstraction Layer - Example Usage")
     print("="*60)
 
     examples = [
@@ -273,12 +273,12 @@ def main():
         try:
             example_func()
         except Exception as e:
-            print(f"\n❌ Example '{name}' failed: {e}")
+            print(f"\n[ERROR] Example '{name}' failed: {e}")
             import traceback
             traceback.print_exc()
 
     print("\n" + "="*60)
-    print("✅ All examples completed!")
+    print("[OK] All examples completed!")
     print("="*60 + "\n")
 
 

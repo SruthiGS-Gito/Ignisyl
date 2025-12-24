@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import pandas as pd
+import os
 from models.activity_log import activity_logger
 from models.user_management import user_manager
 from api.auth import get_current_user
@@ -34,7 +35,7 @@ async def get_recent_activities(
 ):
     """Get recent user activities with optional filtering"""
     
-    # ✅ FIXED: Use real database instead of mock data
+    # [OK] FIXED: Use real database instead of mock data
     if user_id:
         activities = activity_logger.get_user_activities(user_id, limit=limit)
     else:
@@ -58,7 +59,7 @@ async def get_dashboard_stats():
         all_users = user_manager.get_all_users()
         total_users = len(all_users)
         
-        print(f"📊 DEBUG: Found {total_users} users in database")
+        print(f"[DATA] DEBUG: Found {total_users} users in database")
         
         # Get recent activities
         recent_activities = activity_logger.get_recent_activities(limit=1000)
@@ -144,7 +145,7 @@ async def get_dashboard_stats():
             "system_health": {
                 "cpu_usage": round(psutil.cpu_percent(interval=0.1), 1),
                 "memory_usage": round(psutil.virtual_memory().percent, 1),
-                "disk_usage": round(psutil.disk_usage('/').percent, 1),
+                "disk_usage": round(psutil.disk_usage(os.path.abspath(os.sep)).percent, 1),
                 "network_throughput": 16.25
             },
             "activity_stats": {
@@ -158,53 +159,136 @@ async def get_dashboard_stats():
         }
         
     except Exception as e:
-        print(f"❌ Error getting dashboard stats: {e}")
+        print(f"[ERROR] Error getting dashboard stats: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed: {str(e)}")
         
 @router.get("/debug/users")
-async def debug_users():
-    """Debug endpoint to check user database directly"""
-    import sqlite3
-    
+async def debug_users(current_user: dict = Depends(get_current_user)):
+    """Debug endpoint to check user database directly (admin only)"""
+    from pathlib import Path
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
     try:
-        # Connect directly to database
-        conn = sqlite3.connect("data/users.db")
+        # Use the same path resolution as UserManager
+        backend_dir = Path(__file__).parent.parent.resolve()
+        db_path = str(backend_dir / "data" / "users.db")
+
+        import sqlite3
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
-        # Get ALL users (no filter)
-        cursor.execute("SELECT user_id, username, full_name, status, last_activity, current_risk_score FROM users")
+
+        # Get ALL users (no filter) - exclude password_hash for security but show if it exists
+        cursor.execute("SELECT user_id, username, full_name, status, last_activity, current_risk_score, password_hash FROM users")
         rows = cursor.fetchall()
         conn.close()
-        
+
         users = []
         for row in rows:
+            password_hash = row[6]
+            has_bcrypt = password_hash and password_hash.startswith(('$2a$', '$2b$', '$2y$')) if password_hash else False
             users.append({
                 "user_id": row[0],
                 "username": row[1],
                 "full_name": row[2],
                 "status": row[3],
                 "last_activity": row[4],
-                "current_risk_score": row[5]
+                "current_risk_score": row[5],
+                "has_password": bool(password_hash),
+                "has_valid_bcrypt": has_bcrypt
             })
-        
+
         return {
             "total_users_in_db": len(users),
             "users": users,
-            "database_path": "data/users.db"
+            "database_path": db_path,
+            "requested_by": current_user.get('sub', 'unknown')
         }
     except Exception as e:
+        import traceback
         return {
             "error": str(e),
+            "traceback": traceback.format_exc(),
             "message": "Could not read database"
+        }
+
+@router.get("/debug/auth-check")
+async def debug_auth_check():
+    """Public endpoint to verify authentication system status (no auth required)"""
+    from pathlib import Path
+    import sqlite3
+
+    try:
+        # Check database path
+        backend_dir = Path(__file__).parent.parent.resolve()
+        db_path = str(backend_dir / "data" / "users.db")
+
+        # Check if database exists and has users
+        if not os.path.exists(db_path):
+            return {
+                "status": "error",
+                "message": "User database not found",
+                "database_path": db_path,
+                "recommendation": "Restart the backend server to initialize the database"
+            }
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Count users
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        # Count users with valid bcrypt passwords
+        cursor.execute("SELECT COUNT(*) FROM users WHERE password_hash LIKE '$2%'")
+        users_with_bcrypt = cursor.fetchone()[0]
+
+        # Check admin user specifically
+        cursor.execute("SELECT username, status, password_hash FROM users WHERE username = 'admin'")
+        admin_row = cursor.fetchone()
+        conn.close()
+
+        admin_status = None
+        if admin_row:
+            admin_status = {
+                "exists": True,
+                "status": admin_row[1],
+                "has_bcrypt_password": admin_row[2] and admin_row[2].startswith(('$2a$', '$2b$', '$2y$'))
+            }
+        else:
+            admin_status = {"exists": False}
+
+        return {
+            "status": "ok",
+            "database_path": db_path,
+            "total_users": total_users,
+            "users_with_valid_password": users_with_bcrypt,
+            "admin_user": admin_status,
+            "login_endpoint": "/api/v1/auth/login",
+            "test_credentials": {
+                "admin": {"username": "admin", "password": "admin123"},
+                "demo_user": {"username": "john.doe", "password": "demo123"}
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
         }      
         
 @router.get("/users/{user_id}/profile")
 async def get_user_profile(user_id: str):
     """Get detailed user profile and behavioral patterns"""
     
-    # ✅ FIXED: Use real user data from database
+    # [OK] FIXED: Use real user data from database
     user = user_manager.get_user(user_id)
     
     if not user:
@@ -276,7 +360,7 @@ async def get_user_profile(user_id: str):
 async def get_active_threats():
     """Get currently active threats requiring attention"""
     
-    # ✅ FIXED: Get real high-risk activities from database
+    # [OK] FIXED: Get real high-risk activities from database
     all_activities = activity_logger.get_recent_activities(limit=100)
     
     # Filter for HIGH and CRITICAL risk levels
@@ -315,7 +399,7 @@ async def get_analytics_trends(
 ):
     """Get threat and activity trends over time"""
     
-    # ✅ FIXED: Calculate trends from real database data
+    # [OK] FIXED: Calculate trends from real database data
     all_activities = activity_logger.get_recent_activities(limit=10000)
     
     # Group activities by date
@@ -385,7 +469,7 @@ async def execute_firewall_action(action_data: Dict):
     if action not in ["ALLOW", "RESTRICT", "BLOCK"]:
         raise HTTPException(status_code=400, detail="Invalid action")
     
-    # ✅ Verify user exists
+    # [OK] Verify user exists
     user = user_manager.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -408,7 +492,7 @@ async def execute_firewall_action(action_data: Dict):
         }.get(action, [])
     }
     
-    print(f"🔥 Firewall action: {action} applied to {user['username']}")
+    print(f"[FIREWALL] Firewall action: {action} applied to {user['username']}")
     
     return result
 
@@ -446,7 +530,7 @@ async def acknowledge_alert(alert_data: Dict):
     if not alert_id:
         raise HTTPException(status_code=400, detail="alert_id required")
     
-    # ✅ TODO: In production, have to update alerts table in database
+    # [OK] TODO: In production, have to update alerts table in database
     # But For now, let's return acknowledgment
     
     return {
@@ -614,7 +698,7 @@ async def contact_user(
             raise HTTPException(status_code=404, detail="User not found")
         
         # Log the contact attempt
-        print(f"📧 Analyst {current_user.get('username')} contacting user {threat_id}")
+        print(f"[*] Analyst {current_user.get('username')} contacting user {threat_id}")
         
         contact_log = {
             "analyst_id": current_user.get('username'),
@@ -688,7 +772,7 @@ async def escalate_threat(
             "timestamp": datetime.now().isoformat()
         }
         
-        print(f"⚠️ Threat escalated: {escalation}")
+        print(f"[WARN] Threat escalated: {escalation}")
         
         # Log escalation
         activity_logger.log_activity({
@@ -769,9 +853,14 @@ async def get_analyst_actions(
         raise HTTPException(status_code=500, detail="Failed to get actions")
 
 @router.post("/debug/simulate-activity")
-async def simulate_activity(count: int = 50):
-    """Generate realistic test activities"""
-    
+async def simulate_activity(count: int = 50, current_user: dict = Depends(get_current_user)):
+    """Generate realistic test activities (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
     try:
         # Get real users from database
         users = user_manager.get_all_users()
@@ -873,7 +962,7 @@ async def simulate_activity(count: int = 50):
         }
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-17T20:05:28.688145",
+  "timestamp": "2025-12-18T09:22:22.635656",
   "baseline": {
     "isolation_forest": {
       "accuracy": 0.8308308308308309,
@@ -45,7 +45,7 @@
         "description": "Split malicious activities into 10 micro-activities over time"
       },
       "perturbation_metrics": {
-        "l2_distance": 53117659.769620895
+        "l2_distance": 53117659.76962091
       },
       "n_adversarial_samples": 1050,
       "models": {
@@ -97,20 +97,20 @@
         "l2_distance": NaN,
         "linf_distance": NaN,
         "feature_changes": [
-          5.471976327625035,
+          5.270405985171673,
           0.0,
-          23582549.831381097,
+          22756279.631127622,
           NaN,
-          52988820.819065265,
+          43227589.13417587,
           NaN,
-          0.2761904761904762,
-          0.38095238095238093,
-          0.12040938157303942,
-          0.6285714285714286,
-          2.257195288582091,
+          0.2857142857142857,
+          0.44761904761904764,
+          0.1088178471838881,
+          0.6952380952380952,
+          2.187008650173249,
           0.14285714285714285,
           0.0,
-          65.86666666666666
+          60.13333333333333
         ]
       },
       "n_adversarial_samples": 105,
@@ -128,27 +128,27 @@
           "false_positive_rate": 0.08612975391498881
         },
         "xgboost": {
-          "accuracy": 0.948948948948949,
+          "accuracy": 0.95995995995996,
           "precision": 1.0,
-          "recall": 0.5142857142857142,
-          "f1_score": 0.6792452830188679,
-          "true_positives": 54,
+          "recall": 0.6190476190476191,
+          "f1_score": 0.7647058823529411,
+          "true_positives": 65,
           "false_positives": 0,
           "true_negatives": 894,
-          "false_negatives": 51,
-          "evasion_success_rate": 0.4857142857142857,
+          "false_negatives": 40,
+          "evasion_success_rate": 0.38095238095238093,
           "false_positive_rate": 0.0
         },
         "ensemble": {
-          "accuracy": 0.8728728728728729,
-          "precision": 0.4166666666666667,
-          "recall": 0.5238095238095238,
-          "f1_score": 0.4641350210970464,
-          "true_positives": 55,
+          "accuracy": 0.8828828828828829,
+          "precision": 0.45774647887323944,
+          "recall": 0.6190476190476191,
+          "f1_score": 0.5263157894736842,
+          "true_positives": 65,
           "false_positives": 77,
           "true_negatives": 817,
-          "false_negatives": 50,
-          "evasion_success_rate": 0.47619047619047616,
+          "false_negatives": 40,
+          "evasion_success_rate": 0.38095238095238093,
           "false_positive_rate": 0.08612975391498881
         }
       }
@@ -159,11 +159,11 @@
         "description": "Modify features with strength 0.3 to evade thresholds"
       },
       "perturbation_metrics": {
-        "l1_distance": 1606200.476992286,
-        "l2_distance": 17705886.589955665,
+        "l1_distance": 1606200.4627065717,
+        "l2_distance": 17705886.589955494,
         "linf_distance": 29934343.5,
         "feature_changes": [
-          3.3333333333333335,
+          3.1333333333333333,
           0.0,
           7594267.722857142,
           0.3566748962653574,
@@ -225,24 +225,24 @@
         "description": "Add Gaussian noise with \u03c3=0.05 to confuse models"
       },
       "perturbation_metrics": {
-        "l1_distance": 133518.57248728894,
-        "l2_distance": 1519318.2329294034,
-        "linf_distance": 3565680.646359222,
+        "l1_distance": 128694.7365931543,
+        "l2_distance": 1456539.4471799782,
+        "linf_distance": 3345563.5180347413,
         "feature_changes": [
-          0.24458042834848306,
+          0.20915373447026478,
           0.0,
-          616577.1591303095,
-          0.036061812967422516,
-          1252680.1054587823,
-          0.03267928176458097,
-          0.0,
-          0.0,
-          0.0032005507155618215,
-          0.02060764959082238,
-          0.07931567683227954,
+          589202.9592225984,
+          0.03667195297795386,
+          1212520.6275743458,
+          0.03685199952779375,
           0.0,
           0.0,
-          2.3337875532936896
+          0.003510557173474052,
+          0.022119021586994914,
+          0.07387895434510579,
+          0.0,
+          0.0,
+          2.343320995480931
         ]
       },
       "n_adversarial_samples": 105,
@@ -260,15 +260,15 @@
           "false_positive_rate": 0.08612975391498881
         },
         "xgboost": {
-          "accuracy": 0.994994994994995,
+          "accuracy": 0.993993993993994,
           "precision": 1.0,
-          "recall": 0.9523809523809523,
-          "f1_score": 0.975609756097561,
-          "true_positives": 100,
+          "recall": 0.9428571428571428,
+          "f1_score": 0.9705882352941176,
+          "true_positives": 99,
           "false_positives": 0,
           "true_negatives": 894,
-          "false_negatives": 5,
-          "evasion_success_rate": 0.047619047619047616,
+          "false_negatives": 6,
+          "evasion_success_rate": 0.05714285714285714,
           "false_positive_rate": 0.0
         },
         "ensemble": {
@@ -291,11 +291,11 @@
         "description": "Target ensemble weaknesses to evade detection"
       },
       "perturbation_metrics": {
-        "l1_distance": 3747800.3444665456,
-        "l2_distance": 41313735.376546316,
+        "l1_distance": 3747800.3254189263,
+        "l2_distance": 41313735.37654628,
         "linf_distance": 69846801.5,
         "feature_changes": [
-          4.961904761904762,
+          4.695238095238095,
           0.0,
           17719958.019999996,
           1.2039725447713248,

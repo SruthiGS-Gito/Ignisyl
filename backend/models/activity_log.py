@@ -40,7 +40,7 @@ class ActivityLogger:
         
         conn.commit()
         conn.close()
-        print("✅ Activity logging database initialized")
+        print("[OK] Activity logging database initialized")
     
     def log_activity(self, activity_data: Dict) -> int:
         """

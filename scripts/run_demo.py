@@ -25,14 +25,14 @@ async def simulate_medium_threat():
 
 async def simulate_high_threat():
     """Simulate high-risk threat requiring analyst decision"""
-    print("🚨 Simulating HIGH threat...")
+    print("[*] Simulating HIGH threat...")
     print("   Risk Score: 62 - Multiple anomalies detected")
     print("   → Sent to Analyst Decision Queue")
     await asyncio.sleep(3)
 
 async def simulate_critical_threat():
     """Simulate critical threat"""
-    print("🔴 Simulating CRITICAL threat...")
+    print("[*] Simulating CRITICAL threat...")
     print("   Risk Score: 95 - Honeypot file accessed!")
     print("   → AUTO-BLOCKED")
     print("   → Security team notified")
@@ -47,17 +47,17 @@ async def run_demo():
     print("\nThis demo simulates various threat scenarios\n")
     
     # Scenario 1: Normal Activity
-    print("\n📊 Scenario 1: Normal Business Activity")
+    print("\n[*] Scenario 1: Normal Business Activity")
     print("-" * 60)
     await simulate_normal_activity()
     
     # Scenario 2: Medium Threat
-    print("\n📊 Scenario 2: Unusual But Not Critical")
+    print("\n[*] Scenario 2: Unusual But Not Critical")
     print("-" * 60)
     await simulate_medium_threat()
     
     # Scenario 3: High Threat (Analyst Decision)
-    print("\n📊 Scenario 3: Analyst Decision Required")
+    print("\n[*] Scenario 3: Analyst Decision Required")
     print("-" * 60)
     await simulate_high_threat()
     print("\n   Analyst Options:")
@@ -67,7 +67,7 @@ async def run_demo():
     print("   • ESCALATE - Forward to manager")
     
     # Scenario 4: Critical Threat
-    print("\n📊 Scenario 4: Confirmed Insider Threat")
+    print("\n[*] Scenario 4: Confirmed Insider Threat")
     print("-" * 60)
     await simulate_critical_threat()
     
@@ -75,12 +75,12 @@ async def run_demo():
     print("\n" + "=" * 60)
     print("Demo Complete!")
     print("=" * 60)
-    print("\n📋 Key Features Demonstrated:")
+    print("\n[*] Key Features Demonstrated:")
     print("   ✅ 5-Level Graduated Response")
     print("   ✅ Human-in-the-Loop Decision Making")
     print("   ✅ Automatic Threat Blocking")
     print("   ✅ Analyst Control Panel")
-    print("\n💡 To see the full system:")
+    print("\n[*] To see the full system:")
     print("   1. Start backend: cd backend && python main.py")
     print("   2. Start frontend: cd frontend && npm start")
     print("   3. Login at: http://localhost:3000")

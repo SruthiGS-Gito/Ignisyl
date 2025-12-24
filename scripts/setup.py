@@ -46,7 +46,7 @@ def install_dependencies():
     """Install Python dependencies"""
     print_header("Installing Python Dependencies")
     
-    print("📦 Installing requirements...")
+    print("[*] Installing requirements...")
     result = subprocess.run(
         [sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'],
         capture_output=True,
@@ -94,7 +94,7 @@ def setup_frontend():
     print_header("Setting Up Frontend")
     
     if os.path.exists('frontend/package.json'):
-        print("📦 Installing npm dependencies...")
+        print("[*] Installing npm dependencies...")
         result = subprocess.run(
             ['npm', 'install'],
             cwd='frontend',
@@ -114,7 +114,7 @@ def print_next_steps():
     """Print next steps"""
     print_header("Setup Complete!")
     
-    print("\n📋 Next Steps:")
+    print("\n[*] Next Steps:")
     print("   1. Generate training data:")
     print("      python scripts/generate_data.py")
     print("\n   2. Train ML models:")

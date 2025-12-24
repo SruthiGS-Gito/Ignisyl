@@ -28,14 +28,14 @@ def test_imports():
             PostgreSQLConnection,
             MySQLConnection
         )
-        print("✅ Successfully imported DatabaseFactory")
-        print("✅ Successfully imported DatabaseConnection")
-        print("✅ Successfully imported SQLiteConnection")
-        print("✅ Successfully imported PostgreSQLConnection")
-        print("✅ Successfully imported MySQLConnection")
+        print("[OK] Successfully imported DatabaseFactory")
+        print("[OK] Successfully imported DatabaseConnection")
+        print("[OK] Successfully imported SQLiteConnection")
+        print("[OK] Successfully imported PostgreSQLConnection")
+        print("[OK] Successfully imported MySQLConnection")
         return True
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         traceback.print_exc()
         return False
 
@@ -48,18 +48,18 @@ def test_config():
 
     try:
         from backend.config.database_config import DATABASE_CONFIG, get_config
-        print("✅ Successfully imported database configuration")
+        print("[OK] Successfully imported database configuration")
 
         # Verify development config exists
         dev_config = get_config('development')
-        print(f"✅ Development config loaded: {dev_config['type']}")
+        print(f"[OK] Development config loaded: {dev_config['type']}")
 
         # List all available environments
-        print(f"✅ Available environments: {list(DATABASE_CONFIG.keys())}")
+        print(f"[OK] Available environments: {list(DATABASE_CONFIG.keys())}")
 
         return True
     except Exception as e:
-        print(f"❌ Configuration test failed: {e}")
+        print(f"[ERROR] Configuration test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -80,19 +80,19 @@ def test_sqlite_connection():
 
         # Create database connection
         db = DatabaseFactory.get_database(config)
-        print("✅ Database connection created")
+        print("[OK] Database connection created")
 
         # Test simple query
         result = db.fetch_one("SELECT 1 as test")
-        print(f"✅ Test query executed: {result}")
+        print(f"[OK] Test query executed: {result}")
 
         # Close connection
         db.close()
-        print("✅ Connection closed successfully")
+        print("[OK] Connection closed successfully")
 
         return True
     except Exception as e:
-        print(f"❌ SQLite connection test failed: {e}")
+        print(f"[ERROR] SQLite connection test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -110,7 +110,7 @@ def test_crud_operations():
         # Use testing environment (in-memory SQLite)
         config = get_config('testing')
         db = DatabaseFactory.get_database(config)
-        print("✅ Connected to in-memory test database")
+        print("[OK] Connected to in-memory test database")
 
         # CREATE table
         print("\n1️⃣ CREATE Table:")
@@ -122,7 +122,7 @@ def test_crud_operations():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        print("   ✅ Table created")
+        print("   [OK] Table created")
 
         # INSERT
         print("\n2️⃣ INSERT Record:")
@@ -130,12 +130,12 @@ def test_crud_operations():
             "INSERT INTO test_users (username, email) VALUES (?, ?)",
             ('test_user', 'test@example.com')
         )
-        print("   ✅ Record inserted")
+        print("   [OK] Record inserted")
 
         # SELECT
         print("\n3️⃣ SELECT Record:")
         user = db.fetch_one("SELECT * FROM test_users WHERE username = ?", ('test_user',))
-        print(f"   ✅ Record retrieved: {user}")
+        print(f"   [OK] Record retrieved: {user}")
 
         # UPDATE
         print("\n4️⃣ UPDATE Record:")
@@ -144,21 +144,21 @@ def test_crud_operations():
             ('updated@example.com', 'test_user')
         )
         updated_user = db.fetch_one("SELECT email FROM test_users WHERE username = ?", ('test_user',))
-        print(f"   ✅ Record updated: {updated_user}")
+        print(f"   [OK] Record updated: {updated_user}")
 
         # DELETE
         print("\n5️⃣ DELETE Record:")
         db.execute_query("DELETE FROM test_users WHERE username = ?", ('test_user',))
         deleted_user = db.fetch_one("SELECT * FROM test_users WHERE username = ?", ('test_user',))
-        print(f"   ✅ Record deleted (should be None): {deleted_user}")
+        print(f"   [OK] Record deleted (should be None): {deleted_user}")
 
         # Cleanup
         db.close()
-        print("\n✅ All CRUD operations completed successfully")
+        print("\n[OK] All CRUD operations completed successfully")
 
         return True
     except Exception as e:
-        print(f"❌ CRUD operations test failed: {e}")
+        print(f"[ERROR] CRUD operations test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -184,10 +184,10 @@ def test_batch_operations():
                 value INTEGER
             )
         """)
-        print("✅ Table created")
+        print("[OK] Table created")
 
         # Batch insert
-        print("\n📦 Batch inserting 5 records:")
+        print("\n[*] Batch inserting 5 records:")
         test_data = [
             ('record_1', 10),
             ('record_2', 20),
@@ -200,16 +200,16 @@ def test_batch_operations():
             "INSERT INTO test_batch (name, value) VALUES (?, ?)",
             test_data
         )
-        print("   ✅ Batch insert completed")
+        print("   [OK] Batch insert completed")
 
         # Verify
         all_records = db.fetch_all("SELECT * FROM test_batch")
-        print(f"   ✅ Retrieved {len(all_records)} records")
+        print(f"   [OK] Retrieved {len(all_records)} records")
 
         db.close()
         return True
     except Exception as e:
-        print(f"❌ Batch operations test failed: {e}")
+        print(f"[ERROR] Batch operations test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -236,7 +236,7 @@ def test_transactions():
         """)
 
         # Test successful transaction
-        print("\n✅ Testing successful transaction:")
+        print("\n[OK] Testing successful transaction:")
         with db.transaction():
             db.execute_query(
                 "INSERT INTO test_transactions (description) VALUES (?)",
@@ -246,13 +246,13 @@ def test_transactions():
                 "INSERT INTO test_transactions (description) VALUES (?)",
                 ('transaction_2',)
             )
-        print("   ✅ Transaction committed successfully")
+        print("   [OK] Transaction committed successfully")
 
         count = db.fetch_one("SELECT COUNT(*) FROM test_transactions")
-        print(f"   ✅ Records in database: {count[0]}")
+        print(f"   [OK] Records in database: {count[0]}")
 
         # Test failed transaction (rollback)
-        print("\n❌ Testing failed transaction (should rollback):")
+        print("\n[ERROR] Testing failed transaction (should rollback):")
         try:
             with db.transaction():
                 db.execute_query(
@@ -262,21 +262,21 @@ def test_transactions():
                 # Force an error
                 raise Exception("Simulated error")
         except Exception as e:
-            print(f"   ⚠️ Transaction failed as expected: {e}")
+            print(f"   [WARN] Transaction failed as expected: {e}")
 
         count_after = db.fetch_one("SELECT COUNT(*) FROM test_transactions")
-        print(f"   ✅ Records after rollback: {count_after[0]} (should be {count[0]})")
+        print(f"   [OK] Records after rollback: {count_after[0]} (should be {count[0]})")
 
         if count[0] == count_after[0]:
-            print("   ✅ Rollback worked correctly!")
+            print("   [OK] Rollback worked correctly!")
         else:
-            print("   ❌ Rollback failed!")
+            print("   [ERROR] Rollback failed!")
             return False
 
         db.close()
         return True
     except Exception as e:
-        print(f"❌ Transaction test failed: {e}")
+        print(f"[ERROR] Transaction test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -290,40 +290,40 @@ def test_backward_compatibility():
     try:
         # Test that original database module still works
         from backend.models.database import engine, SessionLocal, Base, User
-        print("✅ Successfully imported existing database models")
+        print("[OK] Successfully imported existing database models")
 
         # Verify engine is created
         if engine:
-            print("✅ Database engine created successfully")
+            print("[OK] Database engine created successfully")
         else:
-            print("❌ Database engine is None")
+            print("[ERROR] Database engine is None")
             return False
 
         # Verify SessionLocal works
         if SessionLocal:
-            print("✅ SessionLocal created successfully")
+            print("[OK] SessionLocal created successfully")
         else:
-            print("❌ SessionLocal is None")
+            print("[ERROR] SessionLocal is None")
             return False
 
         # Verify Base is available
         if Base:
-            print("✅ Base declarative class available")
+            print("[OK] Base declarative class available")
         else:
-            print("❌ Base is None")
+            print("[ERROR] Base is None")
             return False
 
         # Verify User model exists
         if User:
-            print("✅ User model available")
+            print("[OK] User model available")
             print(f"   Table name: {User.__tablename__}")
         else:
-            print("❌ User model is None")
+            print("[ERROR] User model is None")
             return False
 
         return True
     except Exception as e:
-        print(f"❌ Backward compatibility test failed: {e}")
+        print(f"[ERROR] Backward compatibility test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -345,25 +345,25 @@ def test_error_handling():
         print("\n1️⃣ Testing invalid SQL (should handle gracefully):")
         try:
             db.execute_query("INVALID SQL SYNTAX")
-            print("   ❌ Should have raised an error")
+            print("   [ERROR] Should have raised an error")
             return False
         except Exception as e:
-            print(f"   ✅ Error handled correctly: {type(e).__name__}")
+            print(f"   [OK] Error handled correctly: {type(e).__name__}")
 
         # Test 2: Query on non-existent table
         print("\n2️⃣ Testing query on non-existent table:")
         try:
             db.fetch_all("SELECT * FROM non_existent_table")
-            print("   ❌ Should have raised an error")
+            print("   [ERROR] Should have raised an error")
             return False
         except Exception as e:
-            print(f"   ✅ Error handled correctly: {type(e).__name__}")
+            print(f"   [OK] Error handled correctly: {type(e).__name__}")
 
         db.close()
-        print("\n✅ Error handling tests passed")
+        print("\n[OK] Error handling tests passed")
         return True
     except Exception as e:
-        print(f"❌ Error handling test failed: {e}")
+        print(f"[ERROR] Error handling test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -371,7 +371,7 @@ def test_error_handling():
 def run_all_tests():
     """Run all tests and generate report"""
     print("\n" + "="*70)
-    print("🚀 DATABASE ABSTRACTION LAYER - TEST SUITE")
+    print("[START] DATABASE ABSTRACTION LAYER - TEST SUITE")
     print("="*70)
 
     tests = [
@@ -392,20 +392,20 @@ def run_all_tests():
             result = test_func()
             results.append((test_name, result))
         except Exception as e:
-            print(f"\n❌ Test '{test_name}' crashed: {e}")
+            print(f"\n[ERROR] Test '{test_name}' crashed: {e}")
             traceback.print_exc()
             results.append((test_name, False))
 
     # Print summary
     print("\n" + "="*70)
-    print("📊 TEST SUMMARY")
+    print("[DATA] TEST SUMMARY")
     print("="*70)
 
     passed = 0
     failed = 0
 
     for test_name, result in results:
-        status = "✅ PASSED" if result else "❌ FAILED"
+        status = "[OK] PASSED" if result else "[ERROR] FAILED"
         print(f"{status}: {test_name}")
         if result:
             passed += 1
@@ -420,11 +420,11 @@ def run_all_tests():
     print("="*70)
 
     if failed == 0:
-        print("\n🎉 ✅ ALL TESTS PASSED! 🎉")
+        print("\n[*] [OK] ALL TESTS PASSED! [*]")
         print("="*70 + "\n")
         return True
     else:
-        print(f"\n⚠️ {failed} TEST(S) FAILED")
+        print(f"\n[WARN] {failed} TEST(S) FAILED")
         print("="*70 + "\n")
         return False
 

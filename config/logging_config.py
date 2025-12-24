@@ -56,14 +56,14 @@ def setup_logging(log_level: str = "INFO", log_to_file: bool = True):
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
         
-        print(f"📝 Logging to file: {log_file}")
+        print(f"[INFO] Logging to file: {log_file}")
     
     # Suppress noisy libraries
     logging.getLogger('uvicorn.access').setLevel(logging.WARNING)
     logging.getLogger('watchdog').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     
-    print(f"✅ Logging configured (level: {log_level})")
+    print(f"[OK] Logging configured (level: {log_level})")
     
     return logger
 

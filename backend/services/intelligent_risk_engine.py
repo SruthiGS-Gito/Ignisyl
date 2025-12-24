@@ -229,7 +229,7 @@ class IntelligentRiskEngine:
             recommendations.append("Consider temporary account suspension")
         
         else:  # CRITICAL
-            recommendations.append("🚨 IMMEDIATE ACTION REQUIRED")
+            recommendations.append("[ALERT] IMMEDIATE ACTION REQUIRED")
             recommendations.append("Block user access immediately")
             recommendations.append("Preserve all logs for investigation")
             recommendations.append("Notify management and legal")
@@ -260,9 +260,9 @@ class IntelligentRiskEngine:
         elif current_score < 50:
             return f"{event_name} detected (+{score_added:.1f} points). Current risk: {current_score:.1f}/100. {recent_count} events in last hour. Monitoring recommended."
         elif current_score < 75:
-            return f"⚠️ {event_name} detected (+{score_added:.1f} points). Current risk: {current_score:.1f}/100. {recent_count} suspicious events in last hour. Immediate attention required."
+            return f"[WARN] {event_name} detected (+{score_added:.1f} points). Current risk: {current_score:.1f}/100. {recent_count} suspicious events in last hour. Immediate attention required."
         else:
-            return f"🚨 CRITICAL: {event_name} detected (+{score_added:.1f} points). Current risk: {current_score:.1f}/100. {recent_count} threat indicators in last hour. User should be blocked immediately."
+            return f"[ALERT] CRITICAL: {event_name} detected (+{score_added:.1f} points). Current risk: {current_score:.1f}/100. {recent_count} threat indicators in last hour. User should be blocked immediately."
     
     def get_user_risk_profile(self, user_id: str) -> Dict:
         """Get complete risk profile for a user"""

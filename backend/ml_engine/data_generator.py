@@ -546,11 +546,11 @@ class BehavioralDataGenerator:
         df['timestamp'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
         
         df.to_csv(filename, index=False)
-        print(f"✅ Saved {len(activities)} activities to {filename}")
+        print(f"[OK] Saved {len(activities)} activities to {filename}")
     
     def generate_complete_dataset(self) -> Tuple[List[Dict], List[Dict]]:
         """Generate complete dataset with normal and anomalous activities"""
-        print("🚀 Generating user profiles...")
+        print("[START] Generating user profiles...")
         self.generate_user_profiles()
         
         print("Generating normal activities...")

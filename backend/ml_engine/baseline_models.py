@@ -57,7 +57,7 @@ class BaselineComparison:
         """
         if verbose:
             print("\n" + "="*70)
-            print("🏋️ Training Baseline Models")
+            print("[*]️ Training Baseline Models")
             print("="*70)
 
         for name, model in self.models.items():
@@ -72,10 +72,10 @@ class BaselineComparison:
             self.training_times[name] = training_time
 
             if verbose:
-                print(f"✅ Done ({training_time:.2f}s)")
+                print(f"[OK] Done ({training_time:.2f}s)")
 
         if verbose:
-            print("\n✅ All baseline models trained successfully!")
+            print("\n[OK] All baseline models trained successfully!")
 
         return self.trained_models
 
@@ -142,7 +142,7 @@ class BaselineComparison:
         """
         if verbose:
             print("\n" + "="*70)
-            print("📊 Evaluating Baseline Models")
+            print("[DATA] Evaluating Baseline Models")
             print("="*70)
 
         all_results = {}
@@ -155,12 +155,12 @@ class BaselineComparison:
             all_results[name] = results
 
             if verbose:
-                print(f"✅ Accuracy: {results['accuracy']*100:.1f}%")
+                print(f"[OK] Accuracy: {results['accuracy']*100:.1f}%")
 
         self.results = all_results
 
         if verbose:
-            print("\n✅ All baseline models evaluated!")
+            print("\n[OK] All baseline models evaluated!")
 
         return all_results
 
@@ -171,7 +171,7 @@ class BaselineComparison:
             include_ignisyl: Optional dict with IGNISYL results to include
         """
         print("\n" + "="*70)
-        print("📊 BASELINE MODEL COMPARISON")
+        print("[DATA] BASELINE MODEL COMPARISON")
         print("="*70)
 
         # Header

@@ -240,7 +240,7 @@ class LogProcessor:
         with open(filepath, 'w') as f:
             json.dump(logs_to_export, f, indent=2, default=str)
         
-        print(f"📄 Exported {len(logs_to_export)} logs to {filepath}")
+        print(f"[*] Exported {len(logs_to_export)} logs to {filepath}")
         
         return len(logs_to_export)
     
@@ -265,7 +265,7 @@ class LogProcessor:
         cleared_count = initial_count - len(self.processed_logs)
         
         if cleared_count > 0:
-            print(f"🗑️ Cleared {cleared_count} old logs")
+            print(f"[DEL] Cleared {cleared_count} old logs")
         
         return cleared_count
 

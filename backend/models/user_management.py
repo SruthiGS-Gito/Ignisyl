@@ -7,12 +7,23 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, List, Optional
 import json
+import os
+from pathlib import Path
 
 class UserManager:
     """Manages users being monitored by IGNISYL"""
-    
-    def __init__(self, db_path: str = "../data/users.db"):
-        self.db_path = db_path
+
+    def __init__(self, db_path: str = None):
+        # Use absolute path resolved from this file's location
+        if db_path is None:
+            # Get the backend directory (parent of models/)
+            backend_dir = Path(__file__).parent.parent.resolve()
+            self.db_path = str(backend_dir / "data" / "users.db")
+        else:
+            self.db_path = db_path
+
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._init_database()
     
     def _init_database(self):
@@ -39,7 +50,7 @@ class UserManager:
         
         conn.commit()
         conn.close()
-        print("✅ User database initialized")
+        print("[OK] User database initialized")
     
     def register_user(self, username: str, full_name: str, department: str, 
                  role: str, email: str = None, password_hash: str = None) -> Dict:
@@ -57,7 +68,7 @@ class UserManager:
             """, (user_id, username, password_hash, full_name, department, role, email, datetime.now().isoformat()))
             
             conn.commit()
-            print(f"✅ User registered: {full_name} ({user_id})")
+            print(f"[OK] User registered: {full_name} ({user_id})")
             
             return {
                 "success": True,
@@ -67,7 +78,7 @@ class UserManager:
             }
             
         except sqlite3.IntegrityError:
-            print(f"⚠️ User {username} already exists")
+            print(f"[WARN] User {username} already exists")
             return {
                 "success": False,
                 "message": "User already exists"
@@ -197,6 +208,65 @@ class UserManager:
             print(f"Error incrementing threat count: {e}")
             conn.close()
             return False
+
+    def update_user_password(self, user_id: str, password_hash: str) -> bool:
+        """
+        Update user's password hash
+
+        Args:
+            user_id: User ID
+            password_hash: New bcrypt password hash
+
+        Returns:
+            True if successful, False otherwise
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE users
+                SET password_hash = ?
+                WHERE user_id = ?
+            """, (password_hash, user_id))
+
+            conn.commit()
+            updated = cursor.rowcount > 0
+            conn.close()
+
+            if updated:
+                print(f"[OK] Password updated for user: {user_id}")
+            return updated
+        except Exception as e:
+            print(f"Error updating password: {e}")
+            conn.close()
+            return False
+
+    def get_user_by_username(self, username: str) -> Optional[Dict]:
+        """Get user by username instead of user_id"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return {
+                "user_id": row[0],
+                "username": row[1],
+                "password_hash": row[2],
+                "full_name": row[3],
+                "department": row[4],
+                "role": row[5],
+                "email": row[6],
+                "registered_at": row[7],
+                "last_activity": row[8],
+                "total_threats": row[9],
+                "current_risk_score": row[10],
+                "status": row[11]
+            }
+        return None
 
 # Global user manager instance
 user_manager = UserManager()

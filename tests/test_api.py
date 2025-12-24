@@ -228,7 +228,7 @@ def run_all_tests():
     # Run tests manually (without pytest runner)
     try:
         # Authentication tests
-        print("\n📋 Testing Authentication...")
+        print("\n[*] Testing Authentication...")
         auth = TestAuthentication()
         auth.test_login_success()
         auth.test_login_invalid_credentials()
@@ -245,24 +245,24 @@ def run_all_tests():
         token = token_response.json()["access_token"]
         
         # Dashboard tests
-        print("\n📋 Testing Dashboard...")
+        print("\n[*] Testing Dashboard...")
         dashboard = TestDashboard()
         dashboard.test_get_dashboard_stats(token)
         dashboard.test_get_recent_activities(token)
         
         # Users tests
-        print("\n📋 Testing User Management...")
+        print("\n[*] Testing User Management...")
         users = TestUsers()
         users.test_get_users_list(token)
         
         # Analyst tests
-        print("\n📋 Testing Analyst Control...")
+        print("\n[*] Testing Analyst Control...")
         analyst = TestAnalyst()
         analyst.test_get_pending_decisions(token)
         analyst.test_analyst_take_action(token)
         
         # Threats tests
-        print("\n📋 Testing Threats...")
+        print("\n[*] Testing Threats...")
         threats = TestThreats()
         threats.test_get_active_threats(token)
         

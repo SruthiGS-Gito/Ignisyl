@@ -18,7 +18,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def load_training_data(filepath='data/synthetic/training_data.json'):
     """Load training data"""
-    print(f"📂 Loading training data from {filepath}")
+    print(f"[*] Loading training data from {filepath}")
     
     with open(filepath, 'r') as f:
         data = json.load(f)
@@ -28,7 +28,7 @@ def load_training_data(filepath='data/synthetic/training_data.json'):
 
 def prepare_features(data):
     """Prepare features for training"""
-    print("🔧 Preparing features...")
+    print("[*] Preparing features...")
     
     X = []
     y = []
@@ -71,7 +71,7 @@ def prepare_features(data):
 
 def train_isolation_forest(X):
     """Train Isolation Forest"""
-    print("\n🌲 Training Isolation Forest...")
+    print("\n[*] Training Isolation Forest...")
     
     model = IsolationForest(
         contamination=0.1,
@@ -86,7 +86,7 @@ def train_isolation_forest(X):
 
 def train_autoencoder(X):
     """Train Autoencoder"""
-    print("\n🧠 Training Autoencoder...")
+    print("\n[*] Training Autoencoder...")
     
     # Normalize data
     scaler = StandardScaler()
@@ -120,7 +120,7 @@ def train_autoencoder(X):
 
 def train_xgboost(X, y):
     """Train XGBoost with class balancing"""
-    print("🚀 Training XGBoost...")
+    print("[*] Training XGBoost...")
     
     # Calculate class weights for imbalanced data
     n_samples = len(y)
@@ -154,7 +154,7 @@ def train_xgboost(X, y):
 
 def save_models(isolation_forest, autoencoder, scaler, xgboost, output_dir='data/models'):
     """Save trained models"""
-    print(f"\n💾 Saving models to {output_dir}...")
+    print(f"\n[*] Saving models to {output_dir}...")
     
     os.makedirs(output_dir, exist_ok=True)
     

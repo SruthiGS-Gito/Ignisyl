@@ -41,13 +41,13 @@ def extract_features(sample):
 
 def validate():
     print("="*60)
-    print("🧪 PROPER IGNISYL VALIDATION")
+    print("[*] PROPER IGNISYL VALIDATION")
     print("="*60)
     
     # Load ALL data
-    print("\n📊 Loading all data...")
+    print("\n[DATA] Loading all data...")
     all_data = load_all_data()
-    print(f"✅ Loaded {len(all_data)} total samples")
+    print(f"[OK] Loaded {len(all_data)} total samples")
     
     # Extract features and labels
     X_all = []
@@ -77,7 +77,7 @@ def validate():
     print(f"   Test:  {len(X_test)} samples")
     
     # Load scaler from training
-    print("\n🔧 Loading scaler...")
+    print("\n[FIX] Loading scaler...")
     models_dir = Path(__file__).parent.parent / 'data' / 'models'
     scaler = pickle.load(open(models_dir / 'scaler.pkl', 'rb'))
     
@@ -87,15 +87,15 @@ def validate():
     print(f"   Scaled features - Min: {X_test_scaled.min():.3f}, Max: {X_test_scaled.max():.3f}")
     
     # Load model
-    print("\n🤖 Loading XGBoost model...")
+    print("\n[*] Loading XGBoost model...")
     xgboost_model = pickle.load(open(models_dir / 'xgboost.pkl', 'rb'))
     
     # Predict
-    print("\n🔍 Running predictions...")
+    print("\n[*] Running predictions...")
     y_pred_proba = xgboost_model.predict_proba(X_test_scaled)[:, 1]
     
     # Stats
-    print(f"\n📊 Prediction Probability Stats:")
+    print(f"\n[DATA] Prediction Probability Stats:")
     print(f"   Min: {y_pred_proba.min():.4f}")
     print(f"   Max: {y_pred_proba.max():.4f}")
     print(f"   Mean: {y_pred_proba.mean():.4f}")
@@ -104,7 +104,7 @@ def validate():
     # Try different thresholds
     thresholds = [0.3, 0.4, 0.5, 0.6, 0.7]
     
-    print("\n🎯 Testing different thresholds:")
+    print("\n[*] Testing different thresholds:")
     best_f1 = 0
     best_threshold = 0.5
     
@@ -118,7 +118,7 @@ def validate():
             best_f1 = f1
             best_threshold = thresh
     
-    print(f"\n✅ Best threshold: {best_threshold} (F1={best_f1:.3f})")
+    print(f"\n[OK] Best threshold: {best_threshold} (F1={best_f1:.3f})")
     
     # Final predictions with best threshold
     y_pred = (y_pred_proba >= best_threshold).astype(int)
@@ -134,15 +134,15 @@ def validate():
     
     # Display results
     print("\n" + "="*60)
-    print("📊 FINAL VALIDATION RESULTS")
+    print("[DATA] FINAL VALIDATION RESULTS")
     print("="*60)
-    print(f"✅ Accuracy:  {accuracy*100:.1f}%")
-    print(f"✅ Precision: {precision*100:.1f}%")
-    print(f"✅ Recall:    {recall*100:.1f}%")
-    print(f"✅ F1-Score:  {f1*100:.1f}%")
-    print(f"✅ FPR:       {fpr*100:.1f}%")
+    print(f"[OK] Accuracy:  {accuracy*100:.1f}%")
+    print(f"[OK] Precision: {precision*100:.1f}%")
+    print(f"[OK] Recall:    {recall*100:.1f}%")
+    print(f"[OK] F1-Score:  {f1*100:.1f}%")
+    print(f"[OK] FPR:       {fpr*100:.1f}%")
     
-    print("\n📋 Confusion Matrix:")
+    print("\n[*] Confusion Matrix:")
     print(f"   True Negatives:  {tn}")
     print(f"   False Positives: {fp}")
     print(f"   False Negatives: {fn}")
@@ -170,7 +170,7 @@ def validate():
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
     
-    print(f"\n✅ Results saved to {output_file}")
+    print(f"\n[OK] Results saved to {output_file}")
     
     return results
 

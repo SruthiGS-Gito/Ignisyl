@@ -221,7 +221,7 @@ class CompleteTester:
         pass_rate = (self.passed / total * 100) if total > 0 else 0
         
         print("\n" + "=" * 80)
-        print(f"{BLUE}📊 COMPREHENSIVE TEST SUMMARY{RESET}")
+        print(f"{BLUE}[DATA] COMPREHENSIVE TEST SUMMARY{RESET}")
         print("=" * 80)
         
         # Category breakdown
@@ -255,21 +255,21 @@ class CompleteTester:
                 "results": self.results
             }, f, indent=2)
         
-        print(f"\n📄 Detailed report saved to: {report_file}")
+        print(f"\n[*] Detailed report saved to: {report_file}")
 
 def main():
     tester = CompleteTester()
     
     print(f"{BLUE}{'=' * 80}{RESET}")
-    print(f"{BLUE}🧪 IGNISYL COMPLETE API TEST SUITE{RESET}")
+    print(f"{BLUE}[*] IGNISYL COMPLETE API TEST SUITE{RESET}")
     print(f"{BLUE}{'=' * 80}{RESET}\n")
     
-    print("🔍 Discovering all endpoints...")
+    print("[*] Discovering all endpoints...")
     endpoints = tester.discover_endpoints()
-    print(f"✅ Found {len(endpoints)} endpoints\n")
+    print(f"[OK] Found {len(endpoints)} endpoints\n")
     
     print(f"{BLUE}{'=' * 80}{RESET}")
-    print("🚀 Testing all endpoints...")
+    print("[START] Testing all endpoints...")
     print(f"{BLUE}{'=' * 80}{RESET}\n")
     
     for endpoint in endpoints:

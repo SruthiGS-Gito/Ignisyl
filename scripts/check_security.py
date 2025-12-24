@@ -18,7 +18,7 @@ def get_project_root():
 def check_gitignore():
     """Check if .env is in .gitignore"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 1: .gitignore Verification")
+    print("[*] SECURITY CHECK 1: .gitignore Verification")
     print("="*70)
 
     gitignore_path = get_project_root() / '.gitignore'
@@ -60,7 +60,7 @@ def check_gitignore():
 def check_env_example():
     """Check that .env.example has only placeholders"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 2: .env.example Verification")
+    print("[*] SECURITY CHECK 2: .env.example Verification")
     print("="*70)
 
     env_example_path = get_project_root() / '.env.example'
@@ -121,7 +121,7 @@ def check_env_example():
 def check_for_real_env():
     """Check if .env file exists (should not be committed)"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 3: Real .env File Check")
+    print("[*] SECURITY CHECK 3: Real .env File Check")
     print("="*70)
 
     env_path = get_project_root() / '.env'
@@ -157,7 +157,7 @@ def check_for_real_env():
 def scan_for_hardcoded_secrets():
     """Scan Python files for hardcoded passwords and secrets"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 4: Hardcoded Secrets Scan")
+    print("[*] SECURITY CHECK 4: Hardcoded Secrets Scan")
     print("="*70)
 
     project_root = get_project_root()
@@ -222,7 +222,7 @@ def scan_for_hardcoded_secrets():
         except Exception as e:
             pass  # Skip files that can't be read
 
-    print(f"📊 Scanned {scanned_count} Python files")
+    print(f"[*] Scanned {scanned_count} Python files")
 
     if issues_found:
         print(f"\n⚠️ FOUND {len(issues_found)} POTENTIAL ISSUE(S):")
@@ -239,7 +239,7 @@ def scan_for_hardcoded_secrets():
 def check_database_files():
     """Check for database files that should not be committed"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 5: Database Files Check")
+    print("[*] SECURITY CHECK 5: Database Files Check")
     print("="*70)
 
     project_root = get_project_root()
@@ -266,7 +266,7 @@ def check_database_files():
         print(f"⚠️ Found {len(db_files_found)} database file(s):")
         for db_file in db_files_found:
             rel_path = db_file.relative_to(project_root)
-            print(f"   📁 {rel_path}")
+            print(f"   [*] {rel_path}")
 
             # Check if it's in git
             try:
@@ -294,7 +294,7 @@ def check_database_files():
 def check_sensitive_files():
     """Check for other sensitive files"""
     print("\n" + "="*70)
-    print("🔒 SECURITY CHECK 6: Sensitive Files Check")
+    print("[*] SECURITY CHECK 6: Sensitive Files Check")
     print("="*70)
 
     project_root = get_project_root()
@@ -324,7 +324,7 @@ def check_sensitive_files():
         print(f"⚠️ Found {len(sensitive_files)} potentially sensitive file(s):")
         for file in sensitive_files:
             rel_path = file.relative_to(project_root)
-            print(f"   📁 {rel_path}")
+            print(f"   [*] {rel_path}")
         print("\n   ℹ️ Verify these files are in .gitignore")
         return False
     else:
@@ -335,7 +335,7 @@ def check_sensitive_files():
 def generate_security_report():
     """Generate comprehensive security report"""
     print("\n" + "="*70)
-    print("🔐 IGNISYL - SECURITY AUDIT REPORT")
+    print("[*] IGNISYL - SECURITY AUDIT REPORT")
     print("="*70)
 
     checks = [
@@ -361,7 +361,7 @@ def generate_security_report():
 
     # Print summary
     print("\n" + "="*70)
-    print("📊 SECURITY AUDIT SUMMARY")
+    print("[*] SECURITY AUDIT SUMMARY")
     print("="*70)
 
     passed = 0
@@ -382,7 +382,7 @@ def generate_security_report():
     print("="*70)
 
     if failed == 0:
-        print("\n🎉 ✅ ALL SECURITY CHECKS PASSED! 🎉")
+        print("\n[*] ✅ ALL SECURITY CHECKS PASSED! [*]")
         print("="*70)
     else:
         print(f"\n⚠️ {failed} CHECK(S) NEED ATTENTION")
@@ -390,7 +390,7 @@ def generate_security_report():
 
     # Security recommendations
     print("\n" + "="*70)
-    print("🔐 SECURITY RECOMMENDATIONS")
+    print("[*] SECURITY RECOMMENDATIONS")
     print("="*70)
     print("1. ✅ Never commit .env files to git")
     print("2. ✅ Keep .env.example with only placeholders")

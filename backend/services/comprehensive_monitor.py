@@ -61,7 +61,7 @@ class ComprehensiveMonitor:
                     'created_at': datetime.now().isoformat()
                 })
         
-        print(f"✅ Created {len(honeypot_files)} honeypot files")
+        print(f"[OK] Created {len(honeypot_files)} honeypot files")
     
     def check_honeypot_access(self) -> List[Dict]:
         """
@@ -268,7 +268,7 @@ class ComprehensiveMonitor:
         filename = Path(filepath).name if filepath else "unknown"
     
         if is_honeypot:
-            return f"🚨 HONEYPOT TRIGGERED: Unauthorized access to decoy file '{filename}'"
+            return f"[ALERT] HONEYPOT TRIGGERED: Unauthorized access to decoy file '{filename}'"
     
         if is_sensitive:
             return f"Access to sensitive file '{filename}' ({operation})"

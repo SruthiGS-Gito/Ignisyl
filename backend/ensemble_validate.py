@@ -59,7 +59,7 @@ def validate_ensemble():
     X_test_scaled = scaler.transform(X_test)
     
     print("="*70)
-    print("🎯 ENSEMBLE VOTING VALIDATION (2/3 Agreement)")
+    print("[*] ENSEMBLE VOTING VALIDATION (2/3 Agreement)")
     print("="*70)
     
     # Get individual predictions
@@ -92,17 +92,17 @@ def validate_ensemble():
     tn, fp, fn, tp = confusion_matrix(y_test, y_pred_ensemble).ravel()
     fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
     
-    print(f"\n📊 ENSEMBLE RESULTS:")
+    print(f"\n[DATA] ENSEMBLE RESULTS:")
     print(f"   Accuracy:  {acc*100:.1f}%")
     print(f"   Precision: {prec*100:.1f}%")
     print(f"   Recall:    {rec*100:.1f}%")
     print(f"   F1-Score:  {f1*100:.1f}%")
     print(f"   FPR:       {fpr*100:.1f}%")
     
-    print(f"\n📋 Confusion Matrix:")
+    print(f"\n[*] Confusion Matrix:")
     print(f"   TN: {tn}, FP: {fp}, FN: {fn}, TP: {tp}")
     
-    print("\n🔍 Individual Model Votes:")
+    print("\n[*] Individual Model Votes:")
     print(f"   IF detected:  {sum(if_anomaly)} anomalies")
     print(f"   AE detected:  {sum(ae_anomaly)} anomalies")
     print(f"   XGB detected: {sum(xgb_anomaly)} anomalies")

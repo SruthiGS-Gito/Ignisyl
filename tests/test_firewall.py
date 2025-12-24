@@ -19,35 +19,35 @@ def test_graduated_response():
     firewall = FirewallController()
     
     # Test Level 1: ALLOW (Risk 0-29)
-    print("\n📊 Test 1: Low Risk (Score: 15)")
+    print("\n[*] Test 1: Low Risk (Score: 15)")
     result = firewall.apply_graduated_response("test_user_1", 15)
     assert result["action"] == "ALLOW"
     assert result["level"] == 1
     print(f"✅ Result: {result['action']} (Level {result['level']})")
     
     # Test Level 2: MONITOR (Risk 30-49)
-    print("\n📊 Test 2: Medium Risk (Score: 40)")
+    print("\n[*] Test 2: Medium Risk (Score: 40)")
     result = firewall.apply_graduated_response("test_user_2", 40)
     assert result["action"] == "MONITOR"
     assert result["level"] == 2
     print(f"✅ Result: {result['action']} (Level {result['level']})")
     
     # Test Level 3: RESTRICT (Risk 50-69)
-    print("\n📊 Test 3: High Risk (Score: 60)")
+    print("\n[*] Test 3: High Risk (Score: 60)")
     result = firewall.apply_graduated_response("test_user_3", 60)
     assert result["action"] in ["RESTRICT", "PENDING"]
     assert result["level"] == 3
     print(f"✅ Result: {result['action']} (Level {result['level']})")
     
     # Test Level 4: ISOLATE (Risk 70-89)
-    print("\n📊 Test 4: Critical Risk (Score: 80)")
+    print("\n[*] Test 4: Critical Risk (Score: 80)")
     result = firewall.apply_graduated_response("test_user_4", 80)
     assert result["action"] == "ISOLATE"
     assert result["level"] == 4
     print(f"✅ Result: {result['action']} (Level {result['level']})")
     
     # Test Level 5: BLOCK (Risk 90-100)
-    print("\n📊 Test 5: Extreme Risk (Score: 95)")
+    print("\n[*] Test 5: Extreme Risk (Score: 95)")
     result = firewall.apply_graduated_response("test_user_5", 95)
     assert result["action"] == "BLOCK"
     assert result["level"] == 5
@@ -64,7 +64,7 @@ def test_analyst_override():
     firewall = FirewallController()
     
     # Test ALLOW action
-    print("\n📊 Test 1: Analyst ALLOW")
+    print("\n[*] Test 1: Analyst ALLOW")
     result = firewall.analyst_override_action(
         user_id="test_user",
         action="ALLOW",
@@ -76,7 +76,7 @@ def test_analyst_override():
     print(f"✅ Result: {result['status']}")
     
     # Test RESTRICT action with custom restrictions
-    print("\n📊 Test 2: Analyst RESTRICT with custom rules")
+    print("\n[*] Test 2: Analyst RESTRICT with custom rules")
     result = firewall.analyst_override_action(
         user_id="test_user",
         action="RESTRICT",
@@ -96,7 +96,7 @@ def test_analyst_override():
     print(f"   Restrictions: {result['restrictions']}")
     
     # Test ISOLATE action
-    print("\n📊 Test 3: Analyst ISOLATE")
+    print("\n[*] Test 3: Analyst ISOLATE")
     result = firewall.analyst_override_action(
         user_id="test_user",
         action="ISOLATE",
@@ -111,7 +111,7 @@ def test_analyst_override():
     print(f"✅ Result: {result['status']}")
     
     # Test BLOCK action
-    print("\n📊 Test 4: Analyst BLOCK")
+    print("\n[*] Test 4: Analyst BLOCK")
     result = firewall.analyst_override_action(
         user_id="test_user",
         action="BLOCK",
@@ -136,13 +136,13 @@ def test_basic_firewall_operations():
     firewall = FirewallController()
     
     # Test block user
-    print("\n📊 Test 1: Block User")
+    print("\n[*] Test 1: Block User")
     result = firewall.apply_block("test_user", "192.168.1.100", duration_minutes=30)
     assert result["success"] == True
     print(f"✅ User blocked: {result['message']}")
     
     # Test restriction
-    print("\n📊 Test 2: Apply Restrictions")
+    print("\n[*] Test 2: Apply Restrictions")
     result = firewall.apply_restriction(
         "test_user_2",
         "192.168.1.101",
@@ -153,12 +153,12 @@ def test_basic_firewall_operations():
     print(f"✅ Restrictions applied: {result['message']}")
     
     # Test get active rules
-    print("\n📊 Test 3: Get Active Rules")
+    print("\n[*] Test 3: Get Active Rules")
     active_rules = firewall.get_active_rules()
     print(f"✅ Active rules: {len(active_rules)}")
     
     # Test remove rule
-    print("\n📊 Test 4: Remove Rule")
+    print("\n[*] Test 4: Remove Rule")
     result = firewall.remove_rule("test_user")
     assert result["success"] == True
     print(f"✅ Rule removed: {result['message']}")
@@ -174,7 +174,7 @@ def test_edge_cases():
     firewall = FirewallController()
     
     # Test invalid action
-    print("\n📊 Test 1: Invalid Action")
+    print("\n[*] Test 1: Invalid Action")
     try:
         firewall.analyst_override_action(
             user_id="test_user",
@@ -188,7 +188,7 @@ def test_edge_cases():
         print(f"✅ Correctly raised ValueError: {e}")
     
     # Test boundary risk scores
-    print("\n📊 Test 2: Boundary Risk Scores")
+    print("\n[*] Test 2: Boundary Risk Scores")
     boundary_scores = [0, 29, 30, 49, 50, 69, 70, 89, 90, 100]
     for score in boundary_scores:
         result = firewall.apply_graduated_response(f"user_{score}", score)

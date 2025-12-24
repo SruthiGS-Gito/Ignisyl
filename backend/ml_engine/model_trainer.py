@@ -29,8 +29,8 @@ class ModelTrainer:
         self.hybrid_detector = None
         self.risk_scorer = None
         
-        print(f"🎓 Model Trainer initialized")
-        print(f"📁 Models directory: {self.models_dir}")
+        print(f"[EDU] Model Trainer initialized")
+        print(f"[*] Models directory: {self.models_dir}")
     
     def prepare_training_data(self, activities: list) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -43,7 +43,7 @@ class ModelTrainer:
             Tuple of (features, labels)
         """
         if not activities:
-            print("⚠️ No training data provided, using synthetic data")
+            print("[WARN] No training data provided, using synthetic data")
             return self._generate_synthetic_data()
         
         features = []
@@ -71,7 +71,7 @@ class ModelTrainer:
         X = np.array(features, dtype=np.float32)
         y = np.array(labels, dtype=np.int32)
         
-        print(f"✅ Prepared {len(features)} training samples")
+        print(f"[OK] Prepared {len(features)} training samples")
         return X, y
     
     def _generate_synthetic_data(self, n_samples: int = 1000) -> Tuple[np.ndarray, np.ndarray]:
@@ -84,7 +84,7 @@ class ModelTrainer:
         Returns:
             Tuple of (features, labels)
         """
-        print(f"🎲 Generating {n_samples} synthetic training samples...")
+        print(f"[*] Generating {n_samples} synthetic training samples...")
         
         # Normal behavior (80% of data)
         n_normal = int(n_samples * 0.8)
@@ -105,7 +105,7 @@ class ModelTrainer:
         X = X[indices]
         y = y[indices]
         
-        print(f"✅ Generated {len(X)} synthetic samples ({n_normal} normal, {n_anomaly} anomalous)")
+        print(f"[OK] Generated {len(X)} synthetic samples ({n_normal} normal, {n_anomaly} anomalous)")
         return X, y
     
     def train_models(self, X: np.ndarray, y: np.ndarray) -> Dict:
@@ -120,7 +120,7 @@ class ModelTrainer:
             Training metrics
         """
         print("\n" + "="*60)
-        print("🎓 STARTING MODEL TRAINING")
+        print("[EDU] STARTING MODEL TRAINING")
         print("="*60)
         
         # Initialize models
@@ -128,13 +128,13 @@ class ModelTrainer:
         self.risk_scorer = ContextualRiskScorer()
         
         # Train hybrid detector
-        print("\n📊 Training Hybrid Detector...")
+        print("\n[DATA] Training Hybrid Detector...")
         start_time = datetime.now()
         
         self.hybrid_detector.fit(X, y)
         
         train_time = (datetime.now() - start_time).total_seconds()
-        print(f"✅ Training completed in {train_time:.2f} seconds")
+        print(f"[OK] Training completed in {train_time:.2f} seconds")
         
         # Evaluate on training data
         risk_scores, model_scores = self.hybrid_detector.predict(X)
@@ -151,7 +151,7 @@ class ModelTrainer:
             "trained_at": datetime.now().isoformat()
         }
         
-        print(f"\n📈 Training Metrics:")
+        print(f"\n[UP] Training Metrics:")
         print(f"   Samples: {metrics['training_samples']}")
         print(f"   Accuracy: {metrics['accuracy']}%")
         print(f"   Training Time: {metrics['training_time_seconds']:.2f}s")
@@ -175,14 +175,14 @@ class ModelTrainer:
         with open(model_path, 'wb') as f:
             pickle.dump(self.hybrid_detector, f)
         
-        print(f"💾 Models saved to: {model_path}")
+        print(f"[SAVE] Models saved to: {model_path}")
         
         # Also save as "latest"
         latest_path = self.models_dir / "hybrid_detector_latest.pkl"
         with open(latest_path, 'wb') as f:
             pickle.dump(self.hybrid_detector, f)
         
-        print(f"💾 Latest model saved to: {latest_path}")
+        print(f"[SAVE] Latest model saved to: {latest_path}")
         
         return str(model_path)
     
@@ -202,7 +202,7 @@ class ModelTrainer:
             model_path = Path(model_path)
         
         if not model_path.exists():
-            print(f"❌ Model file not found: {model_path}")
+            print(f"[ERROR] Model file not found: {model_path}")
             return False
         
         try:
@@ -211,11 +211,11 @@ class ModelTrainer:
             
             self.risk_scorer = ContextualRiskScorer()
             
-            print(f"✅ Models loaded from: {model_path}")
+            print(f"[OK] Models loaded from: {model_path}")
             return True
             
         except Exception as e:
-            print(f"❌ Error loading models: {e}")
+            print(f"[ERROR] Error loading models: {e}")
             return False
     
     def evaluate_model(self, X_test: np.ndarray, y_test: np.ndarray) -> Dict:
@@ -261,7 +261,7 @@ class ModelTrainer:
             "test_samples": len(X_test)
         }
         
-        print("\n📊 Evaluation Metrics:")
+        print("\n[DATA] Evaluation Metrics:")
         print(f"   Accuracy: {metrics['accuracy']}%")
         print(f"   Precision: {metrics['precision']}%")
         print(f"   Recall: {metrics['recall']}%")
@@ -291,5 +291,5 @@ if __name__ == "__main__":
     # Save models
     model_path = trainer.save_models()
     
-    print("\n✅ Training complete!")
-    print(f"📁 Models saved to: {model_path}")
+    print("\n[OK] Training complete!")
+    print(f"[*] Models saved to: {model_path}")

@@ -103,7 +103,7 @@ def load_data():
         Tuple of (X, y) - features and labels
     """
     print("\n" + "="*70)
-    print("📂 Loading Training Data")
+    print("[*] Loading Training Data")
     print("="*70)
 
     data_file = Path(__file__).parent.parent / 'data' / 'synthetic' / 'training_data.json'
@@ -114,31 +114,31 @@ def load_data():
     with open(data_file, 'r') as f:
         all_data = json.load(f)
 
-    print(f"✅ Loaded {len(all_data)} samples from {data_file.name}")
+    print(f"[OK] Loaded {len(all_data)} samples from {data_file.name}")
 
     # Convert to DataFrame
     df = pd.DataFrame(all_data)
 
     # Extract features
-    print("\n🔧 Extracting 14 features...")
+    print("\n[FIX] Extracting 14 features...")
     X = extract_features(df).values
 
     # Use 'is_malicious' field (correct field name in training_data.json)
     y = df['is_malicious'].astype(int).values
 
-    print(f"✅ Features shape: {X.shape}")
-    print(f"✅ Labels shape: {y.shape}")
-    print(f"✅ Malicious samples: {sum(y)} ({sum(y)/len(y)*100:.1f}%)")
-    print(f"✅ Normal samples: {len(y)-sum(y)} ({(len(y)-sum(y))/len(y)*100:.1f}%)")
+    print(f"[OK] Features shape: {X.shape}")
+    print(f"[OK] Labels shape: {y.shape}")
+    print(f"[OK] Malicious samples: {sum(y)} ({sum(y)/len(y)*100:.1f}%)")
+    print(f"[OK] Normal samples: {len(y)-sum(y)} ({(len(y)-sum(y))/len(y)*100:.1f}%)")
 
     # Check for NaN values
     nan_count = np.isnan(X).sum()
     if nan_count > 0:
-        print(f"⚠️ WARNING: Found {nan_count} NaN values in features")
-        print("🔧 Cleaning NaN values...")
+        print(f"[WARN] WARNING: Found {nan_count} NaN values in features")
+        print("[FIX] Cleaning NaN values...")
         # Replace NaN with 0
         X = np.nan_to_num(X, nan=0.0)
-        print(f"✅ NaN values replaced with 0")
+        print(f"[OK] NaN values replaced with 0")
 
     return X, y
 
@@ -156,21 +156,21 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
         Dictionary with IGNISYL results
     """
     print("\n" + "="*70)
-    print("🧠 Training IGNISYL Models")
+    print("[ML] Training IGNISYL Models")
     print("="*70)
 
     # Try different Keras imports for compatibility
     try:
         import keras
-        print("✅ Using standalone Keras")
+        print("[OK] Using standalone Keras")
     except ImportError:
         try:
             from tensorflow import keras
-            print("✅ Using TensorFlow Keras")
+            print("[OK] Using TensorFlow Keras")
         except ImportError:
             try:
                 import tf_keras as keras
-                print("✅ Using tf_keras")
+                print("[OK] Using tf_keras")
             except ImportError:
                 raise ImportError("No Keras installation found. Install with: pip install keras")
 
@@ -185,7 +185,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
     ignisyl_results = {}
 
     # 1. Isolation Forest
-    print("\n🌲 Training Isolation Forest...", end=" ", flush=True)
+    print("\n[*] Training Isolation Forest...", end=" ", flush=True)
     start_time = time.time()
     iso_forest = IsolationForest(
         n_estimators=100,
@@ -195,15 +195,17 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
     )
     iso_forest.fit(X_train_scaled)
     if_train_time = time.time() - start_time
-    print(f"✅ Done ({if_train_time:.2f}s)")
+    print(f"[OK] Done ({if_train_time:.2f}s)")
 
     # Predict
-    if_scores = iso_forest.score_samples(X_test_scaled)
+    if_scores = iso_forest.sco
+    
+    re_samples(X_test_scaled)
     if_scores_norm = (if_scores - if_scores.min()) / (if_scores.max() - if_scores.min() + 1e-10)
     if_pred = (if_scores_norm < 0.3).astype(int)
 
     # 2. Autoencoder
-    print("🧬 Training Autoencoder...", end=" ", flush=True)
+    print("[*] Training Autoencoder...", end=" ", flush=True)
     start_time = time.time()
 
     input_dim = X_train_scaled.shape[1]
@@ -225,7 +227,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
         verbose=0
     )
     ae_train_time = time.time() - start_time
-    print(f"✅ Done ({ae_train_time:.2f}s)")
+    print(f"[OK] Done ({ae_train_time:.2f}s)")
 
     # Predict
     ae_reconstructed = autoencoder.predict(X_test_scaled, verbose=0)
@@ -234,7 +236,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
     ae_pred = (ae_errors_norm > 0.7).astype(int)
 
     # 3. XGBoost
-    print("🚀 Training XGBoost...", end=" ", flush=True)
+    print("[START] Training XGBoost...", end=" ", flush=True)
     start_time = time.time()
     xgb_model = xgb.XGBClassifier(
         n_estimators=100,
@@ -246,7 +248,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
     )
     xgb_model.fit(X_train_scaled, y_train)
     xgb_train_time = time.time() - start_time
-    print(f"✅ Done ({xgb_train_time:.2f}s)")
+    print(f"[OK] Done ({xgb_train_time:.2f}s)")
 
     # Predict
     xgb_pred_proba = xgb_model.predict_proba(X_test_scaled)[:, 1]
@@ -270,7 +272,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
     }
 
     # 4. Ensemble (2/3 voting)
-    print("\n🎯 Creating Ensemble (2/3 voting)...", end=" ", flush=True)
+    print("\n[*] Creating Ensemble (2/3 voting)...", end=" ", flush=True)
     votes = if_pred + ae_pred + xgb_pred
     ensemble_pred = (votes >= 2).astype(int)
 
@@ -292,7 +294,7 @@ def train_ignisyl_models(X_train, y_train, X_test, y_test):
         'training_time': total_train_time
     }
 
-    print(f"✅ Done")
+    print(f"[OK] Done")
 
     return ignisyl_results
 
@@ -317,25 +319,25 @@ def save_results(baseline_results, ignisyl_results, summary):
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2)
 
-    print(f"\n💾 Results saved to: {output_file}")
+    print(f"\n[SAVE] Results saved to: {output_file}")
 
 
 def main():
     """Main comparison function"""
     print("\n" + "="*70)
-    print("🏆 IGNISYL vs BASELINE MODELS COMPARISON")
+    print("[*] IGNISYL vs BASELINE MODELS COMPARISON")
     print("="*70)
 
     # Load data
     X, y = load_data()
 
     # Split data
-    print("\n📊 Splitting data (80% train, 20% test)...")
+    print("\n[DATA] Splitting data (80% train, 20% test)...")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
-    print(f"✅ Train set: {X_train.shape[0]} samples")
-    print(f"✅ Test set: {X_test.shape[0]} samples")
+    print(f"[OK] Train set: {X_train.shape[0]} samples")
+    print(f"[OK] Test set: {X_test.shape[0]} samples")
 
     # Scale data for baselines
     scaler = StandardScaler()
@@ -355,7 +357,7 @@ def main():
         # Print comparison table
         baseline_comparison.print_comparison_table(include_ignisyl=ignisyl_results)
     except ImportError as e:
-        print(f"\n⚠️ Skipping IGNISYL models (TensorFlow not available): {e}")
+        print(f"\n[WARN] Skipping IGNISYL models (TensorFlow not available): {e}")
         ignisyl_results = {}
         # Print comparison table without IGNISYL
         baseline_comparison.print_comparison_table()
@@ -370,13 +372,13 @@ def main():
 
         # Print summary
         print("\n" + "="*70)
-        print("📈 PERFORMANCE SUMMARY")
+        print("[UP] PERFORMANCE SUMMARY")
         print("="*70)
-        print(f"\n🥇 Best Baseline: {best_baseline_name}")
+        print(f"\n[*] Best Baseline: {best_baseline_name}")
         print(f"   Accuracy: {best_baseline_acc*100:.1f}%")
-        print(f"\n🏆 IGNISYL Ensemble")
+        print(f"\n[*] IGNISYL Ensemble")
         print(f"   Accuracy: {ensemble_accuracy*100:.1f}%")
-        print(f"\n✅ IGNISYL Improvement:")
+        print(f"\n[OK] IGNISYL Improvement:")
         print(f"   Absolute: +{absolute_improvement:.1f}% accuracy points")
         print(f"   Relative: {improvement_pct:.1f}% better than best baseline")
         print("="*70)
@@ -391,9 +393,9 @@ def main():
         # Just show baseline summary
         best_baseline_name, best_baseline_acc = baseline_comparison.get_best_baseline()
         print("\n" + "="*70)
-        print("📈 BASELINE PERFORMANCE SUMMARY")
+        print("[UP] BASELINE PERFORMANCE SUMMARY")
         print("="*70)
-        print(f"\n🥇 Best Baseline Model: {best_baseline_name}")
+        print(f"\n[*] Best Baseline Model: {best_baseline_name}")
         print(f"   Accuracy: {best_baseline_acc*100:.1f}%")
         print("="*70)
 
@@ -402,7 +404,7 @@ def main():
     # Save results
     save_results(baseline_results, ignisyl_results, summary_stats)
 
-    print("\n✅ Comparison complete!")
+    print("\n[OK] Comparison complete!")
 
 
 if __name__ == "__main__":

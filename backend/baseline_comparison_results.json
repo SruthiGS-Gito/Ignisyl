@@ -7,8 +7,8 @@
       "recall": 0.9339622641509434,
       "f1_score": 0.9,
       "fpr": 0.016778523489932886,
-      "training_time": 0.18255233764648438,
-      "prediction_time_ms": 0.0312504768371582,
+      "training_time": 0.27670741081237793,
+      "prediction_time_ms": 0.04199504852294922,
       "total_samples": 1000,
       "confusion_matrix": {
         "tn": 879,
@@ -24,8 +24,8 @@
       "recall": 0.660377358490566,
       "f1_score": 0.717948717948718,
       "fpr": 0.021252796420581657,
-      "training_time": 0.7208123207092285,
-      "prediction_time_ms": 0.06288576126098633,
+      "training_time": 0.9355127811431885,
+      "prediction_time_ms": 0.08387923240661621,
       "total_samples": 1000,
       "confusion_matrix": {
         "tn": 875,
@@ -41,7 +41,7 @@
       "recall": 0.5377358490566038,
       "f1_score": 0.6195652173913043,
       "fpr": 0.02348993288590604,
-      "training_time": 1.5995938777923584,
+      "training_time": 0.038290977478027344,
       "prediction_time_ms": 0.0,
       "total_samples": 1000,
       "confusion_matrix": {
@@ -58,7 +58,7 @@
       "recall": 0.9245283018867925,
       "f1_score": 0.8828828828828829,
       "fpr": 0.020134228187919462,
-      "training_time": 0.024224281311035156,
+      "training_time": 0.02889847755432129,
       "prediction_time_ms": 0.0,
       "total_samples": 1000,
       "confusion_matrix": {
@@ -75,7 +75,7 @@
       "recall": 0.5660377358490566,
       "f1_score": 0.6417112299465241,
       "fpr": 0.02348993288590604,
-      "training_time": 0.0,
+      "training_time": 0.002012014389038086,
       "prediction_time_ms": 0.0,
       "total_samples": 1000,
       "confusion_matrix": {
@@ -86,24 +86,7 @@
       }
     }
   },
-  "ignisyl_models": {
-    "IGNISYL (XGBoost)": {
-      "accuracy": 0.979,
-      "precision": 0.8761061946902655,
-      "recall": 0.9339622641509434,
-      "f1_score": 0.9041095890410958,
-      "fpr": 0.015659955257270694,
-      "training_time": 0.08015608787536621
-    },
-    "IGNISYL (Ensemble)": {
-      "accuracy": 0.898,
-      "precision": 1.0,
-      "recall": 0.03773584905660377,
-      "f1_score": 0.07272727272727272,
-      "fpr": 0.0,
-      "training_time": 12.689373970031738
-    }
-  },
+  "ignisyl_models": {},
   "summary": {
     "num_models": 5,
     "mean_accuracy": 0.952,
@@ -112,11 +95,7 @@
     "min_accuracy": 0.93,
     "mean_f1": 0.7524216096338858,
     "mean_fpr": 0.021029082774049218,
-    "best_model": "Random Forest",
-    "ignisyl_ensemble_accuracy": 0.898,
-    "best_baseline_accuracy": 0.978,
-    "improvement_absolute": -7.9999999999999964,
-    "improvement_relative": -8.179959100204496
+    "best_model": "Random Forest"
   },
-  "timestamp": "2025-12-16T03:15:28.387930"
+  "timestamp": "2025-12-18T09:16:10.060014"
 }

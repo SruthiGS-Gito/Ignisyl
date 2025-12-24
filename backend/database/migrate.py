@@ -320,19 +320,19 @@ def migrate_database(environment: str = 'development'):
         for sql in sql_statements:
             try:
                 db.execute_query(sql)
-                logger.info(f"✅ Executed migration statement")
+                logger.info(f"[OK] Executed migration statement")
             except Exception as e:
-                logger.error(f"❌ Migration failed: {e}")
+                logger.error(f"[ERROR] Migration failed: {e}")
                 logger.error(f"SQL: {sql[:100]}...")
                 raise
 
-        logger.info("✅ Migration completed successfully!")
+        logger.info("[OK] Migration completed successfully!")
 
         # Close connection
         db.close()
 
     except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
+        logger.error(f"[ERROR] Migration failed: {e}")
         raise
 
 
@@ -351,15 +351,15 @@ def verify_connection(environment: str = 'development'):
         # Test query
         result = db.fetch_one("SELECT 1")
         if result:
-            logger.info("✅ Database connection successful!")
+            logger.info("[OK] Database connection successful!")
         else:
-            logger.warning("⚠️ Connection successful but test query returned no result")
+            logger.warning("[WARN] Connection successful but test query returned no result")
 
         db.close()
         return True
 
     except Exception as e:
-        logger.error(f"❌ Connection failed: {e}")
+        logger.error(f"[ERROR] Connection failed: {e}")
         return False
 
 

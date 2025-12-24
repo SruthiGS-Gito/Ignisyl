@@ -36,10 +36,10 @@ class NetworkMonitor:
         # Load user configuration
         self.user_config = self._load_user_config()
         
-        print("🔍 Network Monitor initialized")
-        print(f"📡 Monitoring network activity on this laptop")
-        print(f"👤 User: {self.user_config['full_name']} ({self.user_config['user_id']})")
-        print(f"🎯 Alert threshold: {self.alert_threshold_mb}MB in 30 seconds")
+        print("[*] Network Monitor initialized")
+        print(f"[API] Monitoring network activity on this laptop")
+        print(f"[*] User: {self.user_config['full_name']} ({self.user_config['user_id']})")
+        print(f"[*] Alert threshold: {self.alert_threshold_mb}MB in 30 seconds")
     
     def _load_user_config(self) -> Dict:
         """Load user configuration from config file"""
@@ -49,10 +49,10 @@ class NetworkMonitor:
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
-                print(f"✅ Loaded config for user: {config['full_name']}")
+                print(f"[OK] Loaded config for user: {config['full_name']}")
                 return config
         except FileNotFoundError:
-            print("⚠️ user_config.json not found. Using default 'local_user'")
+            print("[WARN] user_config.json not found. Using default 'local_user'")
             return {
                 "user_id": "local_user",
                 "username": "local_user",
@@ -61,7 +61,7 @@ class NetworkMonitor:
                 "role": "Developer"
             }
         except Exception as e:
-            print(f"⚠️ Error loading config: {e}. Using default.")
+            print(f"[WARN] Error loading config: {e}. Using default.")
             return {
                 "user_id": "local_user",
                 "username": "local_user",
@@ -123,7 +123,7 @@ class NetworkMonitor:
                         "pid": conn.pid  # Process ID
                     })
         except Exception as e:
-            print(f"⚠️ Error getting connections: {e}")
+            print(f"[WARN] Error getting connections: {e}")
         
         return connections
     
@@ -145,11 +145,11 @@ class NetworkMonitor:
         # 2. Very high transfer rate (more than 50 MB/s)
         
         if mb_transferred > self.alert_threshold_mb:
-            print(f"🚨 ALERT: Large data transfer detected: {mb_transferred}MB")
+            print(f"[ALERT] ALERT: Large data transfer detected: {mb_transferred}MB")
             return True
         
         if transfer_rate > 50:
-            print(f"⚠️ WARNING: High transfer rate: {transfer_rate} MB/s")
+            print(f"[WARN] WARNING: High transfer rate: {transfer_rate} MB/s")
             return True
         
         return False
@@ -176,11 +176,11 @@ class NetworkMonitor:
                 risk_level = result['risk_assessment']['risk_level']
                 action = result['firewall_action']['action']
                 
-                print(f"📊 API Response: Risk={risk_score} Level={risk_level} Action={action}")
+                print(f"[DATA] API Response: Risk={risk_score} Level={risk_level} Action={action}")
                 
                 # If high risk, show alert
                 if risk_level == "HIGH":
-                    print(f"🚨 HIGH RISK DETECTED! Recommended action: {action}")
+                    print(f"[ALERT] HIGH RISK DETECTED! Recommended action: {action}")
                 
                 # Broadcast threat alert via WebSocket using HTTP
                 try:
@@ -202,21 +202,21 @@ class NetworkMonitor:
                         timeout=5
                     )
                     if broadcast_response.status_code == 200:
-                        print("📡 WebSocket broadcast sent to all connected dashboards")
+                        print("[API] WebSocket broadcast sent to all connected dashboards")
                     else:
-                        print(f"⚠️ WebSocket broadcast failed: {broadcast_response.status_code}")
+                        print(f"[WARN] WebSocket broadcast failed: {broadcast_response.status_code}")
                         
                 except Exception as ws_error:
-                    print(f"⚠️ WebSocket broadcast failed: {ws_error}")
+                    print(f"[WARN] WebSocket broadcast failed: {ws_error}")
                 
                 return result
             else:
-                print(f"❌ API request failed: {response.status_code}")
+                print(f"[ERROR] API request failed: {response.status_code}")
                 
         except requests.exceptions.ConnectionError:
-            print("❌ Cannot connect to API. Is the server running?")
+            print("[ERROR] Cannot connect to API. Is the server running?")
         except Exception as e:
-            print(f"❌ Error sending to API: {e}")
+            print(f"[ERROR] Error sending to API: {e}")
                 
     def monitor_loop(self, check_interval: int = 30):
         """
@@ -227,7 +227,7 @@ class NetworkMonitor:
             check_interval: How often to check (in seconds)
         """
         self.monitoring_active = True
-        print(f"\n🟢 Network monitoring started (checking every {check_interval} seconds)")
+        print(f"\n[*] Network monitoring started (checking every {check_interval} seconds)")
         print("Press Ctrl+C to stop\n")
         
         try:
@@ -235,7 +235,7 @@ class NetworkMonitor:
                 # Get current network usage
                 network_usage = self.get_current_network_usage()
                 
-                print(f"📈 Network Activity: {network_usage['mb_transferred']}MB transferred "
+                print(f"[UP] Network Activity: {network_usage['mb_transferred']}MB transferred "
                       f"({network_usage['transfer_rate_mbps']} MB/s)")
                 
                 # Check if suspicious
@@ -245,19 +245,19 @@ class NetworkMonitor:
                     
                     # Prepare activity data for API
                     activity_data = {
-                        "user_id": self.user_config['user_id'],  # ✅ Use actual user!
+                        "user_id": self.user_config['user_id'],  # [OK] Use actual user!
                         "activity_type": "network_activity",
                         "timestamp": datetime.now().isoformat(),
                         "file_size": int(network_usage['bytes_transferred']),
                         "bytes_transferred": int(network_usage['bytes_transferred']),
                         "transfer_rate_mbps": network_usage['transfer_rate_mbps'],
                         "active_connections": len(connections),
-                        "department": self.user_config['department'],  # ✅ Use actual dept!
-                        "role": self.user_config['role']  # ✅ Use actual role!
+                        "department": self.user_config['department'],  # [OK] Use actual dept!
+                        "role": self.user_config['role']  # [OK] Use actual role!
                     }
                     
                     # Send to API for analysis
-                    print("📤 Sending suspicious activity to API...")
+                    print("[*] Sending suspicious activity to API...")
                     self.send_to_api(activity_data)
                 
                 # Update baseline for next check
@@ -269,7 +269,7 @@ class NetworkMonitor:
                 time.sleep(check_interval)
                 
         except KeyboardInterrupt:
-            print("\n\n🛑 Monitoring stopped by user")
+            print("\n\n[*] Monitoring stopped by user")
             self.monitoring_active = False
     
     def start_monitoring(self, interval: int = 30):

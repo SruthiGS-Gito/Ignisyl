@@ -55,7 +55,7 @@ class FirewallController:
         self.active_rules[user_id] = rule
         self.rule_history.append(rule)
         
-        print(f"🚫 BLOCKED user {user_id} at {ip_address}")
+        print(f"[*] BLOCKED user {user_id} at {ip_address}")
         print(f"   Command: {firewall_command}")
         
         return {
@@ -100,7 +100,7 @@ class FirewallController:
         self.active_rules[user_id] = rule
         self.rule_history.append(rule)
         
-        print(f"⚠️ RESTRICTED user {user_id} at {ip_address}")
+        print(f"[WARN] RESTRICTED user {user_id} at {ip_address}")
         print(f"   Restrictions: {', '.join(restrictions)}")
         
         return {
@@ -124,7 +124,7 @@ class FirewallController:
         
         del self.active_rules[user_id]
         
-        print(f"✅ REMOVED firewall rule for user {user_id}")
+        print(f"[OK] REMOVED firewall rule for user {user_id}")
         
         return {
             "success": True,
@@ -156,7 +156,7 @@ class FirewallController:
             self.remove_rule(user_id)
         
         if expired_count > 0:
-            print(f"🧹 Cleaned up {expired_count} expired firewall rules")
+            print(f"[*] Cleaned up {expired_count} expired firewall rules")
         
         return expired_count
     

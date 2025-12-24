@@ -141,7 +141,7 @@ def ensure_directories():
     for directory in directories:
         directory.mkdir(parents=True, exist_ok=True)
     
-    print(f"✅ Created necessary directories for {settings.APP_NAME}")
+    print(f"[OK] Created necessary directories for {settings.APP_NAME}")
 
 if __name__ == "__main__":
     ensure_directories()

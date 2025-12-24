@@ -50,7 +50,7 @@ def test_thresholds():
     y_pred_proba = xgboost_model.predict_proba(X_test_scaled)[:, 1]
     
     print("="*70)
-    print("🎯 THRESHOLD OPTIMIZATION")
+    print("[*] THRESHOLD OPTIMIZATION")
     print("="*70)
     
     # Test many thresholds
@@ -83,7 +83,7 @@ def test_thresholds():
     # Sort by F1
     results.sort(key=lambda x: x['f1'], reverse=True)
     
-    print("\n📊 TOP 5 THRESHOLDS BY F1-SCORE:")
+    print("\n[DATA] TOP 5 THRESHOLDS BY F1-SCORE:")
     print("-"*70)
     print(f"{'Thresh':<8} {'Acc':<7} {'Prec':<7} {'Rec':<7} {'F1':<7} {'TP':<5} {'FP':<5} {'FN':<5}")
     print("-"*70)
@@ -95,7 +95,7 @@ def test_thresholds():
     
     # Best F1
     best = results[0]
-    print(f"\n✅ BEST THRESHOLD: {best['threshold']:.2f}")
+    print(f"\n[OK] BEST THRESHOLD: {best['threshold']:.2f}")
     print(f"   Accuracy:  {best['accuracy']*100:.1f}%")
     print(f"   Precision: {best['precision']*100:.1f}%")
     print(f"   Recall:    {best['recall']*100:.1f}%")

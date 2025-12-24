@@ -21,7 +21,7 @@ class HoneypotWatcher(FileSystemEventHandler):
         self.running = False
         self.loop = loop or asyncio.get_event_loop()
     
-        print(f"🔍 Honeypot Watcher initialized for: {self.honeypot_dir}")
+        print(f"[*] Honeypot Watcher initialized for: {self.honeypot_dir}")
     
     def on_any_event(self, event: FileSystemEvent):
         """Triggered on ANY file system event"""
@@ -53,11 +53,11 @@ class HoneypotWatcher(FileSystemEventHandler):
                 'event_type': event_type,
                 'accessed_at': datetime.now().isoformat(),
                 'severity': 'CRITICAL',
-                'description': f'🚨 HONEYPOT TRIGGERED: {event_type.upper()} on {filename}'
+                'description': f'[ALERT] HONEYPOT TRIGGERED: {event_type.upper()} on {filename}'
             }
             
             print(f"\n{'='*70}")
-            print(f"🚨 CRITICAL ALERT - HONEYPOT ACCESSED!")
+            print(f"[ALERT] CRITICAL ALERT - HONEYPOT ACCESSED!")
             print(f"{'='*70}")
             print(f"File: {filename}")
             print(f"Event: {event_type}")
@@ -77,7 +77,7 @@ class HoneypotWatcher(FileSystemEventHandler):
         self.observer.start()
         self.running = True
         
-        print(f"✅ Real-time honeypot monitoring ACTIVE")
+        print(f"[OK] Real-time honeypot monitoring ACTIVE")
         print(f"   Monitoring: {self.honeypot_dir}")
         print(f"   Any access will trigger INSTANT alert!")
     
@@ -87,7 +87,7 @@ class HoneypotWatcher(FileSystemEventHandler):
             self.observer.stop()
             self.observer.join()
             self.running = False
-            print("🛑 Honeypot monitoring stopped")
+            print("[*] Honeypot monitoring stopped")
 
 # Callback function for handling alerts
 async def handle_honeypot_alert(alert_data: dict):
@@ -120,7 +120,7 @@ async def handle_honeypot_alert(alert_data: dict):
             'details': alert_data
         })
         
-        print("✅ Alert logged to database")
+        print("[OK] Alert logged to database")
         
         # Broadcast to dashboard
         await notify_threat_detected({
@@ -134,10 +134,10 @@ async def handle_honeypot_alert(alert_data: dict):
             'summary': alert_data['description']
         })
         
-        print("📡 Alert broadcasted to dashboard!")
+        print("[API] Alert broadcasted to dashboard!")
         
     except Exception as e:
-        print(f"❌ Error handling honeypot alert: {e}")
+        print(f"[ERROR] Error handling honeypot alert: {e}")
         import traceback
         traceback.print_exc()
 

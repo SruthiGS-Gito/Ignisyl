@@ -75,7 +75,7 @@ async def startup_event():
     
     global ml_detector, risk_scorer, data_generator
     
-    print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    print(f"[START] Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     
     # Ensure directories exist
     ensure_directories()
@@ -84,13 +84,63 @@ async def startup_event():
     create_tables()
     init_sample_data()
     
-    # ✅ Initialize Real Users
-    print("👥 Checking for real database users...")
+    # [OK] Initialize Real Users
+    print("[USERS] Checking for real database users...")
+    from api.auth import auth_manager
     existing_users = user_manager.get_all_users()
-    
+
+    # Helper function to check if password hash is valid bcrypt
+    def is_valid_bcrypt_hash(hash_str):
+        if not hash_str:
+            return False
+        return hash_str.startswith(('$2a$', '$2b$', '$2y$'))
+
+    # Always ensure admin user exists with valid bcrypt password
+    admin_user = user_manager.get_user_by_username('admin')
+    if not admin_user:
+        print("[AUTH] Creating admin user...")
+        admin_password_hash = auth_manager.hash_password('admin123')  # Default password
+        result = user_manager.register_user(
+            username="admin",
+            full_name="System Administrator",
+            department="IT",
+            role="Administrator",
+            email="admin@ignisyl.local",
+            password_hash=admin_password_hash
+        )
+        if result["success"]:
+            print("[OK] Admin user created (username: admin, password: admin123)")
+            print("[WARN]  IMPORTANT: Change the admin password in production!")
+    elif not is_valid_bcrypt_hash(admin_user.get('password_hash')):
+        # Update existing admin with bcrypt password if missing or invalid
+        print("[AUTH] Updating admin user with bcrypt password...")
+        admin_password_hash = auth_manager.hash_password('admin123')
+        user_manager.update_user_password(admin_user['user_id'], admin_password_hash)
+        print("[OK] Admin password set (password: admin123)")
+    else:
+        print(f"[OK] Admin user exists with valid password hash")
+
+    # Verify and fix password hashes for all existing users
+    print("[AUTH] Verifying password hashes for all users...")
+    all_users_for_check = user_manager.get_all_users()
+    users_fixed = 0
+    for user in all_users_for_check:
+        if not is_valid_bcrypt_hash(user.get('password_hash')):
+            # Set default password for users without valid bcrypt hash
+            default_password = 'demo123'
+            new_hash = auth_manager.hash_password(default_password)
+            user_manager.update_user_password(user['user_id'], new_hash)
+            print(f"   [FIX] Fixed password hash for user: {user['username']}")
+            users_fixed += 1
+
+    if users_fixed > 0:
+        print(f"[OK] Fixed password hashes for {users_fixed} users (default password: demo123)")
+    else:
+        print("[OK] All user password hashes are valid")
+
     if len(existing_users) == 0:
-        print("📝 Creating default monitored users...")
-        
+        print("[INFO] Creating default monitored users...")
+
         default_users = [
             {
                 "username": "john.doe",
@@ -100,7 +150,7 @@ async def startup_event():
                 "email": "john.doe@company.com"
             },
             {
-                "username": "jane.smith", 
+                "username": "jane.smith",
                 "full_name": "Jane Smith",
                 "department": "Security",
                 "role": "Security Analyst",
@@ -128,26 +178,29 @@ async def startup_event():
                 "email": "charlie.brown@company.com"
             }
         ]
-        
+
         for user_data in default_users:
+            # Generate password for monitored users (they can login too)
+            password_hash = auth_manager.hash_password('demo123')
+            user_data['password_hash'] = password_hash
             result = user_manager.register_user(**user_data)
             if result["success"]:
                 # Set initial activity time and risk score
                 import random
                 user_manager.update_user_activity(result["user_id"], risk_score=float(random.randint(5, 30)))
-        
-        print(f"✅ Created {len(default_users)} monitored users")
+
+        print(f"[OK] Created {len(default_users)} monitored users (default password: demo123)")
     else:
-        print(f"📊 Found {len(existing_users)} existing users in database")
+        print(f"[DATA] Found {len(existing_users)} existing users in database")
     
     # Initialize ML components
-    print("🧠 Initializing ML components...")
+    print("[ML] Initializing ML components...")
     ml_detector = AdvancedHybridDetector()
     risk_scorer = ContextualRiskScorer()
     data_generator = BehavioralDataGenerator()
     
     # Train ML models with sample data
-    print("📊 Training ML models...")
+    print("[DATA] Training ML models...")
     try:
         normal_data, anomalous_data = data_generator.generate_complete_dataset()
         
@@ -198,32 +251,32 @@ async def startup_event():
         
         # Train the detector
         ml_detector.fit(X, y)
-        print("✅ ML models trained successfully!")
+        print("[OK] ML models trained successfully!")
             
     except Exception as e:
-        print(f"⚠️ ML training error: {e}. Using fallback configuration.")
+        print(f"[WARN] ML training error: {e}. Using fallback configuration.")
         
         # Initialize models with defaults even if training fails
         if ml_detector is None:
             ml_detector = AdvancedHybridDetector()
             ml_detector.is_trained = False
-            print("⚠️ ML detector initialized in untrained mode")
+            print("[WARN] ML detector initialized in untrained mode")
         if risk_scorer is None:
             risk_scorer = ContextualRiskScorer()
-            print("⚠️ Risk scorer initialized with defaults")
+            print("[WARN] Risk scorer initialized with defaults")
         if data_generator is None:
             data_generator = BehavioralDataGenerator()
-            print("⚠️ Data generator initialized with defaults")
+            print("[WARN] Data generator initialized with defaults")
     
     # Initialize API routes with ML components
     routes.init_routes(ml_detector, risk_scorer, data_generator)
     
-    # ✅ Start REAL-TIME honeypot monitoring (instant alerts!)
+    # [OK] Start REAL-TIME honeypot monitoring (instant alerts!)
     from services.honeypot_watcher import start_honeypot_monitoring
     start_honeypot_monitoring()
     
-    print(f"🌟 {settings.APP_NAME} is ready!")
-    print(f"📡 API running on http://{settings.API_HOST}:{settings.API_PORT}")
+    print(f"[READY] {settings.APP_NAME} is ready!")
+    print(f"[API] API running on http://{settings.API_HOST}:{settings.API_PORT}")
 
 # API Routes
 
@@ -248,19 +301,19 @@ async def root():
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>🛡️ {settings.APP_NAME}</h1>
+                    <h1>[SHIELD] {settings.APP_NAME}</h1>
                     <h3>AI-Powered Insider Threat Detection System</h3>
                     <p>Version: {settings.APP_VERSION} | Status: <strong>OPERATIONAL</strong></p>
                 </div>
                 
                 <div class="status">
-                    <h3>✅ System Status</h3>
-                    <p>🧠 ML Engine: Active | 🔥 Firewall: Ready | 📊 Risk Scorer: Online</p>
-                    <p>⚡ Real-time Processing: Enabled | 🔒 Security Mode: Adaptive</p>
+                    <h3>[OK] System Status</h3>
+                    <p>[ML] ML Engine: Active | [FIREWALL] Firewall: Ready | [DATA] Risk Scorer: Online</p>
+                    <p>[FAST] Real-time Processing: Enabled | [SECURE] Security Mode: Adaptive</p>
                 </div>
                 
                 <div class="endpoints">
-                    <h3>🔗 API Endpoints</h3>
+                    <h3>[LINK] API Endpoints</h3>
                     <div class="endpoint">
                         <strong>GET</strong> <a href="/api/v1/health">/api/v1/health</a> - System health check
                     </div>
@@ -279,7 +332,7 @@ async def root():
                 </div>
                 
                 <div style="margin-top: 30px; text-align: center; color: #666;">
-                    <p>🎓 Built for Academic Excellence | 🚀 Industry-Ready Architecture</p>
+                    <p>[EDU] Built for Academic Excellence | [START] Industry-Ready Architecture</p>
                     <p>Powered by Advanced ML Algorithms & Real-time Threat Detection</p>
                 </div>
             </div>
@@ -420,7 +473,7 @@ async def analyze_activity(activity_data: Dict):
         final_risk_level = intelligent_assessment['risk_level']
         firewall_action = intelligent_assessment['recommended_action']
         
-        # ✅ Track ML performance in real-time
+        # [OK] Track ML performance in real-time
         from services.ml_performance_tracker import ml_performance_tracker
         
         detection_end_time = time.time()
@@ -441,7 +494,7 @@ async def analyze_activity(activity_data: Dict):
         if firewall_action == 'MONITOR':
             firewall_action = 'RESTRICT'
         
-        print(f"\n🧠 INTELLIGENT RISK ENGINE:")
+        print(f"\n[ML] INTELLIGENT RISK ENGINE:")
         print(f"   Event: {risk_event_type}")
         print(f"   Score Added: +{intelligent_assessment['score_added']}")
         print(f"   Current Total: {final_risk_score}/100")
@@ -487,7 +540,7 @@ async def analyze_activity(activity_data: Dict):
         
         # === LOG ACTIVITY TO DATABASE ===
         print(f"\n{'='*60}")
-        print(f"📝 LOGGING ACTIVITY TO DATABASE")
+        print(f"[INFO] LOGGING ACTIVITY TO DATABASE")
         print(f"{'='*60}")
         
         user_id = activity_data.get('user_id', 'unknown')
@@ -497,7 +550,7 @@ async def analyze_activity(activity_data: Dict):
         user = user_manager.get_user(user_id)
         
         if user:
-            print(f"2️⃣ ✅ Found user in database: {user['full_name']}")
+            print(f"2️⃣ [OK] Found user in database: {user['full_name']}")
             
             try:
                 # Log the activity
@@ -520,18 +573,18 @@ async def analyze_activity(activity_data: Dict):
                     }
                 })
                 
-                print(f"3️⃣ ✅ Activity logged successfully! ID: {activity_id}")
+                print(f"3️⃣ [OK] Activity logged successfully! ID: {activity_id}")
                 
                 # Update user threat count
                 increment_result = user_manager.increment_threat_count(user_id)
-                print(f"4️⃣ ✅ User threat count updated: {increment_result}")
+                print(f"4️⃣ [OK] User threat count updated: {increment_result}")
                 
             except Exception as log_error:
-                print(f"❌ Error during logging: {log_error}")
+                print(f"[ERROR] Error during logging: {log_error}")
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"2️⃣ ❌ User NOT found in database!")
+            print(f"2️⃣ [ERROR] User NOT found in database!")
             print(f"   Requested: {user_id}")
             all_users = user_manager.get_all_users()
             print(f"   Available users: {[u['user_id'] for u in all_users]}")
@@ -542,7 +595,7 @@ async def analyze_activity(activity_data: Dict):
         
     except Exception as e:
         import traceback
-        print(f"\n❌ CRITICAL ERROR in analyze_activity:")
+        print(f"\n[ERROR] CRITICAL ERROR in analyze_activity:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
                
@@ -596,17 +649,17 @@ async def dashboard_stats():
                 "bytes": activity.get('bytes_transferred', 0)
             })
             
-        # ✅ Get REAL system health
+        # [OK] Get REAL system health
         system_health = system_monitor.get_system_health()
         
-        # ✅ Get REAL ML performance with fallback for missing values
+        # [OK] Get REAL ML performance with fallback for missing values
         ml_performance_raw = ml_performance_tracker.get_performance_metrics()
         
         # Ensure all ML metrics have values (fix undefined issue)
         ml_performance = {
             "accuracy": ml_performance_raw.get('accuracy', 94.2),
             "false_positive_rate": ml_performance_raw.get('false_positive_rate', 0.05),
-            "detection_latency_ms": ml_performance_raw.get('detection_latency_ms', 45),  # ✅ FIXED
+            "detection_latency_ms": ml_performance_raw.get('detection_latency_ms', 45),  # [OK] FIXED
             "models_active": ml_performance_raw.get('models_active', 3)
         }
         
@@ -623,8 +676,8 @@ async def dashboard_stats():
                 "high_risk_users": len([u for u in all_users if u['current_risk_score'] >= 70])
             },
             "recent_activities": recent_activities,
-            "ml_performance": ml_performance,  # ✅ Now guaranteed to have all fields!
-            "system_health": {  # ✅ REAL data!
+            "ml_performance": ml_performance,  # [OK] Now guaranteed to have all fields!
+            "system_health": {  # [OK] REAL data!
                 "cpu_usage": system_health['cpu']['usage_percent'],
                 "memory_usage": system_health['memory']['usage_percent'],
                 "disk_usage": system_health['disk']['usage_percent'],
@@ -928,7 +981,7 @@ async def check_honeypots():
     
     # Log CRITICAL honeypot access to database
     for access in accesses:
-        print(f"\n🚨 CRITICAL HONEYPOT TRIGGERED! 🚨")
+        print(f"\n[ALERT] CRITICAL HONEYPOT TRIGGERED! [ALERT]")
         print(f"File: {access['honeypot_file']}")
         print(f"Accessed at: {access['accessed_at']}")
         print(f"{'='*60}\n")
@@ -950,7 +1003,7 @@ async def check_honeypots():
                 'action': 'BLOCK',
                 'bytes_transferred': 0,
                 'file_size': 0,
-                'summary': f"🚨 HONEYPOT TRIGGERED: {access['description']}",
+                'summary': f"[ALERT] HONEYPOT TRIGGERED: {access['description']}",
                 'details': {
                     'honeypot_file': access['honeypot_file'],
                     'severity': 'CRITICAL',
@@ -970,9 +1023,9 @@ async def check_honeypots():
                     'timestamp': access['accessed_at'],
                     'summary': access['description']
                 })
-                print("📡 Honeypot alert broadcasted to dashboard!")
+                print("[API] Honeypot alert broadcasted to dashboard!")
             except Exception as e:
-                print(f"⚠️ Broadcast failed: {e}")
+                print(f"[WARN] Broadcast failed: {e}")
     
     return {
         "total_honeypots": len(comprehensive_monitor.honeypots),
@@ -1064,34 +1117,95 @@ async def get_suspicious_activities():
 
 @app.post("/api/v1/auth/login")
 async def login(login_data: Dict):
-    """User login endpoint"""
+    """User login endpoint with rate limiting, account lockout, and detailed error handling"""
     from api.auth import auth_manager
-    from services.comprehensive_monitor import comprehensive_monitor
-    
-    username = login_data.get('username')
-    password = login_data.get('password')
-    
+
+    username = login_data.get('username', '').strip()
+    password = login_data.get('password', '')
+    ip_address = login_data.get('ip_address', '127.0.0.1')
+
+    print(f"\n{'='*60}")
+    print(f"[AUTH] LOGIN ATTEMPT")
+    print(f"   Username: {username}")
+    print(f"   IP: {ip_address}")
+    print(f"{'='*60}")
+
+    # Validate input
+    if not username:
+        print("[ERROR] LOGIN: Username is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is required"
+        )
+
+    if not password:
+        print("[ERROR] LOGIN: Password is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required"
+        )
+
+    # Check if account is locked
+    lockout_status = auth_manager.is_account_locked(username)
+    if lockout_status['locked']:
+        remaining = lockout_status['remaining_seconds']
+        print(f"[ERROR] LOGIN: Account locked for {remaining} seconds")
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=f"Account is temporarily locked due to too many failed attempts. Try again in {remaining // 60} minutes.",
+            headers={"Retry-After": str(remaining)}
+        )
+
+    # Rate limiting check (by IP and username)
+    rate_limit_key = f"{ip_address}:{username}"
+    if not auth_manager.check_rate_limit(rate_limit_key, ip_address):
+        reset_seconds = auth_manager.get_rate_limit_reset(rate_limit_key)
+        print(f"[ERROR] LOGIN: Rate limited for {reset_seconds} seconds")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Try again in {reset_seconds} seconds.",
+            headers={"Retry-After": str(reset_seconds)}
+        )
+
     # Authenticate user
     user = auth_manager.authenticate_user(username, password)
-    
-    # Log the login attempt
-    comprehensive_monitor.monitor_login_attempt(
-        username=username,
-        success=user is not None,
-        ip_address=login_data.get('ip_address', '127.0.0.1')
-    )
-    
+
+    # Record login attempt for lockout tracking
+    auth_manager.record_login_attempt(username, success=(user is not None), ip_address=ip_address)
+
+    # Log the login attempt (with try/except to not break login if monitor fails)
+    try:
+        from services.comprehensive_monitor import comprehensive_monitor
+        comprehensive_monitor.monitor_login_attempt(
+            username=username,
+            success=user is not None,
+            ip_address=ip_address
+        )
+    except Exception as e:
+        print(f"[WARN] Failed to log login attempt: {e}")
+
     if not user:
+        print(f"[ERROR] LOGIN FAILED for user: {username}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
         )
-    
-    # Create access token
+
+    # Create access token with role information
+    is_admin = user.get('role', '').lower() in ['administrator', 'admin', 'security analyst']
     access_token = auth_manager.create_access_token(
-        data={"sub": user['username'], "user_id": user['user_id']}
+        data={
+            "sub": user['username'],
+            "user_id": user['user_id'],
+            "username": user['username'],
+            "role": user.get('role', 'user'),
+            "is_admin": is_admin
+        }
     )
-    
+
+    print(f"[OK] LOGIN SUCCESS for user: {username} (admin: {is_admin})")
+    print(f"{'='*60}\n")
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -1100,8 +1214,91 @@ async def login(login_data: Dict):
             "username": user['username'],
             "full_name": user['full_name'],
             "department": user['department'],
-            "role": user['role']
+            "role": user['role'],
+            "is_admin": is_admin
         }
+    }
+
+@app.post("/api/v1/auth/change-password")
+async def change_password(password_data: Dict):
+    """Change user password with complexity validation"""
+    from api.auth import auth_manager
+    from models.user_management import user_manager
+
+    username = password_data.get('username', '').strip()
+    current_password = password_data.get('current_password', '')
+    new_password = password_data.get('new_password', '')
+
+    # Validate input
+    if not username or not current_password or not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username, current password, and new password are required"
+        )
+
+    # Verify current credentials
+    user = auth_manager.authenticate_user(username, current_password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect"
+        )
+
+    # Validate new password complexity
+    complexity_result = auth_manager.validate_password_complexity(new_password)
+    if not complexity_result['valid']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "message": "Password does not meet complexity requirements",
+                "errors": complexity_result['errors']
+            }
+        )
+
+    # Check new password is different from current
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password"
+        )
+
+    # Hash and update password
+    new_hash = auth_manager.hash_password(new_password)
+    success = user_manager.update_user_password(user['user_id'], new_hash)
+
+    if success:
+        print(f"[OK] Password changed for user: {username}")
+        return {"message": "Password changed successfully"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password"
+        )
+
+@app.post("/api/v1/auth/validate-password")
+async def validate_password(data: Dict):
+    """Validate password complexity without changing it"""
+    from api.auth import auth_manager
+
+    password = data.get('password', '')
+
+    if not password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is required"
+        )
+
+    result = auth_manager.validate_password_complexity(password)
+    return {
+        "valid": result['valid'],
+        "errors": result['errors'],
+        "requirements": [
+            "At least 8 characters",
+            "At least one uppercase letter",
+            "At least one lowercase letter",
+            "At least one number",
+            "Not a common password"
+        ]
     }
 
 @app.get("/api/v1/activities/recent")

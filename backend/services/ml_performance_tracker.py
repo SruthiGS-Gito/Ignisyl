@@ -46,7 +46,7 @@ class MLPerformanceTracker:
         # Thread safety
         self.lock = threading.Lock()
         
-        print("✅ ML Performance Tracker initialized")
+        print("[OK] ML Performance Tracker initialized")
     
     def record_prediction(self, 
                          predicted_risk: float, 
@@ -182,7 +182,7 @@ class MLPerformanceTracker:
             self.detection_times.clear()
             self.total_predictions = 0
             self.correct_predictions = 0
-            print("🔄 ML Performance metrics reset")
+            print("[SYNC] ML Performance metrics reset")
 
 
 # Global instance

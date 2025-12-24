@@ -63,7 +63,7 @@ class ReportGenerator:
         story = []
         
         # Title
-        title = Paragraph("🛡️ IGNISYL - Threat Detection Report", self.title_style)
+        title = Paragraph("[SHIELD] IGNISYL - Threat Detection Report", self.title_style)
         story.append(title)
         story.append(Spacer(1, 0.3 * inch))
         
@@ -210,7 +210,7 @@ class ReportGenerator:
         # Build PDF
         doc.build(story)
         
-        print(f"✅ Report generated: {filepath}")
+        print(f"[OK] Report generated: {filepath}")
         return filepath
     
     def _generate_recommendations(self, user_data: Dict, summary_stats: Dict) -> List[str]:
@@ -269,7 +269,7 @@ class ReportGenerator:
         story = []
         
         # Title
-        title = Paragraph(f"🛡️ IGNISYL - System Threat Report ({time_period})", self.title_style)
+        title = Paragraph(f"[SHIELD] IGNISYL - System Threat Report ({time_period})", self.title_style)
         story.append(title)
         story.append(Spacer(1, 0.5 * inch))
         
@@ -341,7 +341,7 @@ class ReportGenerator:
         # Build PDF
         doc.build(story)
         
-        print(f"✅ System report generated: {filepath}")
+        print(f"[OK] System report generated: {filepath}")
         return filepath
 
 # Global instance

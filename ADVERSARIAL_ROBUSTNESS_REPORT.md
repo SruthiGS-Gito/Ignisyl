@@ -1,6 +1,6 @@
 # IGNISYL Adversarial Robustness Report
 
-**Generated:** 2025-12-17T20:05:28.688145
+**Generated:** 2025-12-18T09:22:22.635656
 
 ## Baseline Performance
 
@@ -34,8 +34,8 @@
 | Model | Accuracy | ESR | Detection Rate |
 |-------|----------|-----|----------------|
 | isolation_forest | 0.820 | 0.981 | 0.019 |
-| xgboost | 0.949 | 0.486 | 0.514 |
-| ensemble | 0.873 | 0.476 | 0.524 |
+| xgboost | 0.960 | 0.381 | 0.619 |
+| ensemble | 0.883 | 0.381 | 0.619 |
 
 ### Feature Manipulation Attack
 
@@ -53,12 +53,12 @@
 
 **Description:** Add Gaussian noise with σ=0.05 to confuse models
 
-**L2 Distance:** 1519318.2329
+**L2 Distance:** 1456539.4472
 
 | Model | Accuracy | ESR | Detection Rate |
 |-------|----------|-----|----------------|
 | isolation_forest | 0.831 | 0.876 | 0.124 |
-| xgboost | 0.995 | 0.048 | 0.952 |
+| xgboost | 0.994 | 0.057 | 0.943 |
 | ensemble | 0.919 | 0.038 | 0.962 |
 
 ### Ensemble Evasion Attack
