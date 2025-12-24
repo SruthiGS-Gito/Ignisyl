@@ -191,25 +191,34 @@ class HybridAutoencoder:
             self.model = None
             self.is_available = False
     
-    def _create_torch_model(self, **kwargs):
+    def _create_torch_model(self, encoding_dim=32, **kwargs):
         """Create PyTorch autoencoder"""
         try:
             import torch
             import torch.nn as nn
-            
+
             print("Using PyTorch Autoencoder")
-            # Implementation will be added when needed
+            self.torch_config = {
+                'encoding_dim': encoding_dim,
+                'epochs': kwargs.get('epochs', 100),
+                'batch_size': kwargs.get('batch_size', 32),
+                'learning_rate': kwargs.get('learning_rate', 0.001)
+            }
             self.model_type = 'torch'
-            
+            self.is_available = True
+
         except Exception as e:
             print(f"[WARN] PyTorch model creation failed: {e}")
             print("[WARN] Autoencoder will be unavailable")
             self.model = None
             self.implementation = 'custom'
-    
+            self.is_available = False
+
     def fit(self, X):
         if self.implementation == 'tensorflow' and hasattr(self, 'tf_model_config'):
             return self._fit_tensorflow(X)
+        elif self.implementation == 'torch' and hasattr(self, 'torch_config'):
+            return self._fit_torch(X)
         elif self.implementation == 'numpy':
             return self._fit_numpy(X)
         elif hasattr(self.model, 'fit'):
@@ -217,6 +226,84 @@ class HybridAutoencoder:
         else:
             print(f"[WARN] Autoencoder fit skipped - no implementation available")
             return self
+
+    def _fit_torch(self, X):
+        """Fit PyTorch autoencoder model"""
+        import torch
+        import torch.nn as nn
+        import torch.optim as optim
+        from torch.utils.data import DataLoader, TensorDataset
+
+        X = np.array(X, dtype=np.float32)
+        input_dim = X.shape[1]
+        encoding_dim = self.torch_config['encoding_dim']
+
+        # Normalize data
+        self.mean = np.mean(X, axis=0)
+        self.std = np.std(X, axis=0) + 1e-8
+        X_norm = (X - self.mean) / self.std
+
+        # Define autoencoder architecture
+        class Autoencoder(nn.Module):
+            def __init__(self, input_dim, encoding_dim):
+                super(Autoencoder, self).__init__()
+                self.encoder = nn.Sequential(
+                    nn.Linear(input_dim, encoding_dim),
+                    nn.ReLU(),
+                    nn.Linear(encoding_dim, encoding_dim // 2),
+                    nn.ReLU()
+                )
+                self.decoder = nn.Sequential(
+                    nn.Linear(encoding_dim // 2, encoding_dim),
+                    nn.ReLU(),
+                    nn.Linear(encoding_dim, input_dim),
+                    nn.Sigmoid()
+                )
+
+            def forward(self, x):
+                encoded = self.encoder(x)
+                decoded = self.decoder(encoded)
+                return decoded
+
+        # Create model
+        self.torch_model = Autoencoder(input_dim, encoding_dim)
+
+        # Training setup
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(self.torch_model.parameters(),
+                               lr=self.torch_config['learning_rate'])
+
+        # Create data loader
+        X_tensor = torch.FloatTensor(X_norm)
+        dataset = TensorDataset(X_tensor, X_tensor)
+        dataloader = DataLoader(dataset, batch_size=self.torch_config['batch_size'], shuffle=True)
+
+        # Training loop
+        self.torch_model.train()
+        epochs = self.torch_config['epochs']
+        for epoch in range(epochs):
+            total_loss = 0
+            for batch_X, _ in dataloader:
+                optimizer.zero_grad()
+                output = self.torch_model(batch_X)
+                loss = criterion(output, batch_X)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            if (epoch + 1) % 20 == 0:
+                avg_loss = total_loss / len(dataloader)
+                print(f"   PyTorch Autoencoder Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.6f}")
+
+        # Calculate threshold on training data
+        self.torch_model.eval()
+        with torch.no_grad():
+            train_pred = self.torch_model(X_tensor).numpy()
+            train_mse = np.mean(np.power(X_norm - train_pred, 2), axis=1)
+            self.threshold = np.percentile(train_mse, 95)
+
+        print(f"[OK] PyTorch Autoencoder trained: threshold={self.threshold:.4f}")
+        return self
 
     def _fit_numpy(self, X):
         """Simple numpy-based anomaly detection using statistical methods"""
@@ -286,6 +373,15 @@ class HybridAutoencoder:
             X = np.array(X)
             X_norm = (X - self.mean) / self.std
             pred = self.tf_model.predict(X_norm, verbose=0)
+            return np.mean(np.power(X_norm - pred, 2), axis=1)
+        elif self.implementation == 'torch' and hasattr(self, 'torch_model'):
+            import torch
+            X = np.array(X, dtype=np.float32)
+            X_norm = (X - self.mean) / self.std
+            X_tensor = torch.FloatTensor(X_norm)
+            self.torch_model.eval()
+            with torch.no_grad():
+                pred = self.torch_model(X_tensor).numpy()
             return np.mean(np.power(X_norm - pred, 2), axis=1)
         elif self.implementation == 'numpy' and self.mean is not None:
             X = np.array(X, dtype=np.float32)

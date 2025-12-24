@@ -99,7 +99,7 @@ async def startup_event():
     admin_user = user_manager.get_user_by_username('admin')
     if not admin_user:
         print("[AUTH] Creating admin user...")
-        admin_password_hash = auth_manager.hash_password('admin123')  # Default password
+        admin_password_hash = auth_manager.hash_password('demo123')  # Default password
         result = user_manager.register_user(
             username="admin",
             full_name="System Administrator",
@@ -109,16 +109,20 @@ async def startup_event():
             password_hash=admin_password_hash
         )
         if result["success"]:
-            print("[OK] Admin user created (username: admin, password: admin123)")
-            print("[WARN]  IMPORTANT: Change the admin password in production!")
+            print("[OK] Admin user created (username: admin, password: demo123)")
+            print("[WARN] IMPORTANT: Change the admin password in production!")
     elif not is_valid_bcrypt_hash(admin_user.get('password_hash')):
         # Update existing admin with bcrypt password if missing or invalid
         print("[AUTH] Updating admin user with bcrypt password...")
-        admin_password_hash = auth_manager.hash_password('admin123')
+        admin_password_hash = auth_manager.hash_password('demo123')
         user_manager.update_user_password(admin_user['user_id'], admin_password_hash)
-        print("[OK] Admin password set (password: admin123)")
+        print("[OK] Admin password reset (password: demo123)")
     else:
-        print(f"[OK] Admin user exists with valid password hash")
+        # Always reset admin password to demo123 for development
+        print("[AUTH] Resetting admin password to demo123...")
+        admin_password_hash = auth_manager.hash_password('demo123')
+        user_manager.update_user_password(admin_user['user_id'], admin_password_hash)
+        print("[OK] Admin password reset (username: admin, password: demo123)")
 
     # Verify and fix password hashes for all existing users
     print("[AUTH] Verifying password hashes for all users...")
@@ -271,12 +275,132 @@ async def startup_event():
     # Initialize API routes with ML components
     routes.init_routes(ml_detector, risk_scorer, data_generator)
     
+    # [OK] Generate realistic test activity data for demo
+    await generate_test_activity_data()
+
     # [OK] Start REAL-TIME honeypot monitoring (instant alerts!)
     from services.honeypot_watcher import start_honeypot_monitoring
     start_honeypot_monitoring()
-    
+
     print(f"[READY] {settings.APP_NAME} is ready!")
     print(f"[API] API running on http://{settings.API_HOST}:{settings.API_PORT}")
+
+
+async def generate_test_activity_data():
+    """Generate realistic test activity data for all users to populate dashboard"""
+    import random
+    from datetime import datetime, timedelta
+
+    print("[DATA] Generating realistic test activity data...")
+
+    # Get all users
+    users = user_manager.get_all_users()
+    if not users:
+        print("[WARN] No users found - skipping activity generation")
+        return
+
+    # Check if we already have activities
+    existing_activities = activity_logger.get_recent_activities(limit=1)
+    if existing_activities:
+        print(f"[DATA] Found existing activities - skipping generation")
+        return
+
+    # Activity types with risk profiles
+    activity_types = [
+        # Normal activities (low risk)
+        {"type": "LOGIN", "risk_range": (0, 15), "bytes_range": (0, 1000)},
+        {"type": "FILE_READ", "risk_range": (5, 20), "bytes_range": (1000, 50000)},
+        {"type": "EMAIL_SENT", "risk_range": (0, 10), "bytes_range": (5000, 100000)},
+        {"type": "SYSTEM_ACCESS", "risk_range": (5, 25), "bytes_range": (0, 5000)},
+        {"type": "DATABASE_QUERY", "risk_range": (10, 30), "bytes_range": (1000, 20000)},
+        # Medium risk activities
+        {"type": "LARGE_FILE_DOWNLOAD", "risk_range": (30, 55), "bytes_range": (5000000, 50000000)},
+        {"type": "AFTER_HOURS_ACCESS", "risk_range": (35, 60), "bytes_range": (1000, 100000)},
+        {"type": "CROSS_DEPARTMENT_ACCESS", "risk_range": (40, 65), "bytes_range": (10000, 500000)},
+        {"type": "USB_FILE_COPY", "risk_range": (45, 70), "bytes_range": (100000, 10000000)},
+        # High risk activities
+        {"type": "SENSITIVE_FILE_ACCESS", "risk_range": (60, 85), "bytes_range": (50000, 5000000)},
+        {"type": "FAILED_LOGIN_ATTEMPT", "risk_range": (50, 75), "bytes_range": (0, 500)},
+        {"type": "UNUSUAL_DATA_TRANSFER", "risk_range": (70, 95), "bytes_range": (10000000, 100000000)},
+        {"type": "PRIVILEGE_ESCALATION", "risk_range": (75, 95), "bytes_range": (1000, 10000)},
+    ]
+
+    def get_risk_level(score):
+        if score >= 70:
+            return "HIGH"
+        elif score >= 30:
+            return "MEDIUM"
+        return "LOW"
+
+    def get_action(risk_level):
+        if risk_level == "HIGH":
+            return random.choice(["BLOCK", "RESTRICT", "ALERT"])
+        elif risk_level == "MEDIUM":
+            return random.choice(["ALERT", "MONITOR", "LOG"])
+        return random.choice(["ALLOW", "LOG", "MONITOR"])
+
+    activities_generated = 0
+    threats_detected = 0
+
+    for user in users:
+        # Generate 10-25 activities per user over the last 7 days
+        num_activities = random.randint(10, 25)
+
+        for i in range(num_activities):
+            # Random timestamp within last 7 days
+            hours_ago = random.randint(0, 168)  # 7 days in hours
+            timestamp = datetime.now() - timedelta(hours=hours_ago)
+
+            # Select activity type (weighted towards normal activities)
+            if random.random() < 0.7:  # 70% normal
+                activity = random.choice(activity_types[:5])
+            elif random.random() < 0.8:  # 24% medium risk
+                activity = random.choice(activity_types[5:9])
+            else:  # 6% high risk
+                activity = random.choice(activity_types[9:])
+
+            risk_score = random.uniform(*activity["risk_range"])
+            bytes_transferred = random.randint(*activity["bytes_range"])
+            file_size = bytes_transferred if "FILE" in activity["type"] else 0
+            risk_level = get_risk_level(risk_score)
+            action = get_action(risk_level)
+
+            # Track threats
+            if risk_level in ["HIGH", "CRITICAL"]:
+                threats_detected += 1
+                # Update user threat count
+                user_manager.increment_threat_count(user["user_id"])
+
+            # Create activity log
+            activity_data = {
+                "user_id": user["user_id"],
+                "username": user["username"],
+                "full_name": user["full_name"],
+                "activity_type": activity["type"],
+                "timestamp": timestamp.isoformat(),
+                "risk_score": round(risk_score, 1),
+                "risk_level": risk_level,
+                "action": action,
+                "bytes_transferred": bytes_transferred,
+                "file_size": file_size,
+                "summary": f"{activity['type'].replace('_', ' ').title()} by {user['full_name']}",
+                "details": {
+                    "department": user["department"],
+                    "role": user["role"],
+                    "source_ip": f"192.168.1.{random.randint(10, 250)}",
+                    "device": random.choice(["Workstation-A", "Laptop-B", "Desktop-C", "Remote-VPN"])
+                }
+            }
+
+            activity_logger.log_activity(activity_data)
+            activities_generated += 1
+
+        # Update user's last activity and risk score
+        recent_risk = random.uniform(5, 50)  # Overall risk score
+        user_manager.update_user_activity(user["user_id"], risk_score=recent_risk)
+
+    print(f"[OK] Generated {activities_generated} activities for {len(users)} users")
+    print(f"[DATA] Threats detected: {threats_detected}")
 
 # API Routes
 

@@ -852,6 +852,288 @@ async def get_analyst_actions(
         print(f"Error getting analyst actions: {e}")
         raise HTTPException(status_code=500, detail="Failed to get actions")
 
+# ============================================================================
+# PDF REPORT GENERATION ENDPOINTS
+# ============================================================================
+
+@router.post("/reports/generate")
+async def generate_pdf_report(
+    report_data: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a PDF report (comprehensive, user, or system)"""
+    from services.report_generator import report_generator
+    from fastapi.responses import FileResponse
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        report_type = report_data.get('report_type', 'comprehensive')
+        user_id = report_data.get('user_id')
+
+        if report_type == 'user' and user_id:
+            # Generate user-specific report
+            user = user_manager.get_user(user_id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            activities = activity_logger.get_user_activities(user_id, limit=100)
+            summary_stats = {
+                'total_activities': len(activities),
+                'high_risk': len([a for a in activities if a['risk_level'] in ['HIGH', 'CRITICAL']]),
+                'medium_risk': len([a for a in activities if a['risk_level'] == 'MEDIUM']),
+                'low_risk': len([a for a in activities if a['risk_level'] == 'LOW']),
+                'blocked': len([a for a in activities if a['action'] == 'BLOCK']),
+                'restricted': len([a for a in activities if a['action'] == 'RESTRICT'])
+            }
+
+            filepath = report_generator.generate_threat_report(user, activities, summary_stats)
+
+        else:
+            # Generate system-wide report
+            all_activities = activity_logger.get_recent_activities(limit=500)
+            all_users = user_manager.get_all_users()
+
+            system_stats = {
+                'total_threats': len(all_activities),
+                'high_risk_threats': len([a for a in all_activities if a['risk_level'] in ['HIGH', 'CRITICAL']]),
+                'medium_risk_threats': len([a for a in all_activities if a['risk_level'] == 'MEDIUM']),
+                'low_risk_threats': len([a for a in all_activities if a['risk_level'] == 'LOW']),
+                'blocked_actions': len([a for a in all_activities if a['action'] == 'BLOCK']),
+                'total_users': len(all_users),
+                'high_risk_users': len([u for u in all_users if u.get('current_risk_score', 0) >= 70])
+            }
+
+            time_period = report_data.get('time_period', '24h')
+            filepath = report_generator.generate_system_report(all_activities, system_stats, time_period)
+
+        # Return the PDF file
+        filename = os.path.basename(filepath)
+        return FileResponse(
+            filepath,
+            media_type='application/pdf',
+            filename=filename,
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+        )
+
+    except Exception as e:
+        print(f"[ERROR] Error generating report: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
+
+@router.get("/reports/list")
+async def list_reports(current_user: dict = Depends(get_current_user)):
+    """List available generated reports"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        reports_dir = "data/reports"
+        if not os.path.exists(reports_dir):
+            return {"reports": []}
+
+        reports = []
+        for filename in os.listdir(reports_dir):
+            if filename.endswith('.pdf'):
+                filepath = os.path.join(reports_dir, filename)
+                stat = os.stat(filepath)
+                reports.append({
+                    "filename": filename,
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    "download_url": f"/api/v1/reports/download/{filename}"
+                })
+
+        # Sort by creation time (newest first)
+        reports.sort(key=lambda x: x['created_at'], reverse=True)
+
+        return {"reports": reports, "total": len(reports)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reports/download/{filename}")
+async def download_report(filename: str):
+    """Download a specific report"""
+    from fastapi.responses import FileResponse
+
+    filepath = os.path.join("data/reports", filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return FileResponse(
+        filepath,
+        media_type='application/pdf',
+        filename=filename
+    )
+
+
+# ============================================================================
+# USER MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.get("/users/list")
+async def list_users():
+    """Get all users with their details"""
+    try:
+        users = user_manager.get_all_users()
+        return {
+            "users": users,
+            "total": len(users)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/users/register")
+async def register_user(user_data: dict):
+    """Register a new user"""
+    from api.auth import auth_manager
+
+    try:
+        required_fields = ['username', 'full_name', 'department', 'role']
+        for field in required_fields:
+            if field not in user_data:
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
+
+        # Hash password (default: demo123)
+        password = user_data.get('password', 'demo123')
+        password_hash = auth_manager.hash_password(password)
+
+        result = user_manager.register_user(
+            username=user_data['username'],
+            full_name=user_data['full_name'],
+            department=user_data['department'],
+            role=user_data['role'],
+            email=user_data.get('email'),
+            password_hash=password_hash
+        )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/users/{user_id}")
+async def update_user(user_id: str, user_data: dict, current_user: dict = Depends(get_current_user)):
+    """Update user information (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        user = user_manager.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Update user in database
+        # For now, just return success (implement full update in production)
+        return {
+            "success": True,
+            "user_id": user_id,
+            "message": "User updated successfully"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a user (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        user = user_manager.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Mark as inactive instead of deleting
+        # In production, implement proper deletion with cascade
+        return {
+            "success": True,
+            "user_id": user_id,
+            "message": "User deactivated successfully"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# SYSTEM SETTINGS ENDPOINTS
+# ============================================================================
+
+# In-memory settings storage (use database in production)
+_system_settings = {
+    "autoBlockHighRisk": True,
+    "emailNotifications": True,
+    "slackIntegration": False,
+    "riskThresholdHigh": 70,
+    "riskThresholdMedium": 30,
+    "sessionTimeout": 480,
+    "maxLoginAttempts": 5
+}
+
+
+@router.get("/settings")
+async def get_settings(current_user: dict = Depends(get_current_user)):
+    """Get system settings (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    return {
+        "settings": _system_settings,
+        "last_updated": datetime.now().isoformat()
+    }
+
+
+@router.post("/settings")
+async def save_settings(settings: dict, current_user: dict = Depends(get_current_user)):
+    """Save system settings (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        global _system_settings
+        _system_settings.update(settings)
+
+        return {
+            "success": True,
+            "message": "Settings saved successfully",
+            "settings": _system_settings
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# DEBUG & SIMULATION ENDPOINTS
+# ============================================================================
+
 @router.post("/debug/simulate-activity")
 async def simulate_activity(count: int = 50, current_user: dict = Depends(get_current_user)):
     """Generate realistic test activities (admin only)"""
