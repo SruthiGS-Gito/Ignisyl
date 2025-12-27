@@ -268,5 +268,86 @@ class UserManager:
             }
         return None
 
+    def calculate_user_risk_score(self, user_id: str, activities: List[Dict]) -> float:
+        """
+        Calculate risk score based on recent user activities
+        Uses weighted average of recent activity risk scores with recency bias
+
+        Args:
+            user_id: User ID
+            activities: List of recent activities for this user
+
+        Returns:
+            Calculated risk score (0-100)
+        """
+        if not activities:
+            return 0.0
+
+        # Filter activities for this user (last 24 hours most weighted)
+        user_activities = [a for a in activities if a.get('user_id') == user_id]
+
+        if not user_activities:
+            return 0.0
+
+        # Calculate weighted risk score
+        total_weight = 0
+        weighted_score = 0
+
+        for i, activity in enumerate(user_activities[:20]):  # Last 20 activities max
+            # More recent activities have higher weight
+            weight = 1.0 / (i + 1)  # Recency weight
+
+            # Risk level multiplier
+            risk_level = activity.get('risk_level', 'LOW')
+            level_multiplier = {
+                'LOW': 0.5,
+                'MEDIUM': 1.0,
+                'HIGH': 1.5,
+                'CRITICAL': 2.0
+            }.get(risk_level, 1.0)
+
+            risk_score = activity.get('risk_score', 0)
+            weighted_score += risk_score * weight * level_multiplier
+            total_weight += weight
+
+        # Normalize to 0-100 scale
+        if total_weight > 0:
+            base_score = weighted_score / total_weight
+        else:
+            base_score = 0
+
+        # Apply threat count modifier
+        user = self.get_user(user_id)
+        if user:
+            threat_modifier = min(user.get('total_threats', 0) * 2, 20)  # Max 20 point addition
+            final_score = min(100, base_score + threat_modifier)
+        else:
+            final_score = base_score
+
+        return round(final_score, 1)
+
+    def recalculate_all_risk_scores(self, all_activities: List[Dict]) -> Dict:
+        """
+        Recalculate risk scores for all users based on their activities
+
+        Args:
+            all_activities: List of all recent activities
+
+        Returns:
+            Dictionary mapping user_id to their new risk score
+        """
+        users = self.get_all_users()
+        scores = {}
+
+        for user in users:
+            user_id = user['user_id']
+            new_score = self.calculate_user_risk_score(user_id, all_activities)
+
+            # Update the user's risk score in database
+            self.update_user_activity(user_id, new_score)
+            scores[user_id] = new_score
+
+        return scores
+
 # Global user manager instance
 user_manager = UserManager()

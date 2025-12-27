@@ -1,22 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { dashboardAPI, userAPI } from '../../services/api';
+import { dashboardAPI, userAPI, reportAPI, settingsAPI } from '../../services/api';
 import Sidebar from '../Common/Sidebar';
 import Loading from '../Common/Loading';
+import { useToast } from '../Common/Toast';
 import { formatTimestamp, getRiskLevelDetails } from '../../utils/helpers';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
+  const toast = useToast();
   const [stats, setStats] = useState({});
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('users');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [filterRisk, setFilterRisk] = useState('all');
-  const [reportGenerating, setReportGenerating] = useState(false);
   const [systemHealth, setSystemHealth] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Modal states
+  const [viewModal, setViewModal] = useState({ open: false, user: null, loading: false, data: null });
+  const [editModal, setEditModal] = useState({ open: false, user: null, loading: false });
+  const [blockModal, setBlockModal] = useState({ open: false, user: null, loading: false, reason: '' });
+  const [overrideModal, setOverrideModal] = useState({
+    open: false,
+    user: null,
+    loading: false,
+    newAction: '',
+    reason: '',
+    duration: 60
+  });
+
+  // Helper function to get automated action based on risk score (IEEE Paper compliance)
+  const getAutomatedAction = (riskScore) => {
+    if (riskScore >= 76) return { action: 'BLOCK', color: '#dc3545', label: 'BLOCKED', icon: '🚫' };
+    if (riskScore >= 51) return { action: 'RESTRICT', color: '#ff8c00', label: 'RESTRICTED', icon: '⚠️' };
+    if (riskScore >= 31) return { action: 'MONITOR', color: '#ffc107', label: 'MONITORED', icon: '👁️' };
+    return { action: 'ALLOW', color: '#28a745', label: 'ALLOWED', icon: '✓' };
+  };
+
+  // Helper to get risk trend indicator
+  const getRiskTrend = (user) => {
+    // This would normally compare current vs previous risk score
+    const score = user.current_risk_score || 0;
+    if (score > 50) return { icon: '↑', color: '#dc3545', label: 'Increasing' };
+    if (score > 30) return { icon: '→', color: '#ffc107', label: 'Stable' };
+    return { icon: '↓', color: '#28a745', label: 'Decreasing' };
+  };
+
+  // Settings state
   const [settings, setSettings] = useState({
     autoBlockHighRisk: true,
     emailNotifications: true,
@@ -26,9 +60,12 @@ const AdminDashboard = () => {
     sessionTimeout: 480,
     maxLoginAttempts: 5,
   });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
 
   useEffect(() => {
     loadAdminData();
+    loadSettings();
   }, []);
 
   useEffect(() => {
@@ -37,6 +74,7 @@ const AdminDashboard = () => {
 
   const loadAdminData = async () => {
     try {
+      setRefreshing(true);
       const [statsRes, usersRes, activitiesRes] = await Promise.all([
         dashboardAPI.getStats(),
         userAPI.getUsers(),
@@ -48,9 +86,26 @@ const AdminDashboard = () => {
       setActivities(activitiesRes.data.activities || []);
       setSystemHealth(statsRes.data.system_health || {});
       setLoading(false);
+      setRefreshing(false);
     } catch (error) {
       console.error('Error loading admin data:', error);
+      toast.error('Failed to load dashboard data');
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      setSettingsLoading(true);
+      const response = await settingsAPI.getSettings();
+      if (response.data.settings) {
+        setSettings(response.data.settings);
+      }
+      setSettingsLoading(false);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      setSettingsLoading(false);
     }
   };
 
@@ -86,57 +141,95 @@ const AdminDashboard = () => {
 
   const departments = [...new Set(users.map((u) => u.department).filter(Boolean))];
 
-  const generateReport = async () => {
-    setReportGenerating(true);
+  // View User Handler
+  const handleViewUser = async (user) => {
+    setViewModal({ open: true, user, loading: true, data: null });
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/v1/reports/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ report_type: 'comprehensive' }),
-      });
-
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `IGNISYL_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      } else {
-        alert('Failed to generate report');
-      }
+      const response = await userAPI.getUser(user.user_id);
+      setViewModal({ open: true, user, loading: false, data: response.data });
     } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Error generating report');
+      toast.error('Failed to load user details');
+      setViewModal({ open: false, user: null, loading: false, data: null });
     }
-    setReportGenerating(false);
   };
 
+  // Edit User Handler
+  const handleEditUser = (user) => {
+    setEditModal({
+      open: true,
+      user: { ...user },
+      loading: false
+    });
+  };
+
+  const saveUserEdit = async () => {
+    setEditModal(prev => ({ ...prev, loading: true }));
+    try {
+      await userAPI.updateUser(editModal.user.user_id, {
+        full_name: editModal.user.full_name,
+        department: editModal.user.department,
+        role: editModal.user.role,
+        email: editModal.user.email,
+      });
+      toast.success(`User ${editModal.user.full_name} updated successfully`);
+      setEditModal({ open: false, user: null, loading: false });
+      loadAdminData();
+    } catch (error) {
+      toast.error('Failed to update user: ' + (error.response?.data?.detail || error.message));
+      setEditModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Block User Handler
+  const handleBlockUser = (user) => {
+    setBlockModal({ open: true, user, loading: false, reason: '' });
+  };
+
+  const confirmBlockUser = async () => {
+    if (!blockModal.reason.trim()) {
+      toast.warning('Please provide a reason for blocking');
+      return;
+    }
+
+    setBlockModal(prev => ({ ...prev, loading: true }));
+    try {
+      await userAPI.blockUser(blockModal.user.user_id, blockModal.reason, 60);
+      toast.success(`User ${blockModal.user.full_name} has been blocked`);
+      setBlockModal({ open: false, user: null, loading: false, reason: '' });
+      loadAdminData();
+    } catch (error) {
+      toast.error('Failed to block user: ' + (error.response?.data?.detail || error.message));
+      setBlockModal(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  // Unblock User Handler
+  const handleUnblockUser = async (user) => {
+    if (!window.confirm(`Are you sure you want to unblock ${user.full_name}?`)) return;
+
+    try {
+      await userAPI.unblockUser(user.user_id);
+      toast.success(`User ${user.full_name} has been unblocked`);
+      loadAdminData();
+    } catch (error) {
+      toast.error('Failed to unblock user');
+    }
+  };
+
+  // Settings Handlers
   const handleSettingChange = (key, value) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const saveSettings = async () => {
+    setSettingsSaving(true);
     try {
-      await fetch('http://127.0.0.1:8000/api/v1/settings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(settings),
-      });
-      alert('Settings saved successfully');
+      await settingsAPI.saveSettings(settings);
+      toast.success('Settings saved successfully');
     } catch (error) {
-      console.error('Error saving settings:', error);
-      alert('Error saving settings');
+      toast.error('Failed to save settings: ' + (error.response?.data?.detail || error.message));
     }
+    setSettingsSaving(false);
   };
 
   if (loading) {
@@ -151,34 +244,29 @@ const AdminDashboard = () => {
         {/* Admin Header */}
         <div className="admin-header">
           <div>
-            <h1 className="admin-title">Admin Dashboard</h1>
-            <p className="admin-subtitle">System Administration & Threat Management</p>
+            <h1 className="admin-title">User Management</h1>
+            <p className="admin-subtitle">Manage users, permissions, and system settings</p>
           </div>
           <div className="admin-header-actions">
-            <button className="btn-admin" onClick={loadAdminData}>
-              <span>Refresh</span>
-            </button>
             <button
-              className="btn-admin btn-primary"
-              onClick={generateReport}
-              disabled={reportGenerating}
+              className="btn-admin"
+              onClick={loadAdminData}
+              disabled={refreshing}
             >
-              {reportGenerating ? 'Generating...' : 'Generate PDF Report'}
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation - Single set of tabs */}
         <div className="admin-tabs">
-          {['overview', 'users', 'reports', 'settings'].map((tab) => (
+          {['users', 'settings'].map((tab) => (
             <button
               key={tab}
               className={`admin-tab ${activeTab === tab ? 'active' : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'overview' && '📊 '}
               {tab === 'users' && '👥 '}
-              {tab === 'reports' && '📄 '}
               {tab === 'settings' && '⚙️ '}
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -187,133 +275,11 @@ const AdminDashboard = () => {
 
         {/* Tab Content */}
         <div className="admin-content">
-          {/* OVERVIEW TAB */}
-          {activeTab === 'overview' && (
-            <>
-              {/* Stats Grid */}
-              <div className="admin-stats-grid">
-                <div className="admin-stat-card">
-                  <div className="stat-icon">👥</div>
-                  <div className="stat-info">
-                    <div className="stat-value">{stats.total_users || 0}</div>
-                    <div className="stat-label">Total Users</div>
-                  </div>
-                </div>
-                <div className="admin-stat-card">
-                  <div className="stat-icon">🟢</div>
-                  <div className="stat-info">
-                    <div className="stat-value">{stats.active_sessions || 0}</div>
-                    <div className="stat-label">Active Sessions</div>
-                  </div>
-                </div>
-                <div className="admin-stat-card warning">
-                  <div className="stat-icon">⚠️</div>
-                  <div className="stat-info">
-                    <div className="stat-value">{stats.threats_detected_today || 0}</div>
-                    <div className="stat-label">Threats Today</div>
-                  </div>
-                </div>
-                <div className="admin-stat-card danger">
-                  <div className="stat-icon">🛡️</div>
-                  <div className="stat-info">
-                    <div className="stat-value">{stats.threats_blocked || 0}</div>
-                    <div className="stat-label">Threats Blocked</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* System Health & Quick Actions */}
-              <div className="admin-grid-2">
-                <div className="admin-card">
-                  <h3 className="card-title">System Health</h3>
-                  <div className="health-metrics">
-                    <div className="health-metric">
-                      <span className="health-label">CPU Usage</span>
-                      <div className="health-bar">
-                        <div
-                          className={`health-fill ${(systemHealth.cpu_usage || 0) > 80 ? 'danger' : (systemHealth.cpu_usage || 0) > 60 ? 'warning' : ''}`}
-                          style={{ width: `${systemHealth.cpu_usage || 0}%` }}
-                        ></div>
-                      </div>
-                      <span className="health-value">{(systemHealth.cpu_usage || 0).toFixed(1)}%</span>
-                    </div>
-                    <div className="health-metric">
-                      <span className="health-label">Memory Usage</span>
-                      <div className="health-bar">
-                        <div
-                          className={`health-fill ${(systemHealth.memory_usage || 0) > 80 ? 'danger' : (systemHealth.memory_usage || 0) > 60 ? 'warning' : ''}`}
-                          style={{ width: `${systemHealth.memory_usage || 0}%` }}
-                        ></div>
-                      </div>
-                      <span className="health-value">{(systemHealth.memory_usage || 0).toFixed(1)}%</span>
-                    </div>
-                    <div className="health-metric">
-                      <span className="health-label">Disk Usage</span>
-                      <div className="health-bar">
-                        <div
-                          className={`health-fill ${(systemHealth.disk_usage || 0) > 80 ? 'danger' : (systemHealth.disk_usage || 0) > 60 ? 'warning' : ''}`}
-                          style={{ width: `${systemHealth.disk_usage || 0}%` }}
-                        ></div>
-                      </div>
-                      <span className="health-value">{(systemHealth.disk_usage || 0).toFixed(1)}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="admin-card">
-                  <h3 className="card-title">Quick Actions</h3>
-                  <div className="quick-actions">
-                    <button className="action-btn" onClick={() => setActiveTab('users')}>
-                      <span className="action-icon">👤</span>
-                      <span>Manage Users</span>
-                    </button>
-                    <button className="action-btn" onClick={generateReport}>
-                      <span className="action-icon">📄</span>
-                      <span>Generate Report</span>
-                    </button>
-                    <button className="action-btn" onClick={() => setActiveTab('settings')}>
-                      <span className="action-icon">⚙️</span>
-                      <span>Settings</span>
-                    </button>
-                    <button className="action-btn">
-                      <span className="action-icon">🔄</span>
-                      <span>Retrain ML Model</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Threats */}
-              <div className="admin-card">
-                <h3 className="card-title">Recent Threat Alerts</h3>
-                <div className="threats-list">
-                  {activities.slice(0, 5).map((activity, index) => (
-                    <div key={index} className={`threat-item ${activity.risk_level?.toLowerCase() || 'low'}`}>
-                      <div className="threat-info">
-                        <div className="threat-user">{activity.full_name}</div>
-                        <div className="threat-activity">{activity.activity_type}</div>
-                        <div className="threat-time">{formatTimestamp(activity.timestamp)}</div>
-                      </div>
-                      <div className="threat-score">
-                        <span className={`risk-badge ${activity.risk_level?.toLowerCase() || 'low'}`}>
-                          {activity.risk_score || 0}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {activities.length === 0 && (
-                    <div className="empty-state">No recent threats detected</div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-
           {/* USERS TAB */}
           {activeTab === 'users' && (
             <div className="admin-card">
               <div className="users-header">
-                <h3 className="card-title">User Management</h3>
+                <h3 className="card-title">All Users</h3>
                 <div className="users-filters">
                   <input
                     type="text"
@@ -329,9 +295,7 @@ const AdminDashboard = () => {
                   >
                     <option value="all">All Departments</option>
                     {departments.map((dept) => (
-                      <option key={dept} value={dept}>
-                        {dept}
-                      </option>
+                      <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
                   <select
@@ -359,19 +323,26 @@ const AdminDashboard = () => {
                       <th>Department</th>
                       <th>Role</th>
                       <th>Risk Score</th>
-                      <th>Status</th>
+                      <th>AI Action</th>
+                      <th>Trend</th>
                       <th>Last Activity</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredUsers.map((user) => {
-                      const riskDetails = getRiskLevelDetails(user.current_risk_score);
+                      const riskScore = user.current_risk_score || 0;
+                      const riskDetails = getRiskLevelDetails(riskScore);
+                      const autoAction = getAutomatedAction(riskScore);
+                      const trend = getRiskTrend(user);
+                      const isOverridden = user.status === 'blocked' || user.status === 'restricted';
                       return (
-                        <tr key={user.user_id}>
+                        <tr key={user.user_id} className={autoAction.action === 'BLOCK' ? 'blocked-row' : ''}>
                           <td>
                             <div className="user-cell">
-                              <div className="user-avatar">
+                              <div className="user-avatar" style={{
+                                background: `linear-gradient(135deg, ${autoAction.color}80 0%, ${autoAction.color} 100%)`
+                              }}>
                                 {user.full_name?.charAt(0) || 'U'}
                               </div>
                               <div className="user-details">
@@ -383,23 +354,69 @@ const AdminDashboard = () => {
                           <td>{user.department}</td>
                           <td>{user.role}</td>
                           <td>
-                            <span
-                              className={`risk-badge ${riskDetails.label.toLowerCase()}`}
-                            >
-                              {user.current_risk_score || 0}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span className={`risk-badge ${riskDetails.label.toLowerCase()}`}>
+                                {riskScore}
+                              </span>
+                            </div>
                           </td>
                           <td>
-                            <span className={`status-badge ${user.status === 'active' ? 'active' : 'inactive'}`}>
-                              {user.status || 'active'}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              background: `${autoAction.color}20`,
+                              border: `1px solid ${autoAction.color}`,
+                              width: 'fit-content'
+                            }}>
+                              <span>{autoAction.icon}</span>
+                              <span style={{ color: autoAction.color, fontWeight: 'bold', fontSize: '12px' }}>
+                                {autoAction.label}
+                              </span>
+                              {isOverridden && (
+                                <span style={{ color: '#ff6b6b', fontSize: '10px' }}>(Override)</span>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ color: trend.color, fontWeight: 'bold', fontSize: '16px' }} title={trend.label}>
+                              {trend.icon}
                             </span>
                           </td>
                           <td>{formatTimestamp(user.last_activity)}</td>
                           <td>
                             <div className="action-buttons">
-                              <button className="btn-icon" title="View Details">👁️</button>
-                              <button className="btn-icon" title="Edit User">✏️</button>
-                              <button className="btn-icon danger" title="Block User">🚫</button>
+                              <button
+                                className="btn-icon"
+                                title="View Details"
+                                onClick={() => handleViewUser(user)}
+                              >
+                                👁️
+                              </button>
+                              <button
+                                className="btn-icon"
+                                title="Edit User"
+                                onClick={() => handleEditUser(user)}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn-icon"
+                                title="Override AI Action"
+                                style={{ background: 'rgba(102, 126, 234, 0.2)' }}
+                                onClick={() => setOverrideModal({
+                                  open: true,
+                                  user: user,
+                                  loading: false,
+                                  newAction: autoAction.action,
+                                  reason: '',
+                                  duration: 60
+                                })}
+                              >
+                                ⚡
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -407,49 +424,9 @@ const AdminDashboard = () => {
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
-          )}
-
-          {/* REPORTS TAB */}
-          {activeTab === 'reports' && (
-            <div className="admin-card">
-              <h3 className="card-title">Report Generation</h3>
-              <div className="reports-grid">
-                <div className="report-card" onClick={generateReport}>
-                  <div className="report-icon">📊</div>
-                  <div className="report-title">Comprehensive Report</div>
-                  <div className="report-desc">
-                    Full threat analysis with user risk scores and recommendations
-                  </div>
-                  <button className="btn-admin btn-primary" disabled={reportGenerating}>
-                    {reportGenerating ? 'Generating...' : 'Generate PDF'}
-                  </button>
-                </div>
-                <div className="report-card">
-                  <div className="report-icon">👥</div>
-                  <div className="report-title">User Activity Report</div>
-                  <div className="report-desc">
-                    Detailed user activity logs and behavioral analysis
-                  </div>
-                  <button className="btn-admin">Generate PDF</button>
-                </div>
-                <div className="report-card">
-                  <div className="report-icon">🚨</div>
-                  <div className="report-title">Threat Summary</div>
-                  <div className="report-desc">
-                    Summary of all detected threats and actions taken
-                  </div>
-                  <button className="btn-admin">Generate PDF</button>
-                </div>
-                <div className="report-card">
-                  <div className="report-icon">📈</div>
-                  <div className="report-title">ML Performance Report</div>
-                  <div className="report-desc">
-                    Machine learning model accuracy and performance metrics
-                  </div>
-                  <button className="btn-admin">Generate PDF</button>
-                </div>
+                {filteredUsers.length === 0 && (
+                  <div className="empty-state">No users found matching your criteria</div>
+                )}
               </div>
             </div>
           )}
@@ -457,130 +434,509 @@ const AdminDashboard = () => {
           {/* SETTINGS TAB */}
           {activeTab === 'settings' && (
             <div className="settings-container">
-              <div className="admin-card">
-                <h3 className="card-title">Security Settings</h3>
-                <div className="settings-group">
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Auto-block High Risk Users</div>
-                      <div className="setting-desc">
-                        Automatically block users when risk score exceeds threshold
+              {settingsLoading ? (
+                <Loading message="Loading settings..." />
+              ) : (
+                <>
+                  <div className="admin-card">
+                    <h3 className="card-title">Security Settings</h3>
+                    <div className="settings-group">
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Auto-block High Risk Users</div>
+                          <div className="setting-desc">
+                            Automatically block users when risk score exceeds threshold
+                          </div>
+                        </div>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={settings.autoBlockHighRisk}
+                            onChange={(e) => handleSettingChange('autoBlockHighRisk', e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">High Risk Threshold</div>
+                          <div className="setting-desc">Score above which users are considered high risk</div>
+                        </div>
+                        <input
+                          type="number"
+                          className="setting-input"
+                          value={settings.riskThresholdHigh}
+                          onChange={(e) => handleSettingChange('riskThresholdHigh', parseInt(e.target.value))}
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Medium Risk Threshold</div>
+                          <div className="setting-desc">Score above which users are considered medium risk</div>
+                        </div>
+                        <input
+                          type="number"
+                          className="setting-input"
+                          value={settings.riskThresholdMedium}
+                          onChange={(e) => handleSettingChange('riskThresholdMedium', parseInt(e.target.value))}
+                          min="0"
+                          max="100"
+                        />
+                      </div>
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Max Login Attempts</div>
+                          <div className="setting-desc">Number of failed attempts before account lockout</div>
+                        </div>
+                        <input
+                          type="number"
+                          className="setting-input"
+                          value={settings.maxLoginAttempts}
+                          onChange={(e) => handleSettingChange('maxLoginAttempts', parseInt(e.target.value))}
+                          min="1"
+                          max="20"
+                        />
                       </div>
                     </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.autoBlockHighRisk}
-                        onChange={(e) => handleSettingChange('autoBlockHighRisk', e.target.checked)}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
                   </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">High Risk Threshold</div>
-                      <div className="setting-desc">Score above which users are considered high risk</div>
-                    </div>
-                    <input
-                      type="number"
-                      className="setting-input"
-                      value={settings.riskThresholdHigh}
-                      onChange={(e) => handleSettingChange('riskThresholdHigh', parseInt(e.target.value))}
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Medium Risk Threshold</div>
-                      <div className="setting-desc">Score above which users are considered medium risk</div>
-                    </div>
-                    <input
-                      type="number"
-                      className="setting-input"
-                      value={settings.riskThresholdMedium}
-                      onChange={(e) => handleSettingChange('riskThresholdMedium', parseInt(e.target.value))}
-                      min="0"
-                      max="100"
-                    />
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Max Login Attempts</div>
-                      <div className="setting-desc">Number of failed attempts before account lockout</div>
-                    </div>
-                    <input
-                      type="number"
-                      className="setting-input"
-                      value={settings.maxLoginAttempts}
-                      onChange={(e) => handleSettingChange('maxLoginAttempts', parseInt(e.target.value))}
-                      min="1"
-                      max="20"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="admin-card">
-                <h3 className="card-title">Notification Settings</h3>
-                <div className="settings-group">
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Email Notifications</div>
-                      <div className="setting-desc">Receive email alerts for high-risk threats</div>
+                  <div className="admin-card">
+                    <h3 className="card-title">Notification Settings</h3>
+                    <div className="settings-group">
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Email Notifications</div>
+                          <div className="setting-desc">Receive email alerts for high-risk threats</div>
+                        </div>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={settings.emailNotifications}
+                            onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Slack Integration</div>
+                          <div className="setting-desc">Send alerts to Slack channel</div>
+                        </div>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={settings.slackIntegration}
+                            onChange={(e) => handleSettingChange('slackIntegration', e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                      <div className="setting-item">
+                        <div className="setting-info">
+                          <div className="setting-label">Session Timeout (minutes)</div>
+                          <div className="setting-desc">Auto-logout after inactivity</div>
+                        </div>
+                        <input
+                          type="number"
+                          className="setting-input"
+                          value={settings.sessionTimeout}
+                          onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
+                          min="5"
+                          max="1440"
+                        />
+                      </div>
                     </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.emailNotifications}
-                        onChange={(e) => handleSettingChange('emailNotifications', e.target.checked)}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
                   </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Slack Integration</div>
-                      <div className="setting-desc">Send alerts to Slack channel</div>
-                    </div>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={settings.slackIntegration}
-                        onChange={(e) => handleSettingChange('slackIntegration', e.target.checked)}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                  <div className="setting-item">
-                    <div className="setting-info">
-                      <div className="setting-label">Session Timeout (minutes)</div>
-                      <div className="setting-desc">Auto-logout after inactivity</div>
-                    </div>
-                    <input
-                      type="number"
-                      className="setting-input"
-                      value={settings.sessionTimeout}
-                      onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
-                      min="5"
-                      max="1440"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="settings-actions">
-                <button className="btn-admin" onClick={() => window.location.reload()}>
-                  Reset to Defaults
-                </button>
-                <button className="btn-admin btn-primary" onClick={saveSettings}>
-                  Save Settings
-                </button>
-              </div>
+                  <div className="settings-actions">
+                    <button className="btn-admin" onClick={loadSettings}>
+                      Reset
+                    </button>
+                    <button
+                      className="btn-admin btn-primary"
+                      onClick={saveSettings}
+                      disabled={settingsSaving}
+                    >
+                      {settingsSaving ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* VIEW USER MODAL */}
+      {viewModal.open && (
+        <div className="modal-overlay" onClick={() => setViewModal({ open: false, user: null, loading: false, data: null })}>
+          <div className="modal-content modal-large" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>User Details: {viewModal.user?.full_name}</h2>
+              <button className="modal-close" onClick={() => setViewModal({ open: false, user: null, loading: false, data: null })}>×</button>
+            </div>
+            <div className="modal-body">
+              {viewModal.loading ? (
+                <Loading message="Loading user details..." />
+              ) : viewModal.data ? (
+                <>
+                  <div className="detail-grid">
+                    <div className="detail-item">
+                      <label>Full Name</label>
+                      <span>{viewModal.data.user?.full_name}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Username</label>
+                      <span>{viewModal.data.user?.username}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Email</label>
+                      <span>{viewModal.data.user?.email || 'N/A'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Department</label>
+                      <span>{viewModal.data.user?.department}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Role</label>
+                      <span>{viewModal.data.user?.role}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Status</label>
+                      <span className={`status-badge ${viewModal.data.user?.status === 'blocked' ? 'blocked' : 'active'}`}>
+                        {viewModal.data.user?.status || 'active'}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Risk Score</label>
+                      <span className={`risk-badge ${getRiskLevelDetails(viewModal.data.user?.current_risk_score).label.toLowerCase()}`}>
+                        {viewModal.data.user?.current_risk_score || 0}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Total Threats</label>
+                      <span>{viewModal.data.user?.total_threats || 0}</span>
+                    </div>
+                  </div>
+
+                  <h3 style={{ marginTop: '24px', marginBottom: '16px' }}>Activity Statistics</h3>
+                  <div className="detail-grid">
+                    <div className="detail-item">
+                      <label>Total Activities</label>
+                      <span>{viewModal.data.stats?.total_activities || 0}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>High Risk Activities</label>
+                      <span style={{ color: '#ef4444' }}>{viewModal.data.stats?.high_risk_activities || 0}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Blocked Actions</label>
+                      <span>{viewModal.data.stats?.blocked_actions || 0}</span>
+                    </div>
+                    <div className="detail-item">
+                      <label>Average Risk Score</label>
+                      <span>{(viewModal.data.stats?.average_risk_score || 0).toFixed(1)}</span>
+                    </div>
+                  </div>
+
+                  {viewModal.data.activities?.length > 0 && (
+                    <>
+                      <h3 style={{ marginTop: '24px', marginBottom: '16px' }}>Recent Activities</h3>
+                      <div className="mini-table">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Activity</th>
+                              <th>Risk</th>
+                              <th>Action</th>
+                              <th>Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {viewModal.data.activities.slice(0, 5).map((activity, i) => (
+                              <tr key={i}>
+                                <td>{activity.activity_type}</td>
+                                <td>
+                                  <span className={`risk-badge ${getRiskLevelDetails(activity.risk_score).label.toLowerCase()}`}>
+                                    {activity.risk_score}
+                                  </span>
+                                </td>
+                                <td>{activity.action}</td>
+                                <td>{formatTimestamp(activity.timestamp)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="empty-state">Failed to load user data</div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-admin" onClick={() => setViewModal({ open: false, user: null, loading: false, data: null })}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT USER MODAL */}
+      {editModal.open && (
+        <div className="modal-overlay" onClick={() => setEditModal({ open: false, user: null, loading: false })}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit User</h2>
+              <button className="modal-close" onClick={() => setEditModal({ open: false, user: null, loading: false })}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Full Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editModal.user?.full_name || ''}
+                  onChange={(e) => setEditModal(prev => ({
+                    ...prev,
+                    user: { ...prev.user, full_name: e.target.value }
+                  }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Department</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editModal.user?.department || ''}
+                  onChange={(e) => setEditModal(prev => ({
+                    ...prev,
+                    user: { ...prev.user, department: e.target.value }
+                  }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select
+                  className="form-input"
+                  value={editModal.user?.role || ''}
+                  onChange={(e) => setEditModal(prev => ({
+                    ...prev,
+                    user: { ...prev.user, role: e.target.value }
+                  }))}
+                >
+                  <option value="User">User</option>
+                  <option value="Analyst">Analyst</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Administrator">Administrator</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={editModal.user?.email || ''}
+                  onChange={(e) => setEditModal(prev => ({
+                    ...prev,
+                    user: { ...prev.user, email: e.target.value }
+                  }))}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-admin" onClick={() => setEditModal({ open: false, user: null, loading: false })}>
+                Cancel
+              </button>
+              <button
+                className="btn-admin btn-primary"
+                onClick={saveUserEdit}
+                disabled={editModal.loading}
+              >
+                {editModal.loading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BLOCK USER MODAL */}
+      {blockModal.open && (
+        <div className="modal-overlay" onClick={() => setBlockModal({ open: false, user: null, loading: false, reason: '' })}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Block User</h2>
+              <button className="modal-close" onClick={() => setBlockModal({ open: false, user: null, loading: false, reason: '' })}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="warning-box">
+                <span className="warning-icon">⚠️</span>
+                <div>
+                  <strong>Warning:</strong> You are about to block <strong>{blockModal.user?.full_name}</strong>.
+                  This will prevent the user from logging in and accessing the system.
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: '20px' }}>
+                <label>Reason for blocking (required)</label>
+                <textarea
+                  className="form-input"
+                  rows="3"
+                  placeholder="Enter the reason for blocking this user..."
+                  value={blockModal.reason}
+                  onChange={(e) => setBlockModal(prev => ({ ...prev, reason: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-admin" onClick={() => setBlockModal({ open: false, user: null, loading: false, reason: '' })}>
+                Cancel
+              </button>
+              <button
+                className="btn-admin btn-danger"
+                onClick={confirmBlockUser}
+                disabled={blockModal.loading || !blockModal.reason.trim()}
+              >
+                {blockModal.loading ? 'Blocking...' : 'Confirm Block'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OVERRIDE AI ACTION MODAL */}
+      {overrideModal.open && overrideModal.user && (
+        <div className="modal-overlay" onClick={() => setOverrideModal({ open: false, user: null, loading: false, newAction: '', reason: '', duration: 60 })}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Override AI Action</h2>
+              <button className="modal-close" onClick={() => setOverrideModal({ open: false, user: null, loading: false, newAction: '', reason: '', duration: 60 })}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{
+                padding: '16px',
+                background: 'rgba(102, 126, 234, 0.1)',
+                borderRadius: '10px',
+                marginBottom: '20px',
+                border: '1px solid rgba(102, 126, 234, 0.3)'
+              }}>
+                <div style={{ fontSize: '14px', color: '#a8d0ff', marginBottom: '8px' }}>
+                  <strong>IGNISYL AI-Driven Response System</strong>
+                </div>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
+                  The AI automatically determines actions based on risk scores. Override only when
+                  manual intervention is justified. All overrides are logged for audit.
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div style={{ padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#a8d0ff' }}>User</div>
+                  <div style={{ fontSize: '16px', color: '#fff', fontWeight: 'bold' }}>{overrideModal.user.full_name}</div>
+                </div>
+                <div style={{ padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#a8d0ff' }}>Current Risk Score</div>
+                  <div style={{ fontSize: '16px', color: getAutomatedAction(overrideModal.user.current_risk_score || 0).color, fontWeight: 'bold' }}>
+                    {overrideModal.user.current_risk_score || 0} - {getAutomatedAction(overrideModal.user.current_risk_score || 0).label}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>New Action</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginTop: '8px' }}>
+                  {[
+                    { action: 'ALLOW', color: '#28a745', icon: '✓' },
+                    { action: 'MONITOR', color: '#ffc107', icon: '👁️' },
+                    { action: 'RESTRICT', color: '#ff8c00', icon: '⚠️' },
+                    { action: 'BLOCK', color: '#dc3545', icon: '🚫' }
+                  ].map(opt => (
+                    <button
+                      key={opt.action}
+                      onClick={() => setOverrideModal(prev => ({ ...prev, newAction: opt.action }))}
+                      style={{
+                        padding: '12px 8px',
+                        border: overrideModal.newAction === opt.action ? `2px solid ${opt.color}` : '1px solid rgba(255,255,255,0.2)',
+                        background: overrideModal.newAction === opt.action ? `${opt.color}20` : 'rgba(0,0,0,0.2)',
+                        borderRadius: '8px',
+                        color: opt.color,
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div>{opt.icon}</div>
+                      <div>{opt.action}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Duration</label>
+                <select
+                  className="form-input"
+                  value={overrideModal.duration}
+                  onChange={(e) => setOverrideModal(prev => ({ ...prev, duration: parseInt(e.target.value) }))}
+                >
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 hour</option>
+                  <option value={240}>4 hours</option>
+                  <option value={480}>8 hours</option>
+                  <option value={1440}>24 hours</option>
+                  <option value={10080}>1 week</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Justification (Required for Audit) *</label>
+                <textarea
+                  className="form-input"
+                  rows="3"
+                  placeholder="Explain why you are overriding the AI decision..."
+                  value={overrideModal.reason}
+                  onChange={(e) => setOverrideModal(prev => ({ ...prev, reason: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-admin" onClick={() => setOverrideModal({ open: false, user: null, loading: false, newAction: '', reason: '', duration: 60 })}>
+                Cancel
+              </button>
+              <button
+                className="btn-admin btn-primary"
+                onClick={async () => {
+                  if (!overrideModal.reason.trim()) {
+                    toast.warning('Justification is required for audit trail');
+                    return;
+                  }
+                  setOverrideModal(prev => ({ ...prev, loading: true }));
+                  try {
+                    // Apply the override via firewall API
+                    await userAPI.blockUser(overrideModal.user.user_id,
+                      `[OVERRIDE] ${overrideModal.newAction}: ${overrideModal.reason}`,
+                      overrideModal.duration
+                    );
+                    toast.success(`Action override applied: ${overrideModal.newAction}`);
+                    setOverrideModal({ open: false, user: null, loading: false, newAction: '', reason: '', duration: 60 });
+                    loadAdminData();
+                  } catch (error) {
+                    toast.error('Failed to apply override: ' + (error.response?.data?.detail || error.message));
+                    setOverrideModal(prev => ({ ...prev, loading: false }));
+                  }
+                }}
+                disabled={overrideModal.loading || !overrideModal.reason.trim() || !overrideModal.newAction}
+              >
+                {overrideModal.loading ? 'Applying...' : 'Apply Override'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

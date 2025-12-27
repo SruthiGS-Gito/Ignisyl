@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { analystAPI } from '../../services/api';
+import { analystAPI, dashboardAPI } from '../../services/api';
 import Sidebar from '../Common/Sidebar';
 import Loading from '../Common/Loading';
 import { formatTimestamp, getRiskLevelDetails } from '../../utils/helpers';
-import { ACTIONS, DURATION_OPTIONS, DEFAULT_RESTRICTIONS } from '../../utils/constants';
+import { DURATION_OPTIONS, DEFAULT_RESTRICTIONS } from '../../utils/constants';
+import './AnalystControl.css';
 
 const AnalystControl = () => {
   const [pendingThreats, setPendingThreats] = useState([]);
+  const [recentActions, setRecentActions] = useState([]);
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [stats, setStats] = useState({ pending: 0, reviewed: 0, avgRisk: 0, responseTime: '4hrs' });
 
   // Form states
   const [action, setAction] = useState('RESTRICT');
@@ -19,18 +22,42 @@ const AnalystControl = () => {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchPendingDecisions();
-    const interval = setInterval(fetchPendingDecisions, 30000); // Refresh every 30s
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchPendingDecisions = async () => {
+  const fetchData = async () => {
     try {
-      const response = await analystAPI.getPendingDecisions();
-      setPendingThreats(response.data.pending_decisions || []);
+      // Fetch pending decisions
+      const pendingResponse = await analystAPI.getPendingDecisions();
+      const pending = pendingResponse.data.pending_decisions || [];
+      setPendingThreats(pending);
+
+      // Calculate stats
+      const avgRisk = pending.length > 0
+        ? Math.round(pending.reduce((sum, t) => sum + t.risk_score, 0) / pending.length)
+        : 0;
+
+      setStats({
+        pending: pending.length,
+        reviewed: 0,
+        avgRisk: avgRisk,
+        responseTime: '4hrs'
+      });
+
+      // Try to get recent analyst actions
+      try {
+        const actionsResponse = await analystAPI.getMyActions(10);
+        setRecentActions(actionsResponse.data.actions || []);
+        setStats(prev => ({ ...prev, reviewed: actionsResponse.data.count || 0 }));
+      } catch (e) {
+        // Actions endpoint might fail for non-analysts
+      }
+
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching pending decisions:', error);
+      console.error('Error fetching data:', error);
       setLoading(false);
     }
   };
@@ -58,13 +85,13 @@ const AnalystControl = () => {
         duration_minutes: duration,
       });
 
-      alert(`✅ Action ${action} applied successfully!`);
+      alert(`Action ${action} applied successfully!`);
       setShowModal(false);
-      fetchPendingDecisions();
+      fetchData();
       resetForm();
     } catch (error) {
       console.error('Error applying action:', error);
-      alert('❌ Failed to apply action. Please try again.');
+      alert('Failed to apply action. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -76,10 +103,10 @@ const AnalystControl = () => {
 
     try {
       await analystAPI.contactUser(selectedThreat.user_id, message, 'notification');
-      alert('✅ Message sent to user successfully!');
+      alert('Message sent to user successfully!');
     } catch (error) {
       console.error('Error contacting user:', error);
-      alert('❌ Failed to send message.');
+      alert('Failed to send message.');
     }
   };
 
@@ -92,12 +119,12 @@ const AnalystControl = () => {
 
     try {
       await analystAPI.escalateThreat(selectedThreat.user_id, escalateTo, notes);
-      alert(`✅ Threat escalated to ${escalateTo} successfully!`);
+      alert(`Threat escalated to ${escalateTo} successfully!`);
       setShowModal(false);
-      fetchPendingDecisions();
+      fetchData();
     } catch (error) {
       console.error('Error escalating:', error);
-      alert('❌ Failed to escalate threat.');
+      alert('Failed to escalate threat.');
     }
   };
 
@@ -119,373 +146,365 @@ const AnalystControl = () => {
   }
 
   return (
-    <div className="flex">
+    <div className="analyst-layout">
       <Sidebar />
 
-      <div className="main-content bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900">Analyst Threat Control</h1>
-            <p className="text-gray-600 mt-2">
-              Review and respond to threats requiring analyst decision (Risk Score 50-69)
+      <div className="analyst-main">
+        {/* Header */}
+        <div className="analyst-header">
+          <div>
+            <h1 className="analyst-title">Analyst Threat Control</h1>
+            <p className="analyst-subtitle">
+              Review and respond to threats requiring manual decision (Risk Score 50-69)
             </p>
           </div>
+        </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-600">Pending Decisions</div>
-              <div className="text-4xl font-bold text-orange-600 mt-2">
-                {pendingThreats.length}
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-600">Avg Risk Score</div>
-              <div className="text-4xl font-bold text-gray-900 mt-2">
-                {pendingThreats.length > 0
-                  ? Math.round(
-                      pendingThreats.reduce((sum, t) => sum + t.risk_score, 0) /
-                        pendingThreats.length
-                    )
-                  : 0}
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-sm text-gray-600">Response Time Target</div>
-              <div className="text-4xl font-bold text-blue-600 mt-2">4hrs</div>
-            </div>
+        {/* Stats Cards */}
+        <div className="analyst-stats-grid">
+          <div className="analyst-stat-card">
+            <div className="analyst-stat-label">Pending Decisions</div>
+            <div className="analyst-stat-value orange">{stats.pending}</div>
           </div>
+          <div className="analyst-stat-card">
+            <div className="analyst-stat-label">Average Risk Score</div>
+            <div className="analyst-stat-value blue">{stats.avgRisk}</div>
+          </div>
+          <div className="analyst-stat-card">
+            <div className="analyst-stat-label">Actions Today</div>
+            <div className="analyst-stat-value green">{stats.reviewed}</div>
+          </div>
+          <div className="analyst-stat-card">
+            <div className="analyst-stat-label">Response Target</div>
+            <div className="analyst-stat-value">{stats.responseTime}</div>
+          </div>
+        </div>
 
-          {/* Pending Threats Table */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Pending Threat Decisions
-              </h2>
-            </div>
+        {/* Main Content Grid */}
+        <div className="analyst-content-grid">
+          {/* Left: Pending Threats Table */}
+          <div className="analyst-card">
+            <h2 className="analyst-card-title">Pending Threat Decisions</h2>
 
             {pendingThreats.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="text-gray-400 text-6xl mb-4">✓</div>
-                <div className="text-xl text-gray-600">No pending decisions</div>
-                <div className="text-sm text-gray-500 mt-2">
-                  All threats have been reviewed or auto-handled
+              <div className="analyst-empty-state">
+                <div className="analyst-empty-icon">&#10003;</div>
+                <div className="analyst-empty-title">No pending decisions</div>
+                <div className="analyst-empty-desc">
+                  All threats have been reviewed or automatically handled by the system
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        User
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Activity
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Risk Score
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Time
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {pendingThreats.map((threat) => {
-                      const riskDetails = getRiskLevelDetails(threat.risk_score);
-                      return (
-                        <tr
-                          key={threat.id}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleThreatClick(threat)}
-                        >
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {threat.full_name}
-                            </div>
-                            <div className="text-sm text-gray-500">{threat.username}</div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">
-                              {threat.activity_type}
-                            </div>
-                            <div className="text-sm text-gray-500 truncate max-w-xs">
-                              {threat.summary}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
-                              style={{
-                                background: riskDetails.bgColor,
-                                color: riskDetails.textColor,
-                              }}
-                            >
-                              {threat.risk_score}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatTimestamp(threat.timestamp)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              className="text-blue-600 hover:text-blue-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleThreatClick(threat);
-                              }}
-                            >
-                              Review →
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <table className="analyst-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Activity</th>
+                    <th>Risk Score</th>
+                    <th>Time</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingThreats.map((threat) => {
+                    const riskDetails = getRiskLevelDetails(threat.risk_score);
+                    const riskClass = threat.risk_score >= 70 ? 'critical' :
+                                     threat.risk_score >= 50 ? 'high' : 'medium';
+                    return (
+                      <tr key={threat.id} onClick={() => handleThreatClick(threat)}>
+                        <td>
+                          <div className="user-name">{threat.full_name}</div>
+                          <div className="user-id">{threat.username}</div>
+                        </td>
+                        <td>
+                          <div className="activity-type">{threat.activity_type?.replace(/_/g, ' ')}</div>
+                          <div className="activity-summary">{threat.summary}</div>
+                        </td>
+                        <td>
+                          <span className={`risk-badge-analyst ${riskClass}`}>
+                            {threat.risk_score}
+                          </span>
+                        </td>
+                        <td>{formatTimestamp(threat.timestamp)}</td>
+                        <td>
+                          <button
+                            className="btn-review"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleThreatClick(threat);
+                            }}
+                          >
+                            Review
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             )}
+          </div>
+
+          {/* Right: Information Panel */}
+          <div className="analyst-info-panel">
+            <div className="info-section">
+              <h3 className="info-section-title">&#128161; What is Analyst Control?</h3>
+              <div className="info-section-content">
+                This page displays threats that require <strong>manual analyst review</strong>.
+                The ML system automatically handles low-risk (ALLOW) and high-risk (BLOCK)
+                activities, but medium-risk activities (50-69 score) need human judgment.
+              </div>
+            </div>
+
+            <div className="info-section">
+              <h3 className="info-section-title">&#128203; Risk Score Thresholds</h3>
+              <ul className="info-list">
+                <li>
+                  <span className="dot green"></span>
+                  <span><strong>0-29:</strong> Low risk - Auto ALLOW</span>
+                </li>
+                <li>
+                  <span className="dot orange"></span>
+                  <span><strong>50-69:</strong> Medium risk - Analyst Review</span>
+                </li>
+                <li>
+                  <span className="dot red"></span>
+                  <span><strong>70+:</strong> High risk - Auto BLOCK</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="info-section">
+              <h3 className="info-section-title">&#128736; Available Actions</h3>
+              <ul className="info-list">
+                <li>
+                  <span className="dot green"></span>
+                  <span><strong>ALLOW:</strong> Mark as false positive</span>
+                </li>
+                <li>
+                  <span className="dot orange"></span>
+                  <span><strong>RESTRICT:</strong> Limit user access</span>
+                </li>
+                <li>
+                  <span className="dot red"></span>
+                  <span><strong>ISOLATE:</strong> Quarantine user</span>
+                </li>
+                <li>
+                  <span className="dot red"></span>
+                  <span><strong>BLOCK:</strong> Complete access block</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="info-section">
+              <h3 className="info-section-title">&#9889; Quick Actions</h3>
+              <div className="quick-actions">
+                <button className="quick-action-btn" onClick={fetchData}>
+                  &#128260; Refresh Pending List
+                </button>
+                <button className="quick-action-btn" onClick={() => window.location.href = '/threats'}>
+                  &#128680; View All Threats
+                </button>
+                <button className="quick-action-btn" onClick={() => window.location.href = '/activities'}>
+                  &#128203; Activity Log
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Threat Review Modal */}
       {showModal && selectedThreat && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+        <div className="analyst-modal-overlay" onClick={closeModal}>
+          <div className="analyst-modal" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <div className="analyst-modal-header">
               <div>
-                <h3 className="text-2xl font-bold text-gray-900">
+                <h3 className="analyst-modal-title">
                   Threat Analysis: {selectedThreat.full_name}
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="analyst-modal-subtitle">
                   Risk Score: {selectedThreat.risk_score} ({selectedThreat.risk_level})
                 </p>
               </div>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
-              >
-                ×
+              <button className="analyst-modal-close" onClick={closeModal}>
+                &times;
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="px-6 py-4 space-y-6">
+            <div className="analyst-modal-body">
               {/* User Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-2">User Information</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">Username:</span>{' '}
-                    <span className="font-medium">{selectedThreat.username}</span>
+              <div className="analyst-modal-section">
+                <h4 className="analyst-modal-section-title">User Information</h4>
+                <div className="analyst-modal-info-grid">
+                  <div className="analyst-modal-info-item">
+                    <label>Username:</label>
+                    <span>{selectedThreat.username}</span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Full Name:</span>{' '}
-                    <span className="font-medium">{selectedThreat.full_name}</span>
+                  <div className="analyst-modal-info-item">
+                    <label>Full Name:</label>
+                    <span>{selectedThreat.full_name}</span>
                   </div>
                 </div>
               </div>
 
               {/* Activity Details */}
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-2">Activity Details</h4>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="text-gray-600">Type:</span>{' '}
-                    <span className="font-medium">{selectedThreat.activity_type}</span>
+              <div className="analyst-modal-section" style={{background: 'rgba(59, 130, 246, 0.1)'}}>
+                <h4 className="analyst-modal-section-title">Activity Details</h4>
+                <div className="analyst-modal-info-grid">
+                  <div className="analyst-modal-info-item">
+                    <label>Type:</label>
+                    <span>{selectedThreat.activity_type?.replace(/_/g, ' ')}</span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Summary:</span>{' '}
-                    <span className="font-medium">{selectedThreat.summary}</span>
+                  <div className="analyst-modal-info-item">
+                    <label>Timestamp:</label>
+                    <span>{formatTimestamp(selectedThreat.timestamp)}</span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Timestamp:</span>{' '}
-                    <span className="font-medium">
-                      {formatTimestamp(selectedThreat.timestamp)}
-                    </span>
-                  </div>
+                </div>
+                <div className="analyst-modal-info-item" style={{marginTop: '12px'}}>
+                  <label>Summary:</label>
+                  <span>{selectedThreat.summary}</span>
                 </div>
               </div>
 
               {/* Action Selection */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-900">Select Action</h4>
+              <h4 className="analyst-modal-section-title">Select Action</h4>
+              <div className="action-grid">
+                <button
+                  className={`action-btn ${action === 'ALLOW' ? 'selected allow' : ''}`}
+                  onClick={() => setAction('ALLOW')}
+                >
+                  <div className="action-btn-icon">&#10003;</div>
+                  <div className="action-btn-label">ALLOW</div>
+                  <div className="action-btn-desc">False positive</div>
+                </button>
 
-                <div className="grid grid-cols-4 gap-3">
-                  <button
-                    className={`p-4 rounded-lg border-2 text-center transition ${
-                      action === 'ALLOW'
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-gray-200 hover:border-green-300'
-                    }`}
-                    onClick={() => setAction('ALLOW')}
-                  >
-                    <div className="text-2xl mb-1">✓</div>
-                    <div className="font-semibold text-sm">ALLOW</div>
-                    <div className="text-xs text-gray-600">False positive</div>
-                  </button>
+                <button
+                  className={`action-btn ${action === 'RESTRICT' ? 'selected restrict' : ''}`}
+                  onClick={() => setAction('RESTRICT')}
+                >
+                  <div className="action-btn-icon">&#9888;</div>
+                  <div className="action-btn-label">RESTRICT</div>
+                  <div className="action-btn-desc">Limit access</div>
+                </button>
 
-                  <button
-                    className={`p-4 rounded-lg border-2 text-center transition ${
-                      action === 'RESTRICT'
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray-200 hover:border-orange-300'
-                    }`}
-                    onClick={() => setAction('RESTRICT')}
-                  >
-                    <div className="text-2xl mb-1">⚠️</div>
-                    <div className="font-semibold text-sm">RESTRICT</div>
-                    <div className="text-xs text-gray-600">Limit access</div>
-                  </button>
+                <button
+                  className={`action-btn ${action === 'ISOLATE' ? 'selected isolate' : ''}`}
+                  onClick={() => setAction('ISOLATE')}
+                >
+                  <div className="action-btn-icon">&#128683;</div>
+                  <div className="action-btn-label">ISOLATE</div>
+                  <div className="action-btn-desc">Quarantine</div>
+                </button>
 
-                  <button
-                    className={`p-4 rounded-lg border-2 text-center transition ${
-                      action === 'ISOLATE'
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-200 hover:border-red-300'
-                    }`}
-                    onClick={() => setAction('ISOLATE')}
-                  >
-                    <div className="text-2xl mb-1">🚫</div>
-                    <div className="font-semibold text-sm">ISOLATE</div>
-                    <div className="text-xs text-gray-600">Quarantine</div>
-                  </button>
+                <button
+                  className={`action-btn ${action === 'BLOCK' ? 'selected block' : ''}`}
+                  onClick={() => setAction('BLOCK')}
+                >
+                  <div className="action-btn-icon">&#9940;</div>
+                  <div className="action-btn-label">BLOCK</div>
+                  <div className="action-btn-desc">Complete block</div>
+                </button>
+              </div>
 
-                  <button
-                    className={`p-4 rounded-lg border-2 text-center transition ${
-                      action === 'BLOCK'
-                        ? 'border-red-700 bg-red-100'
-                        : 'border-gray-200 hover:border-red-400'
-                    }`}
-                    onClick={() => setAction('BLOCK')}
-                  >
-                    <div className="text-2xl mb-1">⛔</div>
-                    <div className="font-semibold text-sm">BLOCK</div>
-                    <div className="text-xs text-gray-600">Complete block</div>
-                  </button>
-                </div>
-
-                {/* Custom Restrictions for RESTRICT action */}
-                {action === 'RESTRICT' && (
-                  <div className="bg-orange-50 rounded-lg p-4 space-y-3">
-                    <h5 className="font-semibold text-gray-900">Custom Restrictions</h5>
-                    <div className="space-y-2">
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={customRestrictions.block_external_internet}
-                          onChange={(e) =>
-                            setCustomRestrictions({
-                              ...customRestrictions,
-                              block_external_internet: e.target.checked,
-                            })
-                          }
-                          className="rounded"
-                        />
-                        <span className="text-sm">Block external internet</span>
-                      </label>
-                      <label className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={customRestrictions.notify_user}
-                          onChange={(e) =>
-                            setCustomRestrictions({
-                              ...customRestrictions,
-                              notify_user: e.target.checked,
-                            })
-                          }
-                          className="rounded"
-                        />
-                        <span className="text-sm">Send notification to user</span>
-                      </label>
-                      <div className="flex items-center space-x-2">
-                        <label className="text-sm">Rate limit (Mbps):</label>
-                        <input
-                          type="number"
-                          value={customRestrictions.rate_limit_mbps}
-                          onChange={(e) =>
-                            setCustomRestrictions({
-                              ...customRestrictions,
-                              rate_limit_mbps: parseInt(e.target.value),
-                            })
-                          }
-                          className="w-20 px-2 py-1 border rounded"
-                          min="1"
-                          max="100"
-                        />
-                      </div>
-                    </div>
+              {/* Custom Restrictions for RESTRICT action */}
+              {action === 'RESTRICT' && (
+                <div className="restrictions-panel">
+                  <h5 className="restrictions-title">Custom Restrictions</h5>
+                  <div className="restriction-item">
+                    <input
+                      type="checkbox"
+                      id="block_internet"
+                      checked={customRestrictions.block_external_internet}
+                      onChange={(e) =>
+                        setCustomRestrictions({
+                          ...customRestrictions,
+                          block_external_internet: e.target.checked,
+                        })
+                      }
+                    />
+                    <label htmlFor="block_internet">Block external internet</label>
                   </div>
-                )}
-
-                {/* Duration */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (minutes)
-                  </label>
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {DURATION_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="restriction-item">
+                    <input
+                      type="checkbox"
+                      id="notify_user"
+                      checked={customRestrictions.notify_user}
+                      onChange={(e) =>
+                        setCustomRestrictions({
+                          ...customRestrictions,
+                          notify_user: e.target.checked,
+                        })
+                      }
+                    />
+                    <label htmlFor="notify_user">Send notification to user</label>
+                  </div>
+                  <div className="restriction-item">
+                    <label>Rate limit (Mbps):</label>
+                    <input
+                      type="number"
+                      value={customRestrictions.rate_limit_mbps}
+                      onChange={(e) =>
+                        setCustomRestrictions({
+                          ...customRestrictions,
+                          rate_limit_mbps: parseInt(e.target.value) || 1,
+                        })
+                      }
+                      min="1"
+                      max="100"
+                    />
+                  </div>
                 </div>
+              )}
 
-                {/* Reason */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Reason (Required) *
-                  </label>
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder="Explain your decision..."
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows="3"
-                  />
-                </div>
+              {/* Duration */}
+              <div className="analyst-form-group">
+                <label className="analyst-form-label">Duration</label>
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(parseInt(e.target.value))}
+                  className="analyst-form-select"
+                >
+                  {DURATION_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reason */}
+              <div className="analyst-form-group">
+                <label className="analyst-form-label">Reason (Required) *</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Explain your decision..."
+                  className="analyst-form-textarea"
+                />
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
-              <div className="space-x-2">
-                <button
-                  onClick={handleContactUser}
-                  className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition"
-                >
-                  📧 Contact User
+            <div className="analyst-modal-footer">
+              <div className="analyst-modal-footer-left">
+                <button className="btn-contact" onClick={handleContactUser}>
+                  &#128231; Contact User
                 </button>
-                <button
-                  onClick={handleEscalate}
-                  className="px-4 py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition"
-                >
-                  ⬆️ Escalate
+                <button className="btn-escalate" onClick={handleEscalate}>
+                  &#11014; Escalate
                 </button>
               </div>
-              <div className="space-x-2">
-                <button
-                  onClick={closeModal}
-                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-                >
+              <div className="analyst-modal-footer-right">
+                <button className="btn-cancel" onClick={closeModal}>
                   Cancel
                 </button>
                 <button
+                  className="btn-apply"
                   onClick={handleApplyAction}
                   disabled={submitting || !reason.trim()}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Applying...' : `Apply ${action}`}
                 </button>

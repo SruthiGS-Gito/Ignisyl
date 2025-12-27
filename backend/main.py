@@ -21,6 +21,21 @@ import numpy as np  # Required for np.log1p() in extract_features()
 import time
 from pathlib import Path
 
+# Pre-import matplotlib with Agg backend for report visualizations
+# Must be done before any other matplotlib imports
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+    print("[OK] Matplotlib initialized with Agg backend")
+except ImportError as e:
+    MATPLOTLIB_AVAILABLE = False
+    print(f"[WARN] Matplotlib not available - report visualizations disabled: {e}")
+except Exception as e:
+    MATPLOTLIB_AVAILABLE = False
+    print(f"[WARN] Matplotlib initialization error: {e}")
+
 # Add project root to path (works from any directory)
 project_root = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(project_root))
@@ -1081,17 +1096,152 @@ async def generate_system_report(request_data: Dict):
 async def download_report(filename: str):
     """Download a generated report"""
     from fastapi.responses import FileResponse
-    
+
     filepath = os.path.join("data/reports", filename)
-    
+
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Report not found")
-    
+
     return FileResponse(
         filepath,
         media_type='application/pdf',
         filename=filename
     )
+
+@app.post("/api/v1/reports/generate-user-report")
+async def generate_individual_user_report(request_data: Dict):
+    """Generate comprehensive individual user security report PDF"""
+    from fastapi.responses import Response
+    from services.report_generator import report_generator
+    from models.activity_log import activity_logger
+    from models.user_management import user_manager
+    from services.intelligent_risk_engine import intelligent_risk_engine
+
+    user_id = request_data.get('user_id')
+
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+
+    # Handle both string and int user_id
+    try:
+        user_id_int = int(user_id)
+    except (ValueError, TypeError):
+        user_id_int = user_id
+
+    # Get user data
+    user = user_manager.get_user(user_id_int)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+
+    # Get complete user activity history
+    all_activities = activity_logger.get_user_activities(user_id_int, limit=500)
+
+    # Get intelligent risk profile
+    risk_profile = intelligent_risk_engine.get_user_risk_profile(user_id_int)
+
+    # Get all users for peer comparison
+    all_users = user_manager.get_all_users()
+    department_peers = [u for u in all_users if u.get('department') == user.get('department') and u.get('user_id') != user_id_int]
+
+    # Get department peer activities for comparison
+    peer_activities = []
+    for peer in department_peers[:5]:  # Limit to 5 peers for performance
+        peer_acts = activity_logger.get_user_activities(peer['user_id'], limit=100)
+        peer_activities.extend(peer_acts)
+
+    # Calculate comprehensive statistics
+    stats = {
+        'total_activities': len(all_activities),
+        'high_risk': len([a for a in all_activities if a.get('risk_level') == 'HIGH']),
+        'medium_risk': len([a for a in all_activities if a.get('risk_level') == 'MEDIUM']),
+        'low_risk': len([a for a in all_activities if a.get('risk_level') == 'LOW']),
+        'critical': len([a for a in all_activities if a.get('risk_level') == 'CRITICAL']),
+        'blocked': len([a for a in all_activities if a.get('action') == 'BLOCK']),
+        'restricted': len([a for a in all_activities if a.get('action') == 'RESTRICT']),
+        'allowed': len([a for a in all_activities if a.get('action') == 'ALLOW']),
+        'risk_profile': risk_profile,
+        'department_peers': department_peers,
+        'peer_activities': peer_activities
+    }
+
+    # Activity breakdown by type
+    activity_types = {}
+    for activity in all_activities:
+        act_type = activity.get('activity_type', 'Unknown')
+        activity_types[act_type] = activity_types.get(act_type, 0) + 1
+    stats['activity_breakdown'] = activity_types
+
+    # Get ML predictions for this user (if detector is available)
+    ml_predictions = {}
+    try:
+        if ml_detector and ml_detector.is_trained:
+            # Get average features from user's recent activities
+            import numpy as np
+            recent_activities = all_activities[:20] if all_activities else []
+
+            if recent_activities:
+                # Calculate average risk score
+                avg_risk = sum(a.get('risk_score', 0) for a in recent_activities) / len(recent_activities)
+                avg_bytes = sum(a.get('bytes_transferred', 0) for a in recent_activities) / len(recent_activities)
+
+                # Get model predictions
+                features = [[
+                    12.0,  # hour
+                    2.0,   # day_of_week
+                    avg_bytes,  # file_size
+                    float(np.log1p(avg_bytes)),  # file_size_log
+                    avg_bytes,  # bytes_transferred
+                    float(np.log1p(avg_bytes)),  # network_bytes_log
+                    0.0,   # is_weekend
+                    1.0,   # is_business_hours
+                    avg_risk / 100.0,  # confidence_score
+                    0.0,   # failed_login_count
+                    1.0,   # access_frequency
+                    0.0,   # unusual_location
+                    0.0,   # file_type_risk
+                    60.0   # time_since_last
+                ]]
+
+                try:
+                    risk_scores, individual_scores = ml_detector.predict(features)
+                    ml_predictions = {
+                        'ensemble_score': float(risk_scores[0]),
+                        'individual_scores': {k: float(v) for k, v in individual_scores.items()},
+                        'model_confidence': max(individual_scores.values()) if individual_scores else 0.5,
+                        'is_trained': True
+                    }
+                except Exception as pred_error:
+                    print(f"[WARN] ML prediction error: {pred_error}")
+                    ml_predictions = {'is_trained': False, 'error': str(pred_error)}
+            else:
+                ml_predictions = {'is_trained': True, 'no_data': True}
+        else:
+            ml_predictions = {'is_trained': False}
+    except Exception as e:
+        print(f"[WARN] ML predictions failed: {e}")
+        ml_predictions = {'is_trained': False, 'error': str(e)}
+
+    stats['ml_predictions'] = ml_predictions
+
+    # Generate comprehensive user report PDF
+    try:
+        filepath = report_generator.generate_individual_user_report(user, all_activities, stats)
+
+        # Read the file and return as blob
+        with open(filepath, 'rb') as f:
+            pdf_content = f.read()
+
+        return Response(
+            content=pdf_content,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="IGNISYL_User_Report_{user["username"]}_{datetime.now().strftime("%Y%m%d")}.pdf"'
+            }
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Report generation failed: {str(e)}")
 
 @app.get("/api/v1/monitoring/honeypots")
 async def check_honeypots():
