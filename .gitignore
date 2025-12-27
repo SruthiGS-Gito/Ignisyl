@@ -133,3 +133,4 @@ docker-compose.override.yml
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.claude/
