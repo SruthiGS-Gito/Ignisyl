@@ -63,16 +63,18 @@ class ActivityLogger:
         risk_score = activity_data.get('risk_score')
         timestamp = activity_data.get('timestamp', datetime.now().isoformat())
 
-        # DEDUPLICATION CHECK: Look for similar activity in last 30 seconds
+        # DEDUPLICATION CHECK: Look for similar activity in same minute
+        # Use minute-level comparison to catch rapid duplicate submissions
+        timestamp_minute = timestamp[:16]  # YYYY-MM-DDTHH:MM
         try:
             cursor.execute("""
                 SELECT id FROM activities
                 WHERE user_id = ?
                 AND activity_type = ?
-                AND ABS(risk_score - ?) < 1.0
-                AND datetime(timestamp) >= datetime(?, '-30 seconds')
+                AND CAST(risk_score AS INTEGER) = CAST(? AS INTEGER)
+                AND substr(timestamp, 1, 16) = ?
                 LIMIT 1
-            """, (user_id, activity_type, risk_score, timestamp))
+            """, (user_id, activity_type, risk_score, timestamp_minute))
 
             existing = cursor.fetchone()
             if existing:

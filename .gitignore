@@ -134,3 +134,7 @@ docker-compose.override.yml
 .pytest_cache/
 .ruff_cache/
 .claude/
+
+# Generated reports
+backend/data/reports/*.pdf
+backend/data/reports/charts/

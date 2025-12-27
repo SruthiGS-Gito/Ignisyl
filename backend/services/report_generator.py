@@ -574,8 +574,8 @@ class ReportGenerator:
         
         return recommendations
     
-    def generate_system_report(self, all_activities: List[Dict], 
-                               system_stats: Dict, time_period: str = "24h") -> str:
+    def generate_system_report(self, all_activities: List[Dict],
+                               system_stats_or_users, time_period: str = "24h") -> str:
         """
         Generate system-wide threat report
         
@@ -590,10 +590,25 @@ class ReportGenerator:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"system_report_{time_period}_{timestamp}.pdf"
         filepath = os.path.join(self.output_dir, filename)
-        
+
+        # Handle both dict (stats) and list (users) as second parameter
+        if isinstance(system_stats_or_users, list):
+            all_users = system_stats_or_users
+            system_stats = {
+                'total_threats': len(all_activities),
+                'high_risk_threats': len([a for a in all_activities if a.get('risk_level') in ['HIGH', 'CRITICAL']]),
+                'medium_risk_threats': len([a for a in all_activities if a.get('risk_level') == 'MEDIUM']),
+                'low_risk_threats': len([a for a in all_activities if a.get('risk_level') == 'LOW']),
+                'blocked_actions': len([a for a in all_activities if a.get('action') == 'BLOCK']),
+                'total_users': len(all_users),
+                'high_risk_users': len([u for u in all_users if u.get('current_risk_score', 0) > 50])
+            }
+        else:
+            system_stats = system_stats_or_users
+
         doc = SimpleDocTemplate(filepath, pagesize=letter)
         story = []
-        
+
         # Title
         title = Paragraph(f"[SHIELD] IGNISYL - System Threat Report ({time_period})", self.title_style)
         story.append(title)
