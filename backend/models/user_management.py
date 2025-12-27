@@ -349,5 +349,46 @@ class UserManager:
 
         return scores
 
+
+    def update_user_status(self, user_id: str, status: str, reason: str = None) -> bool:
+        """Update user's status (active, blocked, restricted)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET status = ?, last_activity = ? WHERE user_id = ?",
+                          (status, datetime.now().isoformat(), user_id))
+            conn.commit()
+            updated = cursor.rowcount > 0
+            conn.close()
+            if updated:
+                print(f"[STATUS] User {user_id} status changed to: {status}")
+            return updated
+        except Exception as e:
+            print(f"Error updating user status: {e}")
+            conn.close()
+            return False
+
+    def block_user(self, user_id: str, reason: str) -> bool:
+        """Block a user due to security threat"""
+        return self.update_user_status(user_id, 'blocked', reason)
+
+    def restrict_user(self, user_id: str, reason: str) -> bool:
+        """Restrict a user's access"""
+        return self.update_user_status(user_id, 'restricted', reason)
+
+    def unblock_user(self, user_id: str) -> bool:
+        """Unblock a user"""
+        return self.update_user_status(user_id, 'active', 'Manual unblock')
+
+    def get_blocked_users(self):
+        """Get all blocked users"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE status = 'blocked'")
+        rows = cursor.fetchall()
+        conn.close()
+        return [{"user_id": r[0], "username": r[1], "full_name": r[3], "status": r[11], "current_risk_score": r[10]} for r in rows]
+
+
 # Global user manager instance
 user_manager = UserManager()

@@ -362,5 +362,48 @@ class IntelligentRiskEngine:
         user_data['peak_score'] = max(user_data['peak_score'], user_data['current_score'])
         user_data['last_update'] = datetime.now()
 
+    def recalculate_all_users(self, activity_logger, user_manager):
+        """
+        Recalculate risk scores for ALL users from their activities.
+        This ensures consistency across all pages.
+        """
+        all_users = user_manager.get_all_users()
+
+        for user in all_users:
+            user_id = user['user_id']
+            # Get user's recent activities
+            activities = activity_logger.get_user_activities(user_id, limit=100)
+
+            if activities:
+                # Load activities into the engine
+                self.load_from_activities(user_id, activities)
+                # Sync to database
+                self.sync_to_database(user_id, user_manager)
+                print(f"[SYNC] User {user_id}: risk = {self.get_user_risk_profile(user_id)['current_score']}")
+
+    def get_consistent_user_risk(self, user_id: str, activity_logger, user_manager) -> float:
+        """
+        Get consistent risk score for a user.
+        This is the SINGLE SOURCE OF TRUTH for risk scores.
+        """
+        # Get user's recent activities
+        activities = activity_logger.get_user_activities(user_id, limit=100)
+
+        if not activities:
+            return 0.0
+
+        # Load activities and calculate
+        self.load_from_activities(user_id, activities)
+
+        # Get the calculated score
+        profile = self.get_user_risk_profile(user_id)
+        current_score = profile['current_score']
+
+        # Sync to database for consistency
+        self.sync_to_database(user_id, user_manager)
+
+        return current_score
+
+
 # Global instance
 intelligent_risk_engine = IntelligentRiskEngine()
