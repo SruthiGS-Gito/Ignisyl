@@ -1,74 +1,68 @@
+// IEEE Paper Thresholds: 0-30 ALLOW, 31-50 MONITOR, 51-75 RESTRICT, 76-100 BLOCK
 export const RISK_LEVELS = {
-  LOW: { 
-    label: 'LOW', 
-    color: 'green', 
+  LOW: {
+    label: 'LOW',
+    color: 'green',
     bgColor: 'rgba(76, 175, 80, 0.2)',
     textColor: '#4caf50',
-    threshold: [0, 29] 
+    threshold: [0, 30]
   },
-  MEDIUM: { 
-    label: 'MEDIUM', 
+  MEDIUM: {
+    label: 'MEDIUM',
     color: 'yellow',
-    bgColor: 'rgba(255, 152, 0, 0.2)',
-    textColor: '#ff9800',
-    threshold: [30, 49] 
+    bgColor: 'rgba(255, 193, 7, 0.2)',
+    textColor: '#ffc107',
+    threshold: [31, 50]
   },
-  HIGH: { 
-    label: 'HIGH', 
+  HIGH: {
+    label: 'HIGH',
     color: 'orange',
-    bgColor: 'rgba(255, 152, 0, 0.2)',
-    textColor: '#ff9800',
-    threshold: [50, 69] 
+    bgColor: 'rgba(253, 126, 20, 0.2)',
+    textColor: '#fd7e14',
+    threshold: [51, 75]
   },
-  CRITICAL: { 
-    label: 'CRITICAL', 
+  CRITICAL: {
+    label: 'CRITICAL',
     color: 'red',
-    bgColor: 'rgba(244, 67, 54, 0.2)',
-    textColor: '#f44336',
-    threshold: [70, 100] 
+    bgColor: 'rgba(220, 53, 69, 0.2)',
+    textColor: '#dc3545',
+    threshold: [76, 100]
   },
 };
 
+// IEEE Paper Graduated Response Policy
 export const RESPONSE_LEVELS = {
-  1: { 
+  1: {
     level: 1,
-    label: 'ALLOW', 
-    action: 'Normal operations with logging', 
+    label: 'ALLOW',
+    action: 'Normal operations with logging',
     color: 'green',
     description: 'Legitimate business activities',
-    threshold: [0, 29]
+    threshold: [0, 30]
   },
-  2: { 
+  2: {
     level: 2,
-    label: 'MONITOR', 
-    action: 'Enhanced monitoring', 
-    color: 'blue',
-    description: 'Slightly unusual but likely legitimate',
-    threshold: [30, 49]
+    label: 'MONITOR',
+    action: 'Enhanced monitoring',
+    color: 'yellow',
+    description: 'Slightly unusual - enhanced logging',
+    threshold: [31, 50]
   },
-  3: { 
+  3: {
     level: 3,
-    label: 'RESTRICT', 
-    action: 'Limited network access', 
+    label: 'RESTRICT',
+    action: 'Limited network access',
     color: 'orange',
-    description: 'Analyst decision required',
-    threshold: [50, 69]
+    description: 'Analyst review required',
+    threshold: [51, 75]
   },
-  4: { 
+  4: {
     level: 4,
-    label: 'ISOLATE', 
-    action: 'Network quarantine', 
+    label: 'BLOCK',
+    action: 'Auto-blocked + incident response',
     color: 'red',
-    description: 'High-confidence threat detection',
-    threshold: [70, 89]
-  },
-  5: { 
-    level: 5,
-    label: 'BLOCK', 
-    action: 'Complete shutdown + incident response', 
-    color: 'red',
-    description: 'Critical insider threat',
-    threshold: [90, 100]
+    description: 'Critical insider threat - auto-blocked',
+    threshold: [76, 100]
   },
 };
 

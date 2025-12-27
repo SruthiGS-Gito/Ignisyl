@@ -424,6 +424,7 @@
   color: #ffffff;
 }
 
+/* IEEE Paper Thresholds: 0-30 LOW, 31-50 MEDIUM, 51-75 HIGH, 76-100 CRITICAL */
 .risk-badge.low {
   background: rgba(76, 175, 80, 0.3);
   border: 1px solid #4caf50;
@@ -431,16 +432,21 @@
 }
 
 .risk-badge.medium {
-  background: rgba(255, 152, 0, 0.3);
-  border: 1px solid #ff9800;
-  color: #ff9800;
+  background: rgba(255, 193, 7, 0.3);
+  border: 1px solid #ffc107;
+  color: #ffc107;
 }
 
-.risk-badge.high,
+.risk-badge.high {
+  background: rgba(253, 126, 20, 0.3);
+  border: 1px solid #fd7e14;
+  color: #fd7e14;
+}
+
 .risk-badge.critical {
-  background: rgba(244, 67, 54, 0.3);
-  border: 1px solid #f44336;
-  color: #ff6b6b;
+  background: rgba(220, 53, 69, 0.3);
+  border: 1px solid #dc3545;
+  color: #dc3545;
 }
 
 /* Empty State */

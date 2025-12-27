@@ -155,7 +155,7 @@ const AnalystControl = () => {
           <div>
             <h1 className="analyst-title">Analyst Threat Control</h1>
             <p className="analyst-subtitle">
-              Review and respond to threats requiring manual decision (Risk Score 50-69)
+              Review and respond to threats requiring manual decision (Risk Score 51-75)
             </p>
           </div>
         </div>
@@ -251,25 +251,29 @@ const AnalystControl = () => {
               <h3 className="info-section-title">&#128161; What is Analyst Control?</h3>
               <div className="info-section-content">
                 This page displays threats that require <strong>manual analyst review</strong>.
-                The ML system automatically handles low-risk (ALLOW) and high-risk (BLOCK)
-                activities, but medium-risk activities (50-69 score) need human judgment.
+                The ML system automatically handles low-risk (ALLOW) and critical-risk (BLOCK)
+                activities, but high-risk activities (51-75 score) need human judgment.
               </div>
             </div>
 
             <div className="info-section">
-              <h3 className="info-section-title">&#128203; Risk Score Thresholds</h3>
+              <h3 className="info-section-title">&#128203; Risk Score Thresholds (IEEE Paper)</h3>
               <ul className="info-list">
                 <li>
                   <span className="dot green"></span>
-                  <span><strong>0-29:</strong> Low risk - Auto ALLOW</span>
+                  <span><strong>0-30:</strong> Low risk - Auto ALLOW</span>
+                </li>
+                <li>
+                  <span className="dot" style={{background: '#ffc107'}}></span>
+                  <span><strong>31-50:</strong> Medium risk - MONITOR (enhanced logging)</span>
                 </li>
                 <li>
                   <span className="dot orange"></span>
-                  <span><strong>50-69:</strong> Medium risk - Analyst Review</span>
+                  <span><strong>51-75:</strong> High risk - RESTRICT (Analyst Review)</span>
                 </li>
                 <li>
                   <span className="dot red"></span>
-                  <span><strong>70+:</strong> High risk - Auto BLOCK</span>
+                  <span><strong>76-100:</strong> Critical risk - Auto BLOCK</span>
                 </li>
               </ul>
             </div>

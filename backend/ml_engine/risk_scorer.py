@@ -474,26 +474,44 @@ class ContextualRiskScorer:
     
     def assess_activity_risk(self, activity_data: Dict, user_profile: Dict) -> Dict:
         """Main method to assess risk for a single activity"""
-        
+
         # Calculate base risk score
         base_score, triggered_factors = self.calculate_base_risk_score(activity_data, user_profile)
-        
+
+        # Apply baseline minimum risk for different activity types
+        # Even normal activities have some inherent risk (Zero Trust principle)
+        activity_type = activity_data.get('activity_type', '').lower()
+        baseline_minimums = {
+            'login': 5,           # Normal login: baseline risk 5
+            'logout': 0,          # Logout is safe
+            'file_access': 8,     # File access: baseline risk 8
+            'file_download': 10,  # Downloads: baseline risk 10
+            'network_access': 8,  # Network: baseline risk 8
+            'privileged_access': 15,  # Privileged: higher baseline
+        }
+        baseline_min = baseline_minimums.get(activity_type, 5)  # Default 5 for unknown
+
+        # Ensure minimum baseline risk
+        if base_score < baseline_min:
+            base_score = baseline_min
+            triggered_factors.append(f"Baseline activity risk (+{baseline_min})")
+
         # Apply contextual modifiers
         contextual_score, applied_modifiers = self.apply_contextual_modifiers(
             base_score, activity_data, user_profile
         )
-        
+
         # Calculate behavioral baseline deviation
         baseline_deviation = self.calculate_behavioral_baseline_deviation(activity_data, user_profile)
-        
+
         # Final risk score combines contextual score and baseline deviation
         final_score = min(contextual_score + (baseline_deviation * 0.5), 100.0)
-        
+
         # Generate comprehensive explanation
         explanation = self.generate_risk_explanation(
             final_score, triggered_factors, applied_modifiers, baseline_deviation
         )
-        
+
         return explanation
 
 def test_risk_scorer():

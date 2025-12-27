@@ -2,32 +2,50 @@ import { RISK_LEVELS } from './constants';
 
 /**
  * Get risk color based on score
+ * IEEE Paper Thresholds: 0-30 ALLOW, 31-50 MONITOR, 51-75 RESTRICT, 76-100 BLOCK
  */
 export const getRiskColor = (score) => {
-  if (score < 30) return 'green';
-  if (score < 50) return 'yellow';
-  if (score < 70) return 'orange';
+  if (score <= 30) return 'green';
+  if (score <= 50) return 'yellow';
+  if (score <= 75) return 'orange';
   return 'red';
 };
 
 /**
  * Get risk level label based on score
+ * IEEE Paper Thresholds: 0-30 LOW, 31-50 MEDIUM, 51-75 HIGH, 76-100 CRITICAL
  */
 export const getRiskLevel = (score) => {
-  if (score < 30) return 'LOW';
-  if (score < 50) return 'MEDIUM';
-  if (score < 70) return 'HIGH';
+  if (score <= 30) return 'LOW';
+  if (score <= 50) return 'MEDIUM';
+  if (score <= 75) return 'HIGH';
   return 'CRITICAL';
 };
 
 /**
  * Get risk level details (color, bgColor, etc.)
+ * IEEE Paper Thresholds: 0-30 LOW, 31-50 MEDIUM, 51-75 HIGH, 76-100 CRITICAL
  */
 export const getRiskLevelDetails = (score) => {
-  if (score < 30) return RISK_LEVELS.LOW;
-  if (score < 50) return RISK_LEVELS.MEDIUM;
-  if (score < 70) return RISK_LEVELS.HIGH;
+  if (score <= 30) return RISK_LEVELS.LOW;
+  if (score <= 50) return RISK_LEVELS.MEDIUM;
+  if (score <= 75) return RISK_LEVELS.HIGH;
   return RISK_LEVELS.CRITICAL;
+};
+
+/**
+ * Get AI automated action based on risk score
+ * IEEE Paper Graduated Response Policy:
+ * 0-30: ALLOW (Low risk, normal access)
+ * 31-50: MONITOR (Medium risk, enhanced monitoring)
+ * 51-75: RESTRICT (High risk, limited access)
+ * 76-100: BLOCK (Critical risk, auto-block)
+ */
+export const getAIAction = (score) => {
+  if (score <= 30) return { action: 'ALLOW', icon: '✓', color: '#28a745', description: 'Normal access allowed' };
+  if (score <= 50) return { action: 'MONITOR', icon: '👁', color: '#ffc107', description: 'Enhanced monitoring active' };
+  if (score <= 75) return { action: 'RESTRICT', icon: '⚡', color: '#fd7e14', description: 'Access restricted' };
+  return { action: 'BLOCK', icon: '🚫', color: '#dc3545', description: 'Auto-blocked by system' };
 };
 
 /**

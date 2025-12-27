@@ -179,6 +179,18 @@ class AuthManager:
         cursor.execute("DELETE FROM sessions WHERE expires_at <= datetime('now')")
         conn.commit()
         conn.close()
+
+    def get_active_session_count(self) -> int:
+        """Get count of currently active (non-expired) sessions"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(DISTINCT user_id) FROM sessions
+            WHERE expires_at > datetime('now')
+        """)
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
     
     def validate_password_complexity(self, password: str) -> dict:
         """

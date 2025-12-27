@@ -163,20 +163,21 @@ class IntelligentRiskEngine:
         user_data = self.user_scores[user_id]
         current_score = user_data['current_score']
         
-        # Determine risk level
-        if current_score < 30:
+        # Determine risk level - IEEE Paper Thresholds:
+        # 0-30: ALLOW, 31-50: MONITOR, 51-75: RESTRICT, 76-100: BLOCK
+        if current_score <= 30:
             risk_level = "LOW"
             action = "ALLOW"
             severity = "INFO"
-        elif current_score < 50:
+        elif current_score <= 50:
             risk_level = "MEDIUM"
             action = "MONITOR"
             severity = "WARNING"
-        elif current_score < 75:
+        elif current_score <= 75:
             risk_level = "HIGH"
             action = "RESTRICT"
             severity = "HIGH"
-        else:
+        else:  # current_score > 75 -> CRITICAL/BLOCK
             risk_level = "CRITICAL"
             action = "BLOCK"
             severity = "CRITICAL"
@@ -268,7 +269,7 @@ class IntelligentRiskEngine:
         """Get complete risk profile for a user"""
         self._apply_time_decay(user_id)
         user_data = self.user_scores[user_id]
-        
+
         return {
             'user_id': user_id,
             'current_score': round(user_data['current_score'], 1),
@@ -280,6 +281,86 @@ class IntelligentRiskEngine:
             ]),
             'last_activity': user_data['last_update'].isoformat() if user_data['events'] else None
         }
+
+    def sync_to_database(self, user_id: str, db_user_manager=None):
+        """Sync intelligent engine score to database for consistency"""
+        if db_user_manager is None:
+            return
+
+        profile = self.get_user_risk_profile(user_id)
+        db_user_manager.update_user_activity(user_id, risk_score=profile['current_score'])
+
+    def load_from_activities(self, user_id: str, activities: List[Dict]):
+        """
+        Initialize user risk profile from historical activities.
+        This ensures risk scores are consistent with activity history.
+        """
+        if not activities:
+            return
+
+        # Reset user data
+        self.user_scores[user_id] = {
+            'current_score': 0,
+            'events': [],
+            'last_update': datetime.now(),
+            'peak_score': 0
+        }
+
+        # Process activities from oldest to newest
+        sorted_activities = sorted(activities, key=lambda x: x.get('timestamp', ''))
+
+        for activity in sorted_activities:
+            activity_type = activity.get('activity_type', 'unknown')
+            risk_score = activity.get('risk_score', 0)
+
+            # Update user data without time decay (historical reconstruction)
+            user_data = self.user_scores[user_id]
+            try:
+                timestamp = datetime.fromisoformat(activity.get('timestamp', datetime.now().isoformat()))
+            except:
+                timestamp = datetime.now()
+
+            # Use the ACTUAL risk score from the activity, not a mapping
+            # This ensures high-risk activities (like honeypot_access with 100) are reflected
+            user_data['events'].append({
+                'type': activity_type,
+                'score': risk_score,  # Use actual activity risk score
+                'timestamp': timestamp,
+                'context': {}
+            })
+
+        # Calculate final score from recent events (last 24 hours)
+        user_data = self.user_scores[user_id]
+        recent_events = [
+            e for e in user_data['events']
+            if (datetime.now() - e['timestamp']).total_seconds() < 86400  # 24 hours
+        ]
+
+        # Calculate score using weighted average with recency bias
+        # Also consider the MAXIMUM risk score for recent events (for critical threats)
+        if recent_events:
+            # Find the maximum recent risk score
+            max_recent_score = max(e['score'] for e in recent_events)
+
+            # Calculate weighted average
+            total_score = 0
+            total_weight = 0
+            for i, event in enumerate(sorted(recent_events, key=lambda x: x['timestamp'], reverse=True)[:20]):  # Limit to 20 most recent
+                weight = 1.0 / (i + 1)  # Recency weight
+                total_score += event['score'] * weight
+                total_weight += weight
+
+            weighted_avg = total_score / max(total_weight, 1)
+
+            # Final score: weighted blend of average and maximum
+            # If there's a critical threat (score > 75), weight the max more heavily
+            if max_recent_score > 75:
+                user_data['current_score'] = min(100, max_recent_score * 0.7 + weighted_avg * 0.3)
+            else:
+                user_data['current_score'] = min(100, weighted_avg * 0.6 + max_recent_score * 0.4)
+
+        user_data['peak_score'] = max(user_data['peak_score'], user_data['current_score'])
+        user_data['last_update'] = datetime.now()
 
 # Global instance
 intelligent_risk_engine = IntelligentRiskEngine()
