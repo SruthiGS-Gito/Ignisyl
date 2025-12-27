@@ -958,7 +958,11 @@ async def generate_pdf_report(
 
         # User Activity Report
         if report_type == 'user_activity':
+            print(f"[REPORT] Generating user_activity report...")
             filepath = report_generator.generate_user_activity_report(all_activities, all_users)
+            if not os.path.exists(filepath):
+                raise HTTPException(status_code=500, detail="PDF file was not created")
+            print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
             filename = os.path.basename(filepath)
             return FileResponse(
                 filepath,
@@ -970,7 +974,11 @@ async def generate_pdf_report(
         # Threat Summary Report
         elif report_type == 'threat_summary':
             time_period = report_data.get('time_period', '7d')
+            print(f"[REPORT] Generating threat_summary report for {time_period}...")
             filepath = report_generator.generate_threat_summary_report(all_activities, all_users, time_period)
+            if not os.path.exists(filepath):
+                raise HTTPException(status_code=500, detail="PDF file was not created")
+            print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
             filename = os.path.basename(filepath)
             return FileResponse(
                 filepath,
@@ -981,6 +989,7 @@ async def generate_pdf_report(
 
         # ML Performance Report
         elif report_type == 'ml_performance':
+            print(f"[REPORT] Generating ml_performance report...")
             # Get real ML metrics
             ml_metrics = _get_real_ml_metrics()
             ml_stats = {
@@ -994,6 +1003,9 @@ async def generate_pdf_report(
                 'f1_score': ml_metrics.get('f1_score', 77.0)
             }
             filepath = report_generator.generate_ml_performance_report(all_activities, ml_stats)
+            if not os.path.exists(filepath):
+                raise HTTPException(status_code=500, detail="PDF file was not created")
+            print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
             filename = os.path.basename(filepath)
             return FileResponse(
                 filepath,
@@ -1004,6 +1016,7 @@ async def generate_pdf_report(
 
         # User-specific threat report
         elif report_type == 'user' and user_id:
+            print(f"[REPORT] Generating user-specific report for user_id={user_id}...")
             # Generate user-specific report
             user = user_manager.get_user(user_id)
             if not user:
@@ -1022,7 +1035,8 @@ async def generate_pdf_report(
             filepath = report_generator.generate_threat_report(user, activities, summary_stats)
 
         else:
-            # Generate system-wide report
+            # Generate system-wide report (comprehensive)
+            print(f"[REPORT] Generating comprehensive system report...")
             all_activities = activity_logger.get_recent_activities(limit=500)
             all_users = user_manager.get_all_users()
 
@@ -1038,6 +1052,11 @@ async def generate_pdf_report(
 
             time_period = report_data.get('time_period', '24h')
             filepath = report_generator.generate_system_report(all_activities, system_stats, time_period)
+
+        # Verify file was created
+        if not os.path.exists(filepath):
+            raise HTTPException(status_code=500, detail="PDF file was not created")
+        print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
 
         # Return the PDF file
         filename = os.path.basename(filepath)
