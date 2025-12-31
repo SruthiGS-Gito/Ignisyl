@@ -4,15 +4,26 @@ Stores all detected threats and user activities in database
 """
 
 import sqlite3
+import os
+from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional
 import json
 
 class ActivityLogger:
     """Manages activity logs and threat history"""
-    
-    def __init__(self, db_path: str = "../data/activities.db"):
-        self.db_path = db_path
+
+    def __init__(self, db_path: str = None):
+        # Use absolute path like user_management.py for consistency
+        if db_path is None:
+            backend_dir = Path(__file__).parent.parent.resolve()
+            self.db_path = str(backend_dir / "data" / "activities.db")
+        else:
+            self.db_path = db_path
+
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        print(f"[ACTIVITY] Using database: {self.db_path}")
         self._init_database()
     
     def _init_database(self):

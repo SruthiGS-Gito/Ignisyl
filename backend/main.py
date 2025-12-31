@@ -463,7 +463,7 @@ async def root():
                         <strong>GET</strong> <a href="/api/v1/dashboard/stats">/api/v1/dashboard/stats</a> - Dashboard statistics
                     </div>
                     <div class="endpoint">
-                        <strong>GET</strong> <a href="/api/v1/users/risk">/api/v1/users/risk</a> - User risk assessments
+                        <strong>GET</strong> <a href="/api/v1/users-risk">/api/v1/users-risk</a> - User risk assessments
                     </div>
                     <div class="endpoint">
                         <strong>GET</strong> <a href="/docs">/docs</a> - Interactive API Documentation
@@ -707,13 +707,13 @@ async def analyze_activity(activity_data: Dict):
         print(f"{'='*60}")
         
         user_id = activity_data.get('user_id', 'unknown')
-        print(f"1️⃣ User ID from request: {user_id}")
-        
+        print(f"[1] User ID from request: {user_id}")
+
         # Get user from database
         user = user_manager.get_user(user_id)
-        
+
         if user:
-            print(f"2️⃣ [OK] Found user in database: {user['full_name']}")
+            print(f"[2] [OK] Found user in database: {user['full_name']}")
             
             try:
                 # Log the activity
@@ -736,18 +736,18 @@ async def analyze_activity(activity_data: Dict):
                     }
                 })
                 
-                print(f"3️⃣ [OK] Activity logged successfully! ID: {activity_id}")
-                
+                print(f"[3] [OK] Activity logged successfully! ID: {activity_id}")
+
                 # Update user threat count
                 increment_result = user_manager.increment_threat_count(user_id)
-                print(f"4️⃣ [OK] User threat count updated: {increment_result}")
+                print(f"[4] [OK] User threat count updated: {increment_result}")
                 
             except Exception as log_error:
                 print(f"[ERROR] Error during logging: {log_error}")
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"2️⃣ [ERROR] User NOT found in database!")
+            print(f"[2] [ERROR] User NOT found in database!")
             print(f"   Requested: {user_id}")
             all_users = user_manager.get_all_users()
             print(f"   Available users: {[u['user_id'] for u in all_users]}")
@@ -787,13 +787,23 @@ async def dashboard_stats():
     from models.activity_log import activity_logger
     from services.system_monitor import system_monitor
     from services.ml_performance_tracker import ml_performance_tracker
-    
+    from api.auth import auth_manager
+
     try:
         # Get real user data
         all_users = user_manager.get_all_users()
-        
+
         total_users = len(all_users)
-        active_users = user_manager.get_active_users_count()
+
+        # Get active sessions from auth manager (actual logged-in users)
+        try:
+            active_users = auth_manager.get_active_session_count()
+            # Ensure at least 1 since this endpoint requires authentication
+            if active_users == 0:
+                active_users = 1
+        except Exception as e:
+            print(f"[WARN] Failed to get session count: {e}")
+            active_users = 1  # Fallback: at least current user is active
         
         # Get activity statistics
         activity_stats = activity_logger.get_stats()
@@ -855,37 +865,6 @@ async def dashboard_stats():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Dashboard stats error: {str(e)}")
-
-@app.get("/api/v1/users/risk")
-async def get_user_risks():
-    """Get risk assessments for all users with intelligent scoring"""
-    from models.user_management import user_manager
-    from services.intelligent_risk_engine import intelligent_risk_engine
-    
-    all_users = user_manager.get_all_users()
-    
-    users_risk = []
-    for user in all_users:
-        # Get intelligent risk profile
-        risk_profile = intelligent_risk_engine.get_user_risk_profile(user['user_id'])
-        
-        users_risk.append({
-            "user_id": user['user_id'],
-            "username": user['username'],
-            "full_name": user['full_name'],
-            "department": user['department'],
-            "current_risk_score": risk_profile['current_score'],
-            "peak_risk_score": risk_profile['peak_score'],
-            "risk_level": "LOW" if risk_profile['current_score'] < 30 else 
-                         "MEDIUM" if risk_profile['current_score'] < 50 else 
-                         "HIGH" if risk_profile['current_score'] < 75 else "CRITICAL",
-            "last_activity": user['last_activity'],
-            "total_events": risk_profile['total_events'],
-            "recent_events": risk_profile['recent_events'],
-            "recent_flags": user['total_threats']
-        })
-    
-    return {"users": users_risk, "total_count": len(users_risk)}
 
 @app.post("/api/v1/simulate")
 async def simulate_threat(scenario: Dict):

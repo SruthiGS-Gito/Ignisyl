@@ -699,23 +699,25 @@ async def get_pending_decisions(
 ):
     """
     Get all threats waiting for analyst decision
-    
+
     Returns:
-        List of pending threats requiring analyst review (risk score 50-69)
+        List of pending threats requiring analyst review (risk score 51-75 per IEEE thresholds)
     """
     try:
-        # Verify analyst permission
-        if current_user.get('role') not in ['admin', 'analyst']:
+        # Verify analyst permission (support multiple role formats)
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
+
         # Get recent high-risk activities that need analyst review
-        all_activities = activity_logger.get_recent_activities(limit=200)
-        
-        # Filter for RESTRICT level (risk 50-69) that need review
+        all_activities = activity_logger.get_recent_activities(limit=500)
+
+        # Filter for RESTRICT level (risk 51-75 per IEEE paper) that need review
+        # IEEE Thresholds: 0-30 ALLOW, 31-50 MONITOR, 51-75 RESTRICT (analyst), 76-100 BLOCK (auto)
         pending = [
             activity for activity in all_activities
-            if 50 <= activity['risk_score'] < 70
-            and activity['action'] not in ['BLOCK', 'ISOLATE']  # Not already handled
+            if 50 <= activity['risk_score'] <= 75
+            and activity['action'] not in ['BLOCK', 'ISOLATE']  # Not already auto-handled
         ]
         
         pending_list = []
@@ -742,8 +744,10 @@ async def get_pending_decisions(
         }
         
     except Exception as e:
+        import traceback
         print(f"Error getting pending decisions: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get pending decisions")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to get pending decisions: {str(e)}")
 
 
 @router.post("/analyst/threat/{threat_id}/contact-user")
@@ -890,13 +894,15 @@ async def get_analyst_actions(
         List of actions taken by this analyst
     """
     try:
-        # Verify analyst permission
-        if current_user.get('role') not in ['admin', 'analyst']:
+        # Verify analyst permission (case-insensitive)
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
-        # Get analyst's actions from activity log
-        analyst_id = current_user.get('username')
-        all_activities = activity_logger.get_user_activities(analyst_id, limit=limit)
+
+        # Get analyst's actions from activity log (use user_id, not username)
+        analyst_user_id = current_user.get('user_id')
+        analyst_username = current_user.get('username')
+        all_activities = activity_logger.get_user_activities(analyst_user_id, limit=limit)
         
         # Filter for analyst-specific actions
         analyst_actions = [
@@ -921,7 +927,7 @@ async def get_analyst_actions(
         
         return {
             "success": True,
-            "analyst": analyst_id,
+            "analyst": analyst_username,
             "count": len(actions),
             "actions": actions
         }
@@ -1256,6 +1262,37 @@ async def list_users():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users-risk")
+async def get_user_risks(current_user: dict = Depends(get_current_user)):
+    """Get risk assessments for all users with intelligent scoring"""
+    from services.intelligent_risk_engine import intelligent_risk_engine
+
+    all_users = user_manager.get_all_users()
+
+    users_risk = []
+    for user in all_users:
+        # Get intelligent risk profile
+        risk_profile = intelligent_risk_engine.get_user_risk_profile(user['user_id'])
+
+        users_risk.append({
+            "user_id": user['user_id'],
+            "username": user['username'],
+            "full_name": user['full_name'],
+            "department": user['department'],
+            "current_risk_score": risk_profile['current_score'],
+            "peak_risk_score": risk_profile['peak_score'],
+            "risk_level": "LOW" if risk_profile['current_score'] < 30 else
+                         "MEDIUM" if risk_profile['current_score'] < 50 else
+                         "HIGH" if risk_profile['current_score'] < 75 else "CRITICAL",
+            "last_activity": user['last_activity'],
+            "total_events": risk_profile['total_events'],
+            "recent_events": risk_profile['recent_events'],
+            "recent_flags": user['total_threats']
+        })
+
+    return {"users": users_risk, "total_count": len(users_risk)}
 
 
 @router.get("/users/{user_id}")
