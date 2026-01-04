@@ -3,8 +3,9 @@ API Routes for IGNISYL
 Organized endpoint handlers for the threat detection system
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import Dict, List, Optional
+from fastapi import APIRouter, HTTPException, Query, Depends, Body
+from pydantic import BaseModel, Field
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import pandas as pd
 import os
@@ -12,6 +13,48 @@ from models.activity_log import activity_logger
 from models.user_management import user_manager
 from api.auth import get_current_user
 import psutil
+import logging
+
+
+# ============================================================================
+# PYDANTIC MODELS FOR REQUEST VALIDATION
+# ============================================================================
+
+class AnalystActionRequest(BaseModel):
+    """Request model for analyst firewall actions"""
+    action: str = Field(..., description="Action type: ALLOW, RESTRICT, ISOLATE, or BLOCK")
+    custom_restrictions: Dict[str, Any] = Field(default_factory=dict, description="Custom restriction settings")
+    reason: str = Field(..., min_length=1, description="Justification for the action")
+    duration_minutes: int = Field(default=60, ge=1, le=10080, description="Duration in minutes (1 min to 7 days)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "action": "RESTRICT",
+                "custom_restrictions": {
+                    "block_external_internet": True,
+                    "rate_limit_mbps": 1,
+                    "notify_user": True
+                },
+                "reason": "Suspicious file access detected",
+                "duration_minutes": 60
+            }
+        }
+
+
+class ContactUserRequest(BaseModel):
+    """Request model for contacting a user"""
+    message: str = Field(..., min_length=1, description="Message to send to user")
+    method: str = Field(default="notification", description="Contact method: notification, email, or sms")
+
+
+class EscalateRequest(BaseModel):
+    """Request model for escalating a threat"""
+    escalate_to: str = Field(..., description="Escalation target: admin, manager, or incident_team")
+    notes: str = Field(default="", description="Additional notes for escalation")
+
+# Create logger for routes
+logger = logging.getLogger("ignisyl.api")
 
 router = APIRouter(prefix="/api/v1", tags=["IGNISYL API"])
 
@@ -626,71 +669,115 @@ async def acknowledge_alert(alert_data: Dict):
 @router.post("/analyst/threat/{threat_id}/action")
 async def analyst_take_action(
     threat_id: str,
-    action: str,
-    custom_restrictions: dict,
-    reason: str,
-    duration_minutes: int = 60,
+    request: AnalystActionRequest = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Analyst manually controls threat response
-    
+    Analyst manually controls threat response.
+
+    Applies firewall actions in SIMULATION MODE - commands are logged but not executed.
+    For production deployment, integrate with IGNISYL Agent or enterprise security tools.
+
     Args:
         threat_id: User ID of the threat
-        action: ALLOW, RESTRICT, ISOLATE, or BLOCK
-        custom_restrictions: Custom firewall restrictions
-        reason: Justification for action
-        duration_minutes: How long to apply restriction
+        request: AnalystActionRequest containing action, restrictions, reason, duration
         current_user: Authenticated analyst
-        
+
     Returns:
-        Result of action taken
+        Result of action taken with simulation details
     """
+    import traceback
+
     try:
         from services.firewall_controller import firewall
-        
-        # Verify analyst has permission
-        if current_user.get('role') not in ['admin', 'analyst']:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
-        # Verify user exists
+
+        # Validate action type
+        valid_actions = ["ALLOW", "RESTRICT", "ISOLATE", "BLOCK"]
+        if request.action.upper() not in valid_actions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid action '{request.action}'. Must be one of: {valid_actions}"
+            )
+
+        # Verify analyst has permission (support multiple role formats)
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient permissions. Role '{current_user.get('role')}' cannot apply firewall actions."
+            )
+
+        # Verify target user exists (optional - allow actions on unknown users for flexibility)
         user = user_manager.get_user(threat_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        # Add duration to restrictions
-        custom_restrictions["duration_minutes"] = duration_minutes
-        
-        # Apply firewall action
+        target_username = user.get('username', threat_id) if user else threat_id
+
+        # Prepare restrictions with duration
+        restrictions = dict(request.custom_restrictions)
+        restrictions["duration_minutes"] = request.duration_minutes
+
+        # Apply firewall action (SIMULATION MODE)
+        logger.info(f"[FIREWALL] Analyst {current_user.get('username')} applying {request.action} to {threat_id}")
+
         result = firewall.analyst_override_action(
             user_id=threat_id,
-            action=action,
-            custom_restrictions=custom_restrictions,
+            action=request.action.upper(),
+            custom_restrictions=restrictions,
             analyst_id=current_user.get('username'),
-            reason=reason
+            reason=request.reason
         )
-        
-        # Log the analyst action
-        activity_logger.log_activity({
-            "user_id": current_user.get('username'),
-            "activity_type": "analyst_action",
-            "target_user": threat_id,
-            "action": action,
-            "reason": reason,
-            "timestamp": datetime.now().isoformat()
-        })
-        
+
+        # Log the analyst action to activity database
+        try:
+            activity_logger.log_activity({
+                "user_id": threat_id,
+                "username": target_username,
+                "full_name": user.get('full_name', target_username) if user else target_username,
+                "activity_type": "analyst_action",
+                "timestamp": datetime.now().isoformat(),
+                "risk_score": 0,
+                "risk_level": "LOW",
+                "action": request.action.upper(),
+                "summary": f"Analyst {current_user.get('username')} applied {request.action}: {request.reason}",
+                "details": {
+                    "analyst": current_user.get('username'),
+                    "target_user": threat_id,
+                    "action": request.action.upper(),
+                    "reason": request.reason,
+                    "duration_minutes": request.duration_minutes,
+                    "restrictions": restrictions,
+                    "simulation_mode": True
+                }
+            })
+        except Exception as log_err:
+            logger.warning(f"Failed to log analyst action: {log_err}")
+            # Continue even if logging fails
+
+        logger.info(f"[FIREWALL] Action {request.action} applied successfully (simulation mode)")
+
         return {
             "success": True,
+            "simulation_mode": True,
             "result": result,
-            "message": f"Action {action} applied successfully by {current_user.get('username')}"
+            "action_applied": request.action.upper(),
+            "target_user": threat_id,
+            "applied_by": current_user.get('username'),
+            "duration_minutes": request.duration_minutes,
+            "message": f"Action {request.action.upper()} applied successfully (simulation mode)",
+            "note": "Commands logged but not executed. For real enforcement, deploy IGNISYL Agent."
         }
-        
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
     except ValueError as e:
+        logger.error(f"Validation error in analyst action: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        print(f"Error in analyst action: {e}")
-        raise HTTPException(status_code=500, detail="Failed to apply action")
+        logger.error(f"Error in analyst action: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to apply action: {str(e)}"
+        )
 
 
 @router.get("/analyst/pending-decisions")
@@ -753,133 +840,156 @@ async def get_pending_decisions(
 @router.post("/analyst/threat/{threat_id}/contact-user")
 async def contact_user(
     threat_id: str,
-    message: str,
-    method: str = "notification",  # notification, email, or sms
+    request: ContactUserRequest = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Analyst sends message to user about suspicious activity
-    
+    Analyst sends message to user about suspicious activity.
+
+    In simulation mode, the message is logged but not actually sent.
+    For production, integrate with email/SMS/notification services.
+
     Args:
         threat_id: User ID to contact
-        message: Message to send
-        method: Communication method (notification, email, sms)
+        request: ContactUserRequest with message and method
         current_user: Authenticated analyst
-        
+
     Returns:
-        Confirmation of message sent
+        Confirmation of message sent (simulated)
     """
     try:
-        # Verify analyst permission
-        if current_user.get('role') not in ['admin', 'analyst']:
+        # Verify analyst permission (support multiple role formats)
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
-        # Verify user exists
+
+        # Get user info (optional - allow contacting unknown users)
         user = user_manager.get_user(threat_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
+        target_name = user.get('full_name', threat_id) if user else threat_id
+        target_username = user.get('username', threat_id) if user else threat_id
+
         # Log the contact attempt
-        print(f"[*] Analyst {current_user.get('username')} contacting user {threat_id}")
-        
-        contact_log = {
-            "analyst_id": current_user.get('username'),
-            "user_id": threat_id,
-            "message": message,
-            "method": method,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        # In production, send actual notification via email/SMS/app notification
-        # For now, log it
-        activity_logger.log_activity({
-            "user_id": current_user.get('username'),
-            "activity_type": "analyst_contact",
-            "target_user": threat_id,
-            "message": message,
-            "method": method,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        print(f"User contact logged: {contact_log}")
-        
+        logger.info(f"[CONTACT] Analyst {current_user.get('username')} contacting user {threat_id} via {request.method}")
+
+        # Log to activity database
+        try:
+            activity_logger.log_activity({
+                "user_id": threat_id,
+                "username": target_username,
+                "full_name": target_name,
+                "activity_type": "analyst_contact",
+                "timestamp": datetime.now().isoformat(),
+                "risk_score": 0,
+                "risk_level": "LOW",
+                "action": "CONTACT",
+                "summary": f"Analyst {current_user.get('username')} contacted user via {request.method}",
+                "details": {
+                    "analyst": current_user.get('username'),
+                    "message": request.message,
+                    "method": request.method,
+                    "simulation_mode": True
+                }
+            })
+        except Exception as log_err:
+            logger.warning(f"Failed to log contact: {log_err}")
+
         return {
             "success": True,
-            "status": "message_sent",
-            "method": method,
-            "target_user": user['username'],
+            "simulation_mode": True,
+            "status": "message_logged",
+            "method": request.method,
+            "target_user": target_username,
             "timestamp": datetime.now().isoformat(),
-            "message": f"Message sent to {user['full_name']} via {method}"
+            "message": f"Message to {target_name} logged (simulation mode)",
+            "note": "In production, message would be sent via configured notification service."
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error contacting user: {e}")
-        raise HTTPException(status_code=500, detail="Failed to contact user")
+        logger.error(f"Error contacting user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to contact user: {str(e)}")
 
 
 @router.post("/analyst/threat/{threat_id}/escalate")
 async def escalate_threat(
     threat_id: str,
-    escalate_to: str,  # admin, manager, incident_team
-    notes: str,
+    request: EscalateRequest = Body(...),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Escalate threat to higher authority
-    
+    Escalate threat to higher authority.
+
+    In simulation mode, the escalation is logged but notifications aren't sent.
+    For production, integrate with notification services and incident management.
+
     Args:
         threat_id: User ID of threat
-        escalate_to: Who to escalate to (admin, manager, incident_team)
-        notes: Escalation notes
+        request: EscalateRequest with escalate_to and notes
         current_user: Authenticated analyst
-        
+
     Returns:
-        Escalation confirmation
+        Escalation confirmation (simulated)
     """
     try:
-        # Verify analyst permission
-        if current_user.get('role') not in ['admin', 'analyst']:
+        # Validate escalation target
+        valid_targets = ['admin', 'manager', 'incident_team', 'security_lead', 'ciso']
+        if request.escalate_to.lower() not in valid_targets:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid escalation target. Must be one of: {valid_targets}"
+            )
+
+        # Verify analyst permission (support multiple role formats)
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
-        # Verify user exists
+
+        # Get user info (optional)
         user = user_manager.get_user(threat_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        escalation = {
-            "analyst_id": current_user.get('username'),
-            "user_id": threat_id,
-            "escalated_to": escalate_to,
-            "notes": notes,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        print(f"[WARN] Threat escalated: {escalation}")
-        
-        # Log escalation
-        activity_logger.log_activity({
-            "user_id": current_user.get('username'),
-            "activity_type": "threat_escalation",
-            "target_user": threat_id,
-            "escalated_to": escalate_to,
-            "notes": notes,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        # In production, send notifications to escalation target
-        
+        target_name = user.get('full_name', threat_id) if user else threat_id
+        target_username = user.get('username', threat_id) if user else threat_id
+
+        logger.warning(f"[ESCALATE] Analyst {current_user.get('username')} escalating {threat_id} to {request.escalate_to}")
+
+        # Log escalation to activity database
+        try:
+            activity_logger.log_activity({
+                "user_id": threat_id,
+                "username": target_username,
+                "full_name": target_name,
+                "activity_type": "threat_escalation",
+                "timestamp": datetime.now().isoformat(),
+                "risk_score": 0,
+                "risk_level": "HIGH",
+                "action": "ESCALATE",
+                "summary": f"Threat escalated to {request.escalate_to} by {current_user.get('username')}",
+                "details": {
+                    "analyst": current_user.get('username'),
+                    "escalated_to": request.escalate_to,
+                    "notes": request.notes,
+                    "simulation_mode": True
+                }
+            })
+        except Exception as log_err:
+            logger.warning(f"Failed to log escalation: {log_err}")
+
         return {
             "success": True,
-            "escalated_to": escalate_to,
-            "target_user": user['username'],
+            "simulation_mode": True,
+            "escalated_to": request.escalate_to,
+            "target_user": target_username,
             "analyst": current_user.get('username'),
             "timestamp": datetime.now().isoformat(),
-            "message": f"Threat escalated to {escalate_to}"
+            "message": f"Threat escalated to {request.escalate_to} (simulation mode)",
+            "note": "In production, notifications would be sent to the escalation target."
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error escalating threat: {e}")
-        raise HTTPException(status_code=500, detail="Failed to escalate")
+        logger.error(f"Error escalating threat: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to escalate: {str(e)}")
 
 
 @router.get("/analyst/my-actions")
@@ -946,6 +1056,10 @@ async def generate_pdf_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate a PDF report (comprehensive, user_activity, threat_summary, ml_performance)"""
+    report_type = report_data.get('report_type', 'unknown')
+    user_id = report_data.get('user_id', 'N/A')
+    logger.info(f"[REPORT] Generating {report_type} report (user_id={user_id}) by {current_user.get('username', 'unknown')}")
+    
     from services.report_generator import report_generator
     from fastapi.responses import FileResponse
 
@@ -965,7 +1079,33 @@ async def generate_pdf_report(
         # User Activity Report
         if report_type == 'user_activity':
             print(f"[REPORT] Generating user_activity report...")
-            filepath = report_generator.generate_user_activity_report(all_activities, all_users)
+
+            # If user_id provided, generate full 8-section individual user report
+            if user_id:
+                user = user_manager.get_user(user_id)
+                if not user:
+                    raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+
+                # Get activities for this specific user
+                user_activities = [a for a in all_activities if a.get('user_id') == user_id]
+
+                # Build stats for the user
+                stats = {
+                    'total_activities': len(user_activities),
+                    'threat_count': len([a for a in user_activities if a.get('risk_level') in ['CRITICAL', 'HIGH', 'MEDIUM']]),
+                    'avg_risk_score': sum(a.get('risk_score', 0) for a in user_activities) / max(len(user_activities), 1),
+                    'activity_breakdown': {}
+                }
+                for a in user_activities:
+                    atype = a.get('activity_type', 'UNKNOWN')
+                    stats['activity_breakdown'][atype] = stats['activity_breakdown'].get(atype, 0) + 1
+
+                # Generate full 8-section report with charts
+                filepath = report_generator.generate_individual_user_report(user, user_activities, stats)
+            else:
+                # No user_id: generate summary report for all users
+                filepath = report_generator.generate_threat_summary_report(all_activities, all_users, '7d')
+
             if not os.path.exists(filepath):
                 raise HTTPException(status_code=500, detail="PDF file was not created")
             print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
@@ -1137,6 +1277,9 @@ async def generate_user_report(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate a comprehensive 8-section individual user threat report"""
+    user_id = report_data.get('user_id', 'unknown')
+    logger.info(f"[REPORT] Generating individual user report for {user_id}")
+    
     from fastapi.responses import Response
     from services.report_generator import report_generator
     from services.intelligent_risk_engine import intelligent_risk_engine

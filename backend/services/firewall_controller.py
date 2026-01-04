@@ -1,68 +1,117 @@
 """
 Firewall Controller for IGNISYL
 Manages adaptive firewall rules based on threat detection
+
+SIMULATION MODE (Default):
+- Commands are generated and logged but NOT executed
+- Safe for demo/academic use
+- Actions are recorded in memory and activity database
+
+PRODUCTION MODE (Requires Agent):
+- For real OS-level enforcement, deploy IGNISYL Agent on workstations
+- Agent runs with elevated privileges (SYSTEM/root)
+- Central server sends commands, agents execute locally
+- See docs/FIREWALL_SYSTEM_DOCUMENTATION.md for architecture
 """
 
 import subprocess
 import platform
 import json
+import os
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import asyncio
 import logging
 
-logger = logging.getLogger(__name__) 
+logger = logging.getLogger("ignisyl.firewall")
+
 
 class FirewallController:
     """
-    Controls firewall rules to block/restrict suspicious users
-    Simulates firewall actions for demonstration (actual implementation would use OS-specific commands)
+    Controls firewall rules to block/restrict suspicious users.
+
+    By default, operates in SIMULATION MODE where commands are logged
+    but not executed. This is safe for demos and development.
+
+    For production deployment, integrate with IGNISYL Agent or
+    enterprise security tools (Active Directory, Cisco ISE, etc.)
     """
-    
-    def __init__(self):
-        self.active_rules = {}  # user_id: rule_data
-        self.rule_history = []
+
+    # Simulation mode flag - set to False only if running with proper privileges
+    SIMULATION_MODE = True
+
+    def __init__(self, simulation_mode: bool = True):
+        """
+        Initialize the firewall controller.
+
+        Args:
+            simulation_mode: If True (default), commands are logged but not executed.
+                           If False, will attempt to execute OS commands (requires privileges).
+        """
+        self.simulation_mode = simulation_mode
+        self.active_rules: Dict[str, Dict] = {}  # user_id: rule_data
+        self.rule_history: List[Dict] = []
+        self.action_log: List[Dict] = []  # Persistent action log
         self.os_type = platform.system()  # Windows, Linux, Darwin (macOS)
+
+        if self.simulation_mode:
+            logger.info("[FIREWALL] Initialized in SIMULATION MODE - commands will be logged but not executed")
+        else:
+            logger.warning("[FIREWALL] Initialized in PRODUCTION MODE - commands WILL be executed!")
+            logger.warning("[FIREWALL] Ensure process has appropriate privileges (Administrator/root)")
         
     def apply_block(self, user_id: str, ip_address: str, duration_minutes: int = 60) -> Dict:
         """
-        Block all network access for a user
-        
+        Block all network access for a user.
+
+        In simulation mode: Logs the command but does not execute it.
+        In production mode: Executes the actual OS firewall command.
+
         Args:
             user_id: User identifier
             ip_address: User's IP address to block
-            duration_minutes: How long to maintain the block
-            
+            duration_minutes: How long to maintain the block (0 = indefinite)
+
         Returns:
-            Dict with action details
+            Dict with action details and simulation status
         """
-        expiry_time = datetime.now() + timedelta(minutes=duration_minutes)
-        
+        expiry_time = datetime.now() + timedelta(minutes=duration_minutes) if duration_minutes > 0 else None
+
         rule = {
             "rule_id": f"block_{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
             "user_id": user_id,
             "ip_address": ip_address,
             "action": "BLOCK",
             "applied_at": datetime.now().isoformat(),
-            "expires_at": expiry_time.isoformat(),
-            "status": "active"
+            "expires_at": expiry_time.isoformat() if expiry_time else "indefinite",
+            "status": "active",
+            "simulation_mode": self.simulation_mode
         }
-        
-        # Simulate firewall command (in production, this would execute actual commands)
+
+        # Generate OS-specific firewall command
         firewall_command = self._get_block_command(ip_address)
-        
+
+        # Execute or simulate
+        execution_result = self._execute_command(firewall_command, "BLOCK", user_id)
+
         # Store active rule
         self.active_rules[user_id] = rule
         self.rule_history.append(rule)
-        
-        print(f"[*] BLOCKED user {user_id} at {ip_address}")
-        print(f"   Command: {firewall_command}")
-        
+
+        # Log to action log
+        self._log_action("BLOCK", user_id, ip_address, firewall_command, execution_result)
+
+        logger.info(f"[FIREWALL] BLOCK applied to {user_id} at {ip_address}")
+        logger.info(f"[FIREWALL] Command: {firewall_command}")
+        logger.info(f"[FIREWALL] Mode: {'SIMULATION' if self.simulation_mode else 'PRODUCTION'}")
+
         return {
             "success": True,
+            "simulation_mode": self.simulation_mode,
             "rule": rule,
-            "simulated_command": firewall_command,
-            "message": f"User {user_id} blocked until {expiry_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            "command": firewall_command,
+            "execution_result": execution_result,
+            "message": f"User {user_id} blocked" + (f" until {expiry_time.strftime('%Y-%m-%d %H:%M:%S')}" if expiry_time else " indefinitely")
         }
     
     def apply_restriction(self, user_id: str, ip_address: str, restrictions: List[str], duration_minutes: int = 30) -> Dict:
@@ -198,6 +247,147 @@ class FirewallController:
             return f'iptables -A OUTPUT -s {ip_address} -p tcp -m multiport --dports {port_list} -j DROP'
         else:
             return f'# Block ports {port_list} for {ip_address}'
+
+    # ============================================================================
+    # COMMAND EXECUTION AND LOGGING HELPERS
+    # ============================================================================
+
+    def _execute_command(self, command: str, action_type: str, user_id: str) -> Dict[str, Any]:
+        """
+        Execute or simulate a firewall command.
+
+        In simulation mode: Returns success without executing.
+        In production mode: Attempts to execute the command.
+
+        Args:
+            command: The OS command to execute
+            action_type: Type of action (BLOCK, RESTRICT, etc.)
+            user_id: Target user ID
+
+        Returns:
+            Dict with execution status and details
+        """
+        if self.simulation_mode:
+            return {
+                "executed": False,
+                "simulated": True,
+                "command": command,
+                "status": "success",
+                "message": f"Command logged (simulation mode)"
+            }
+
+        # Production mode - attempt actual execution
+        try:
+            # Check for admin/root privileges
+            if self.os_type == "Windows":
+                import ctypes
+                is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
+            else:
+                is_admin = os.geteuid() == 0
+
+            if not is_admin:
+                return {
+                    "executed": False,
+                    "simulated": False,
+                    "command": command,
+                    "status": "failed",
+                    "error": "Insufficient privileges - requires Administrator/root"
+                }
+
+            # Execute the command
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            return {
+                "executed": True,
+                "simulated": False,
+                "command": command,
+                "status": "success" if result.returncode == 0 else "failed",
+                "return_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr
+            }
+
+        except subprocess.TimeoutExpired:
+            return {
+                "executed": False,
+                "simulated": False,
+                "command": command,
+                "status": "failed",
+                "error": "Command timed out after 30 seconds"
+            }
+        except Exception as e:
+            return {
+                "executed": False,
+                "simulated": False,
+                "command": command,
+                "status": "failed",
+                "error": str(e)
+            }
+
+    def _log_action(self, action_type: str, user_id: str, ip_address: Optional[str],
+                    command: str, execution_result: Dict) -> None:
+        """
+        Log a firewall action to the action log.
+
+        Args:
+            action_type: Type of action (BLOCK, RESTRICT, ISOLATE, ALLOW)
+            user_id: Target user ID
+            ip_address: Target IP address (if known)
+            command: The command that was/would be executed
+            execution_result: Result of execution or simulation
+        """
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action_type": action_type,
+            "user_id": user_id,
+            "ip_address": ip_address,
+            "command": command,
+            "simulation_mode": self.simulation_mode,
+            "execution_result": execution_result,
+            "os_type": self.os_type
+        }
+
+        self.action_log.append(log_entry)
+
+        # Keep only the last 1000 entries to prevent memory issues
+        if len(self.action_log) > 1000:
+            self.action_log = self.action_log[-1000:]
+
+        logger.debug(f"[FIREWALL] Action logged: {action_type} for {user_id}")
+
+    def get_action_log(self, limit: int = 100) -> List[Dict]:
+        """
+        Get recent firewall action log entries.
+
+        Args:
+            limit: Maximum number of entries to return
+
+        Returns:
+            List of action log entries, most recent first
+        """
+        return list(reversed(self.action_log[-limit:]))
+
+    def get_simulation_status(self) -> Dict[str, Any]:
+        """
+        Get current simulation mode status and statistics.
+
+        Returns:
+            Dict with simulation status and action statistics
+        """
+        return {
+            "simulation_mode": self.simulation_mode,
+            "os_type": self.os_type,
+            "active_rules_count": len(self.active_rules),
+            "total_actions_logged": len(self.action_log),
+            "rule_history_count": len(self.rule_history),
+            "message": "Commands are logged but NOT executed" if self.simulation_mode else "Commands ARE being executed"
+        }
     
     def _get_remove_command(self, ip_address: str) -> str:
         """Generate command to remove firewall rule"""

@@ -76,9 +76,8 @@ const Reports = () => {
     try {
       const response = await reportAPI.generateReport(type);
 
-      // Create download link
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
+      // response.data is already a Blob - use it directly
+      const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
       a.download = `IGNISYL_${type}_Report_${new Date().toISOString().split('T')[0]}.pdf`;
@@ -116,9 +115,8 @@ const Reports = () => {
     try {
       const response = await reportAPI.generateUserReport(selectedUserId);
 
-      // Create download link
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
+      // response.data is already a Blob - use it directly
+      const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
       const username = selectedUser ? selectedUser.username : 'user';
@@ -140,8 +138,8 @@ const Reports = () => {
   const downloadReport = async (filename) => {
     try {
       const response = await reportAPI.downloadReport(filename);
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
+      // response.data is already a Blob - use it directly
+      const url = window.URL.createObjectURL(response.data);
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;

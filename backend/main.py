@@ -61,7 +61,18 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
-from api import routes 
+from api import routes
+
+# Import logging middleware
+try:
+    from core.middleware import (
+        RequestLoggingMiddleware, log_startup_banner,
+        log_component_status, log_ready
+    )
+    LOGGING_MIDDLEWARE_AVAILABLE = True
+except ImportError:
+    LOGGING_MIDDLEWARE_AVAILABLE = False
+    print("[WARN] Logging middleware not available") 
 
 # Include the router
 app.include_router(routes.router)
@@ -78,6 +89,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add request logging middleware
+if LOGGING_MIDDLEWARE_AVAILABLE:
+    app.add_middleware(RequestLoggingMiddleware)
 
 # Global instances
 ml_detector = None
