@@ -19,24 +19,44 @@ import logging
 # ============================================================================
 # PYDANTIC MODELS FOR REQUEST VALIDATION
 # ============================================================================
-
+def _normalize_db_user(user_obj):
+    """
+    CRITICAL FIX: Converts SQLAlchemy DB Object to Dictionary.
+    Prevents 'AttributeError: object has no attribute get' crashes in API routes.
+    """
+    if not user_obj:
+        return None
+    
+    # If it's already a dictionary, return it safely
+    if isinstance(user_obj, dict):
+        return user_obj
+        
+    # Convert Object -> Dict manually
+    return {
+        "user_id": getattr(user_obj, "user_id", "N/A"),
+        "username": getattr(user_obj, "username", "Unknown"),
+        "full_name": getattr(user_obj, "full_name", "Unknown"),
+        "email": getattr(user_obj, "email", "N/A"),
+        "department": getattr(user_obj, "department", "N/A"),
+        "role": getattr(user_obj, "role", "N/A"),
+        "current_risk_score": getattr(user_obj, "current_risk_score", 0)
+    }
 class AnalystActionRequest(BaseModel):
-    """Request model for analyst firewall actions"""
+    """Request model for analyst firewall actions (Robust)"""
     action: str = Field(..., description="Action type: ALLOW, RESTRICT, ISOLATE, or BLOCK")
-    custom_restrictions: Dict[str, Any] = Field(default_factory=dict, description="Custom restriction settings")
-    reason: str = Field(..., min_length=1, description="Justification for the action")
-    duration_minutes: int = Field(default=60, ge=1, le=10080, description="Duration in minutes (1 min to 7 days)")
+    # Change: Default to empty dict
+    custom_restrictions: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    # Change: Allow empty reasons by providing a default
+    reason: Optional[str] = Field(default="No reason provided by analyst")
+    # Change: Relax constraints to prevent 422 errors on type mismatch
+    duration_minutes: Optional[int] = Field(default=60)
 
     class Config:
         json_schema_extra = {
             "example": {
                 "action": "RESTRICT",
-                "custom_restrictions": {
-                    "block_external_internet": True,
-                    "rate_limit_mbps": 1,
-                    "notify_user": True
-                },
-                "reason": "Suspicious file access detected",
+                "custom_restrictions": {},
+                "reason": "Suspicious behavior",
                 "duration_minutes": 60
             }
         }
@@ -409,84 +429,127 @@ async def get_user_profile(user_id: str):
     activities = activity_logger.get_user_activities(user_id, limit=100)
     
     # Calculate behavioral patterns from real data
-    if activities:
-        # Extract hours from activities
-        activity_hours = []
-        for activity in activities:
-            try:
-                timestamp = datetime.fromisoformat(activity['timestamp'])
-                activity_hours.append(timestamp.hour)
-            except:
-                pass
-        
-        typical_hours = [min(activity_hours), max(activity_hours)] if activity_hours else [9, 17]
-        
-        # Count activity types
-        activity_types = {}
-        for activity in activities:
-            act_type = activity['activity_type']
-            activity_types[act_type] = activity_types.get(act_type, 0) + 1
-        
-        common_activities = sorted(activity_types.keys(), 
-                                   key=lambda x: activity_types[x], 
-                                   reverse=True)[:3]
-        
-        # Count recent flags (high risk activities)
-        recent_flags = len([a for a in activities if a['risk_level'] in ['HIGH', 'CRITICAL']])
-        
-        # Get risk history (last 10 activities)
-        historical_risk = [a['risk_score'] for a in activities[:10]]
-    else:
-        typical_hours = [9, 17]
-        common_activities = []
-        recent_flags = 0
-        historical_risk = []
-    
-    profile = {
-        "user_id": user['user_id'],
-        "username": user['username'],
-        "full_name": user['full_name'],
-        "department": user['department'],
-        "role": user['role'],
-        "email": user.get('email'),
-        "risk_score": user['current_risk_score'],
-        "risk_level": "LOW" if user['current_risk_score'] < 30 else 
-                     "MEDIUM" if user['current_risk_score'] < 70 else "HIGH",
-        "account_created": user['registered_at'],
-        "last_activity": user['last_activity'],
-        "behavioral_patterns": {
-            "typical_login_hours": typical_hours,
-            "common_activities": common_activities,
-            "total_activities": len(activities),
-        },
-        "recent_flags": recent_flags,
-        "total_threats": user['total_threats'],
-        "historical_risk": historical_risk,
-        "status": user['status']
-    }
-    
-    return profile
+@router.post("/analyst/threat/{threat_id}/action")
+async def analyst_take_action(
+    threat_id: str,
+    request: AnalystActionRequest = Body(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Analyst manually controls threat response.
+    Applies firewall actions in SIMULATION MODE.
+    """
+    import traceback
 
-@router.get("/threats/active")
-async def get_active_threats(current_user: dict = Depends(get_current_user)):
-    """Get currently active threats requiring attention - role-based"""
+    try:
+        from services.firewall_controller import firewall
 
-    # Role-based access control
-    role = current_user.get('role', '').lower()
-    is_admin = role in ['administrator', 'admin', 'security analyst']
-    requesting_user_id = current_user.get('user_id')
+        # Validate action type
+        valid_actions = ["ALLOW", "RESTRICT", "ISOLATE", "BLOCK"]
+        if request.action.upper() not in valid_actions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid action '{request.action}'. Must be one of: {valid_actions}"
+            )
 
-    # Get activities based on role
-    if is_admin:
-        all_activities = activity_logger.get_recent_activities(limit=100)
-    else:
-        all_activities = activity_logger.get_user_activities(requesting_user_id, limit=100)
+        # Verify analyst has permission
+        role = current_user.get('role', '').lower()
+        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient permissions. Role '{current_user.get('role')}' cannot apply firewall actions."
+            )
+
+        # --- FIX START: Normalize the user object ---
+        # Get user and convert to dictionary immediately to prevent .get() crashes
+        raw_user = user_manager.get_user(threat_id)
+        user = _normalize_db_user(raw_user) 
+        # --- FIX END ---
+
+        target_username = user.get('username', threat_id) if user else threat_id
+        target_name = user.get('full_name', target_username) if user else target_username
+
+        # Prepare restrictions with duration
+        restrictions = dict(request.custom_restrictions)
+        restrictions["duration_minutes"] = request.duration_minutes
+
+        # Apply firewall action (SIMULATION MODE)
+        logger.info(f"[FIREWALL] Analyst {current_user.get('username')} applying {request.action} to {threat_id}")
+
+        result = firewall.analyst_override_action(
+            user_id=threat_id,
+            action=request.action.upper(),
+            custom_restrictions=restrictions,
+            analyst_id=current_user.get('username'),
+            reason=request.reason
+        )
+
+        # Update user status in database to reflect action
+        status_map = {
+            "ALLOW": "active",
+            "RESTRICT": "restricted",
+            "ISOLATE": "isolated",
+            "BLOCK": "blocked"
+        }
+        new_status = status_map.get(request.action.upper(), "active")
+        try:
+            user_manager.update_user_status(threat_id, new_status, request.reason)
+            logger.info(f"[STATUS] User {threat_id} status updated to: {new_status}")
+        except Exception as status_err:
+            logger.warning(f"Failed to update user status: {status_err}")
+
+        # Log the analyst action to activity database
+        try:
+            activity_logger.log_activity({
+                "user_id": threat_id,
+                "username": target_username,
+                "full_name": target_name,
+                "activity_type": "analyst_action",
+                "timestamp": datetime.now().isoformat(),
+                "risk_score": 0,
+                "risk_level": "LOW",
+                "action": request.action.upper(),
+                "summary": f"Analyst {current_user.get('username')} applied {request.action}: {request.reason}",
+                "details": {
+                    "analyst": current_user.get('username'),
+                    "target_user": threat_id,
+                    "action": request.action.upper(),
+                    "reason": request.reason,
+                    "duration": request.duration_minutes,
+                    "restrictions": restrictions,
+                    "simulation_mode": True
+                }
+            })
+        except Exception as log_err:
+            logger.warning(f"Failed to log analyst action: {log_err}")
+
+        logger.info(f"[FIREWALL] Action {request.action} applied successfully (simulation mode)")
+
+        return {
+            "success": True,
+            "simulation_mode": True,
+            "result": result,
+            "action_applied": request.action.upper(),
+            "target_user": threat_id,
+            "applied_by": current_user.get('username'),
+            "duration_minutes": request.duration_minutes,
+            "message": f"Action {request.action.upper()} applied successfully (simulation mode)",
+            "note": "Commands logged but not executed. For real enforcement, deploy IGNISYL Agent."
+        }
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except ValueError as e:
+        logger.error(f"Validation error in analyst action: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error in analyst action: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to apply action: {str(e)}"
+        )
     
-    # Filter for HIGH and CRITICAL risk levels
-    active_threats = [
-        activity for activity in all_activities 
-        if activity['risk_level'] in ['HIGH', 'CRITICAL']
-    ]
     
     # Format threats
     threats = []
@@ -725,6 +788,20 @@ async def analyst_take_action(
             analyst_id=current_user.get('username'),
             reason=request.reason
         )
+
+        # Update user status in database to reflect action
+        status_map = {
+            "ALLOW": "active",
+            "RESTRICT": "restricted",
+            "ISOLATE": "isolated",
+            "BLOCK": "blocked"
+        }
+        new_status = status_map.get(request.action.upper(), "active")
+        try:
+            user_manager.update_user_status(threat_id, new_status, request.reason)
+            logger.info(f"[STATUS] User {threat_id} status updated to: {new_status}")
+        except Exception as status_err:
+            logger.warning(f"Failed to update user status: {status_err}")
 
         # Log the analyst action to activity database
         try:

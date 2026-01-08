@@ -215,6 +215,15 @@ const AnalystControl = () => {
                         <td>
                           <div className="user-name">{threat.full_name}</div>
                           <div className="user-id">{threat.username}</div>
+                          {threat.status === 'isolated' && (
+                            <span className="status-badge isolated">Currently Isolated</span>
+                          )}
+                          {threat.status === 'restricted' && (
+                            <span className="status-badge restricted">Currently Restricted</span>
+                          )}
+                          {threat.status === 'blocked' && (
+                            <span className="status-badge blocked">Currently Blocked</span>
+                          )}
                         </td>
                         <td>
                           <div className="activity-type">{threat.activity_type?.replace(/_/g, ' ')}</div>

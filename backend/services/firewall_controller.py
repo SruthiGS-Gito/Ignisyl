@@ -60,6 +60,9 @@ class FirewallController:
             logger.warning("[FIREWALL] Initialized in PRODUCTION MODE - commands WILL be executed!")
             logger.warning("[FIREWALL] Ensure process has appropriate privileges (Administrator/root)")
         
+        # Load active rules from database on startup
+        self._load_active_rules_from_db()
+        
     def apply_block(self, user_id: str, ip_address: str, duration_minutes: int = 60) -> Dict:
         """
         Block all network access for a user.
@@ -642,11 +645,111 @@ class FirewallController:
             "reason": reason
         })
         
+        # Persist rule to database for recovery on restart
+        duration_minutes = custom_restrictions.get('duration_minutes', 60)
+        expires_at = datetime.now() + timedelta(minutes=duration_minutes)
+        self._persist_rule_to_db(
+            user_id=user_id,
+            action=action,
+            restrictions=custom_restrictions,
+            analyst_id=analyst_id,
+            reason=reason,
+            expires_at=expires_at
+        )
+        
         return result
     
     # ============================================================================
     # HELPER METHODS FOR GRADUATED RESPONSE
     # ============================================================================
+    
+    def _persist_rule_to_db(self, user_id: str, action: str, restrictions: dict,
+                            analyst_id: str, reason: str, expires_at):
+        """Store firewall rule in database for persistence across restarts"""
+        import sqlite3
+        try:
+            conn = sqlite3.connect('data/sessions.db')
+            cursor = conn.cursor()
+            
+            # Create table if not exists
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS firewall_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    action TEXT,
+                    restrictions TEXT,
+                    analyst_id TEXT,
+                    reason TEXT,
+                    created_at TIMESTAMP,
+                    expires_at TIMESTAMP,
+                    status TEXT DEFAULT 'active'
+                )
+            ''')
+            
+            # Deactivate any existing rules for this user
+            cursor.execute('''
+                UPDATE firewall_rules SET status='superseded' 
+                WHERE user_id=? AND status='active'
+            ''', (user_id,))
+            
+            cursor.execute('''
+                INSERT INTO firewall_rules 
+                (user_id, action, restrictions, analyst_id, reason, 
+                 created_at, expires_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+            ''', (
+                user_id, action, json.dumps(restrictions), 
+                analyst_id, reason, datetime.now(), expires_at
+            ))
+            conn.commit()
+            conn.close()
+            logger.info(f"[FIREWALL] Persisted rule for {user_id}: {action}")
+        except Exception as e:
+            logger.error(f"Failed to persist firewall rule: {e}")
+    
+    def _load_active_rules_from_db(self):
+        """Load unexpired rules from database on startup"""
+        import sqlite3
+        try:
+            conn = sqlite3.connect('data/sessions.db')
+            cursor = conn.cursor()
+            
+            # Check if table exists
+            cursor.execute('''
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='firewall_rules'
+            ''')
+            if not cursor.fetchone():
+                conn.close()
+                return
+            
+            # Get active rules that haven't expired
+            # Use strftime format to match SQLite datetime format (space separator)
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            cursor.execute('''
+                SELECT user_id, action, restrictions, expires_at
+                FROM firewall_rules
+                WHERE status='active'
+                AND expires_at > ?
+            ''', (now_str,))
+            
+            loaded_count = 0
+            for row in cursor.fetchall():
+                user_id, action, restrictions_json, expires_at = row
+                self.active_rules[user_id] = {
+                    'action': action,
+                    'restrictions': json.loads(restrictions_json) if restrictions_json else {},
+                    'expires_at': expires_at
+                }
+                loaded_count += 1
+                logger.info(f"[FIREWALL] Restored rule for {user_id}: {action}")
+            
+            if loaded_count > 0:
+                logger.info(f"[FIREWALL] Loaded {loaded_count} active rules from database")
+            
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to load rules from DB: {e}")
     
     def _get_user_ip(self, user_id: str) -> str:
         """Get user's current IP address from activity logs"""
