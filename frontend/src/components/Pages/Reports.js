@@ -13,7 +13,49 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState({});
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [dateRange, setDateRange] = useState('7days');
+  const [generatingBulk, setGeneratingBulk] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState({ active: false, current: 0, total: 8, section: '' });
   const toast = useToast();
+
+  // Simulate report generation progress
+  const simulateProgress = (callback) => {
+    const sections = [
+      'Header & Metadata',
+      'User Profile',
+      'Activity History',
+      'Threat Analysis',
+      'Behavioral Patterns',
+      'ML Predictions',
+      'Actions Taken',
+      'Executive Summary'
+    ];
+
+    setGenerationProgress({ active: true, current: 0, total: 8, section: sections[0] });
+
+    let currentSection = 0;
+    const interval = setInterval(() => {
+      currentSection++;
+      if (currentSection < sections.length) {
+        setGenerationProgress({
+          active: true,
+          current: currentSection,
+          total: 8,
+          section: sections[currentSection]
+        });
+      } else {
+        clearInterval(interval);
+      }
+    }, 400); // Progress every 400ms
+
+    return () => {
+      clearInterval(interval);
+      setGenerationProgress({ active: false, current: 0, total: 8, section: '' });
+    };
+  };
+
+  // Get high-risk users (risk score >= 60)
+  const highRiskUsers = users.filter(u => (u.current_risk_score || 0) >= 60);
 
   useEffect(() => {
     loadData();
@@ -73,8 +115,11 @@ const Reports = () => {
 
   const generateReport = async (type, title) => {
     setGenerating(prev => ({ ...prev, [type]: true }));
+    const cleanup = simulateProgress();
+
     try {
-      const response = await reportAPI.generateReport(type);
+      // Pass date range to API for filtering
+      const response = await reportAPI.generateReport(type, { date_range: dateRange });
 
       // response.data is already a Blob - use it directly
       const url = window.URL.createObjectURL(response.data);
@@ -92,6 +137,7 @@ const Reports = () => {
       console.error('Error generating report:', error);
       toast.error('Failed to generate report: ' + (error.response?.data?.detail || error.message));
     }
+    cleanup();
     setGenerating(prev => ({ ...prev, [type]: false }));
   };
 
@@ -153,10 +199,64 @@ const Reports = () => {
     }
   };
 
+  // Generate reports for all high-risk users
+  const generateHighRiskReports = async () => {
+    if (highRiskUsers.length === 0) {
+      toast.warning('No high-risk users found (risk score >= 60)');
+      return;
+    }
+
+    if (!window.confirm(`Generate reports for ${highRiskUsers.length} high-risk user(s)?`)) {
+      return;
+    }
+
+    setGeneratingBulk(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const user of highRiskUsers) {
+      try {
+        const response = await reportAPI.generateUserReport(user.user_id);
+        const url = window.URL.createObjectURL(response.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `IGNISYL_User_Report_${user.username}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate report for ${user.username}:`, error);
+        failCount++;
+      }
+    }
+
+    setGeneratingBulk(false);
+    loadReports();
+
+    if (failCount === 0) {
+      toast.success(`Generated ${successCount} reports successfully!`);
+    } else {
+      toast.warning(`Generated ${successCount} reports, ${failCount} failed`);
+    }
+  };
+
   const formatFileSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  // Extract report type from filename
+  const getReportType = (filename) => {
+    if (filename.includes('comprehensive')) return { type: 'Comprehensive', icon: '📊', color: '#667eea' };
+    if (filename.includes('individual') || filename.includes('threat_report')) return { type: 'User Report', icon: '👤', color: '#28a745' };
+    if (filename.includes('ml_report') || filename.includes('ml_performance')) return { type: 'ML Performance', icon: '📈', color: '#17a2b8' };
+    if (filename.includes('threat_summary')) return { type: 'Threat Summary', icon: '🚨', color: '#dc3545' };
+    if (filename.includes('user_activity') || filename.includes('activity')) return { type: 'Activity Report', icon: '👥', color: '#ffc107' };
+    if (filename.includes('system')) return { type: 'System Report', icon: '🖥️', color: '#6c757d' };
+    return { type: 'Report', icon: '📄', color: '#6c757d' };
   };
 
   if (loading) {
@@ -171,6 +271,28 @@ const Reports = () => {
           <div>
             <h1 className="admin-title">Reports</h1>
             <p className="admin-subtitle">Generate and download security reports</p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ color: '#a8d0ff', fontSize: '13px' }}>Date Range:</label>
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#1a252f',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '13px'
+                }}
+              >
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="90days">Last 90 Days</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -236,6 +358,183 @@ const Reports = () => {
               >
                 {generating.ml_performance ? 'Generating...' : 'Generate PDF'}
               </button>
+            </div>
+
+            {/* High-Risk User Reports - Full Width Professional Card */}
+            <div className="report-card" style={{ gridColumn: 'span 2' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '16px' }}>
+                <div className="report-icon" style={{ color: '#dc3545', fontSize: '32px' }}>&#9888;</div>
+                <div style={{ flex: 1 }}>
+                  <div className="report-title" style={{ marginBottom: '8px' }}>High-Risk User Reports</div>
+                  <div className="report-desc" style={{ marginBottom: '0' }}>
+                    Generate comprehensive security reports for users with risk score &ge; 60.
+                    These reports are suitable for HR review, legal documentation, and security audits.
+                  </div>
+                </div>
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: highRiskUsers.length > 0 ? 'rgba(220, 53, 69, 0.2)' : 'rgba(40, 167, 69, 0.2)',
+                  border: `1px solid ${highRiskUsers.length > 0 ? 'rgba(220, 53, 69, 0.4)' : 'rgba(40, 167, 69, 0.4)'}`,
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '24px', fontWeight: 'bold', color: highRiskUsers.length > 0 ? '#dc3545' : '#28a745' }}>
+                    {highRiskUsers.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>
+                    {highRiskUsers.length === 1 ? 'User' : 'Users'}
+                  </div>
+                </div>
+              </div>
+
+              {/* High-Risk Users List */}
+              {highRiskUsers.length > 0 ? (
+                <div style={{
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px'
+                }}>
+                  <div style={{ fontSize: '12px', color: '#a8d0ff', marginBottom: '10px', fontWeight: 'bold' }}>
+                    Detected High-Risk Users:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {highRiskUsers.map((user, idx) => {
+                      const riskScore = user.current_risk_score || 0;
+                      const riskInfo = getRiskLevel(riskScore);
+                      return (
+                        <div key={user.user_id || idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          backgroundColor: 'rgba(255,255,255,0.03)',
+                          borderRadius: '6px',
+                          borderLeft: `3px solid ${riskInfo.color}`
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              backgroundColor: `${riskInfo.color}30`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: riskInfo.color,
+                              fontWeight: 'bold',
+                              fontSize: '14px'
+                            }}>
+                              {(user.full_name || user.username || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 'bold', color: '#fff', fontSize: '14px' }}>
+                                {user.full_name || user.username}
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
+                                {user.department || 'N/A'} &bull; {user.role || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px'
+                          }}>
+                            <div style={{
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              backgroundColor: riskInfo.bg,
+                              border: `1px solid ${riskInfo.color}`,
+                              color: riskInfo.color,
+                              fontWeight: 'bold',
+                              fontSize: '12px'
+                            }}>
+                              {riskInfo.level}
+                            </div>
+                            <div style={{
+                              fontWeight: 'bold',
+                              fontSize: '16px',
+                              color: riskInfo.color,
+                              minWidth: '50px',
+                              textAlign: 'right'
+                            }}>
+                              {riskScore.toFixed(0)}/100
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  marginBottom: '16px',
+                  textAlign: 'center',
+                  border: '1px solid rgba(40, 167, 69, 0.3)'
+                }}>
+                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>&#10003;</div>
+                  <div style={{ color: '#28a745', fontWeight: 'bold', marginBottom: '4px' }}>
+                    No High-Risk Users Detected
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                    All users are currently within acceptable risk thresholds
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn-admin btn-primary"
+                  onClick={generateHighRiskReports}
+                  disabled={highRiskUsers.length === 0 || generatingBulk}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: highRiskUsers.length > 0 ? '#dc3545' : 'rgba(255,255,255,0.1)',
+                    opacity: highRiskUsers.length === 0 ? 0.5 : 1
+                  }}
+                >
+                  {generatingBulk
+                    ? 'Generating Reports...'
+                    : highRiskUsers.length === 0
+                      ? 'No Reports to Generate'
+                      : `Generate All Reports (${highRiskUsers.length})`
+                  }
+                </button>
+                {highRiskUsers.length > 0 && (
+                  <select
+                    className="admin-select"
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedUserId(e.target.value);
+                        setShowConfirmDialog(true);
+                      }
+                    }}
+                    value=""
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      backgroundColor: '#1a252f',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Select Individual User...</option>
+                    {highRiskUsers.map(user => (
+                      <option key={user.user_id} value={user.user_id}>
+                        {user.full_name || user.username} (Risk: {(user.current_risk_score || 0).toFixed(0)})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
 
             {/* Enhanced Individual User Report Card */}
@@ -414,14 +713,21 @@ const Reports = () => {
 
         {/* Previous Reports */}
         <div className="admin-card">
-          <h3 className="card-title">Previous Reports</h3>
+          <h3 className="card-title">Previous Reports ({reports.length})</h3>
           {reports.length === 0 ? (
-            <div className="empty-state">No reports generated yet</div>
+            <div className="empty-state">
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+              <div style={{ fontSize: '16px', marginBottom: '8px' }}>No reports generated yet</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>
+                Generate a report above to see it here
+              </div>
+            </div>
           ) : (
             <div className="users-table-container">
               <table className="admin-table">
                 <thead>
                   <tr>
+                    <th>Type</th>
                     <th>Filename</th>
                     <th>Size</th>
                     <th>Created</th>
@@ -429,27 +735,46 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reports.map((report, index) => (
-                    <tr key={index}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontSize: '24px' }}>📄</span>
-                          <span>{report.filename}</span>
-                        </div>
-                      </td>
-                      <td>{formatFileSize(report.size_bytes)}</td>
-                      <td>{new Date(report.created_at).toLocaleString()}</td>
-                      <td>
-                        <button
-                          className="btn-admin btn-primary"
-                          style={{ padding: '6px 12px', fontSize: '13px' }}
-                          onClick={() => downloadReport(report.filename)}
-                        >
-                          Download
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {reports.map((report, index) => {
+                    const reportInfo = getReportType(report.filename);
+                    return (
+                      <tr key={index}>
+                        <td>
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            backgroundColor: `${reportInfo.color}20`,
+                            border: `1px solid ${reportInfo.color}40`
+                          }}>
+                            <span>{reportInfo.icon}</span>
+                            <span style={{ color: reportInfo.color, fontSize: '12px', fontWeight: 'bold' }}>
+                              {reportInfo.type}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '20px' }}>📄</span>
+                            <span style={{ fontSize: '13px' }}>{report.filename}</span>
+                          </div>
+                        </td>
+                        <td>{formatFileSize(report.size_bytes)}</td>
+                        <td>{new Date(report.created_at).toLocaleString()}</td>
+                        <td>
+                          <button
+                            className="btn-admin btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '13px' }}
+                            onClick={() => downloadReport(report.filename)}
+                          >
+                            Download
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -543,6 +868,77 @@ const Reports = () => {
           </div>
         </div>
       );})()}
+
+      {/* Report Generation Progress Overlay */}
+      {generationProgress.active && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}>
+          <div style={{
+            backgroundColor: '#1a1a2e',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            border: '1px solid rgba(102, 126, 234, 0.3)'
+          }}>
+            <div style={{
+              width: '60px',
+              height: '60px',
+              border: '4px solid rgba(102, 126, 234, 0.2)',
+              borderTop: '4px solid #667eea',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 20px'
+            }}></div>
+
+            <h3 style={{ color: '#fff', marginBottom: '8px', fontSize: '18px' }}>
+              Generating Report...
+            </h3>
+
+            <div style={{
+              color: '#667eea',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}>
+              {generationProgress.current + 1}/{generationProgress.total} sections complete
+            </div>
+
+            <div style={{
+              height: '8px',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              marginBottom: '12px'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${((generationProgress.current + 1) / generationProgress.total) * 100}%`,
+                backgroundColor: '#667eea',
+                transition: 'width 0.3s ease',
+                borderRadius: '4px'
+              }}></div>
+            </div>
+
+            <div style={{
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '13px'
+            }}>
+              Processing: {generationProgress.section}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CSS for spinner animation */}
       <style>{`

@@ -25,6 +25,7 @@ MANIFEST
 
 # Virtual Environment
 venv/
+.venv/
 env/
 ENV/
 env.bak/
@@ -104,6 +105,16 @@ Thumbs.db
 temp/
 tmp/
 
+# Claude Code temporary files
+*.cwd
+*tmpclaude*
+
+# Test reports and results
+*test_report_*
+*complete_test_report_*
+*_comparison_results.json
+validation_results*.json
+
 # Backup files
 *.bak
 *.backup
@@ -117,6 +128,8 @@ poetry.lock
 *_secret.json
 *_credentials.json
 config/secrets.json
+.secret_key
+backend/data/.secret_key
 
 # Large data files
 *.csv

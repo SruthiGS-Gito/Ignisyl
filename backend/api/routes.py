@@ -141,13 +141,72 @@ async def get_recent_activities(
 
     # Filter by risk threshold if provided
     if risk_threshold is not None:
-        activities = [a for a in activities if a['risk_score'] >= risk_threshold]
+        activities = [a for a in activities if a.get('risk_score', 0) >= risk_threshold]
 
     return {
         "total": len(activities),
         "activities": activities,
         "is_admin_view": is_admin
     }
+
+
+@router.get("/threats/active")
+async def get_active_threats(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all active/pending threats that require analyst attention.
+    Returns high-risk activities (risk_score >= 50) that haven't been resolved.
+    """
+    # Role-based access control
+    role = current_user.get('role', '').lower()
+    is_admin = role in ['administrator', 'admin', 'security analyst']
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Admin privileges required to view active threats")
+
+    try:
+        # Get recent activities with elevated risk
+        all_activities = activity_logger.get_recent_activities(limit=500)
+
+        # Filter for active threats: high risk activities that need attention
+        active_threats = [
+            activity for activity in all_activities
+            if activity.get('risk_score', 0) >= 50
+            and activity.get('action') not in ['BLOCK', 'RESOLVED']
+        ]
+
+        # Format as threats
+        threats = []
+        for activity in active_threats[:100]:  # Limit to 100 most recent
+            threats.append({
+                "threat_id": f"thr_{activity.get('id', 'unknown')}",
+                "user_id": activity.get('user_id'),
+                "username": activity.get('username'),
+                "full_name": activity.get('full_name'),
+                "threat_type": activity.get('activity_type'),
+                "severity": activity.get('risk_level'),
+                "risk_score": activity.get('risk_score'),
+                "detected_at": activity.get('timestamp'),
+                "status": "active",
+                "summary": activity.get('summary'),
+                "action_taken": activity.get('action'),
+                "details": activity.get('details', {})
+            })
+
+        return {
+            "success": True,
+            "active_count": len(threats),
+            "threats": threats,
+            "is_admin_view": is_admin
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching active threats: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch active threats: {str(e)}")
+
 
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
@@ -549,32 +608,7 @@ async def analyst_take_action(
             status_code=500,
             detail=f"Failed to apply action: {str(e)}"
         )
-    
-    
-    # Format threats
-    threats = []
-    for activity in active_threats:
-        threat = {
-            "threat_id": f"thr_{activity['id']}",
-            "user_id": activity['user_id'],
-            "username": activity['username'],
-            "full_name": activity['full_name'],
-            "threat_type": activity['activity_type'],
-            "severity": activity['risk_level'],
-            "risk_score": activity['risk_score'],
-            "detected_at": activity['timestamp'],
-            "status": "active",
-            "summary": activity['summary'],
-            "action_taken": activity['action'],
-            "details": activity.get('details', {})
-        }
-        threats.append(threat)
-    
-    return {
-        "active_count": len(threats),
-        "threats": threats,
-        "is_admin_view": is_admin
-    }
+
 
 @router.get("/analytics/trends")
 async def get_analytics_trends(
@@ -728,134 +762,6 @@ async def acknowledge_alert(alert_data: Dict):
 # ============================================================================
 # ANALYST THREAT CONTROL ENDPOINTS
 # ============================================================================
-
-@router.post("/analyst/threat/{threat_id}/action")
-async def analyst_take_action(
-    threat_id: str,
-    request: AnalystActionRequest = Body(...),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    Analyst manually controls threat response.
-
-    Applies firewall actions in SIMULATION MODE - commands are logged but not executed.
-    For production deployment, integrate with IGNISYL Agent or enterprise security tools.
-
-    Args:
-        threat_id: User ID of the threat
-        request: AnalystActionRequest containing action, restrictions, reason, duration
-        current_user: Authenticated analyst
-
-    Returns:
-        Result of action taken with simulation details
-    """
-    import traceback
-
-    try:
-        from services.firewall_controller import firewall
-
-        # Validate action type
-        valid_actions = ["ALLOW", "RESTRICT", "ISOLATE", "BLOCK"]
-        if request.action.upper() not in valid_actions:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid action '{request.action}'. Must be one of: {valid_actions}"
-            )
-
-        # Verify analyst has permission (support multiple role formats)
-        role = current_user.get('role', '').lower()
-        if role not in ['admin', 'administrator', 'analyst', 'security analyst']:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Insufficient permissions. Role '{current_user.get('role')}' cannot apply firewall actions."
-            )
-
-        # Verify target user exists (optional - allow actions on unknown users for flexibility)
-        user = user_manager.get_user(threat_id)
-        target_username = user.get('username', threat_id) if user else threat_id
-
-        # Prepare restrictions with duration
-        restrictions = dict(request.custom_restrictions)
-        restrictions["duration_minutes"] = request.duration_minutes
-
-        # Apply firewall action (SIMULATION MODE)
-        logger.info(f"[FIREWALL] Analyst {current_user.get('username')} applying {request.action} to {threat_id}")
-
-        result = firewall.analyst_override_action(
-            user_id=threat_id,
-            action=request.action.upper(),
-            custom_restrictions=restrictions,
-            analyst_id=current_user.get('username'),
-            reason=request.reason
-        )
-
-        # Update user status in database to reflect action
-        status_map = {
-            "ALLOW": "active",
-            "RESTRICT": "restricted",
-            "ISOLATE": "isolated",
-            "BLOCK": "blocked"
-        }
-        new_status = status_map.get(request.action.upper(), "active")
-        try:
-            user_manager.update_user_status(threat_id, new_status, request.reason)
-            logger.info(f"[STATUS] User {threat_id} status updated to: {new_status}")
-        except Exception as status_err:
-            logger.warning(f"Failed to update user status: {status_err}")
-
-        # Log the analyst action to activity database
-        try:
-            activity_logger.log_activity({
-                "user_id": threat_id,
-                "username": target_username,
-                "full_name": user.get('full_name', target_username) if user else target_username,
-                "activity_type": "analyst_action",
-                "timestamp": datetime.now().isoformat(),
-                "risk_score": 0,
-                "risk_level": "LOW",
-                "action": request.action.upper(),
-                "summary": f"Analyst {current_user.get('username')} applied {request.action}: {request.reason}",
-                "details": {
-                    "analyst": current_user.get('username'),
-                    "target_user": threat_id,
-                    "action": request.action.upper(),
-                    "reason": request.reason,
-                    "duration_minutes": request.duration_minutes,
-                    "restrictions": restrictions,
-                    "simulation_mode": True
-                }
-            })
-        except Exception as log_err:
-            logger.warning(f"Failed to log analyst action: {log_err}")
-            # Continue even if logging fails
-
-        logger.info(f"[FIREWALL] Action {request.action} applied successfully (simulation mode)")
-
-        return {
-            "success": True,
-            "simulation_mode": True,
-            "result": result,
-            "action_applied": request.action.upper(),
-            "target_user": threat_id,
-            "applied_by": current_user.get('username'),
-            "duration_minutes": request.duration_minutes,
-            "message": f"Action {request.action.upper()} applied successfully (simulation mode)",
-            "note": "Commands logged but not executed. For real enforcement, deploy IGNISYL Agent."
-        }
-
-    except HTTPException:
-        raise  # Re-raise HTTP exceptions as-is
-    except ValueError as e:
-        logger.error(f"Validation error in analyst action: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error in analyst action: {e}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to apply action: {str(e)}"
-        )
-
 
 @router.get("/analyst/pending-decisions")
 async def get_pending_decisions(
@@ -1225,7 +1131,7 @@ async def generate_pdf_report(
                 'recall': ml_metrics.get('recall', 75.0),
                 'f1_score': ml_metrics.get('f1_score', 77.0)
             }
-            filepath = report_generator.generate_ml_performance_report(all_activities, ml_stats)
+            filepath = report_generator.generate_ml_report(ml_stats, all_activities)
             if not os.path.exists(filepath):
                 raise HTTPException(status_code=500, detail="PDF file was not created")
             print(f"[REPORT] Generated: {filepath} ({os.path.getsize(filepath)} bytes)")
@@ -1248,14 +1154,14 @@ async def generate_pdf_report(
             activities = activity_logger.get_user_activities(user_id, limit=100)
             summary_stats = {
                 'total_activities': len(activities),
-                'high_risk': len([a for a in activities if a['risk_level'] in ['HIGH', 'CRITICAL']]),
-                'medium_risk': len([a for a in activities if a['risk_level'] == 'MEDIUM']),
-                'low_risk': len([a for a in activities if a['risk_level'] == 'LOW']),
-                'blocked': len([a for a in activities if a['action'] == 'BLOCK']),
-                'restricted': len([a for a in activities if a['action'] == 'RESTRICT'])
+                'high_risk': len([a for a in activities if a.get('risk_level') in ['HIGH', 'CRITICAL']]),
+                'medium_risk': len([a for a in activities if a.get('risk_level') == 'MEDIUM']),
+                'low_risk': len([a for a in activities if a.get('risk_level') == 'LOW']),
+                'blocked': len([a for a in activities if a.get('action') == 'BLOCK']),
+                'restricted': len([a for a in activities if a.get('action') == 'RESTRICT'])
             }
 
-            filepath = report_generator.generate_threat_report(user, activities, summary_stats)
+            filepath = report_generator.generate_individual_user_report(user, activities, summary_stats)
 
         else:
             # Generate system-wide report (comprehensive)
@@ -1265,16 +1171,16 @@ async def generate_pdf_report(
 
             system_stats = {
                 'total_threats': len(all_activities),
-                'high_risk_threats': len([a for a in all_activities if a['risk_level'] in ['HIGH', 'CRITICAL']]),
-                'medium_risk_threats': len([a for a in all_activities if a['risk_level'] == 'MEDIUM']),
-                'low_risk_threats': len([a for a in all_activities if a['risk_level'] == 'LOW']),
-                'blocked_actions': len([a for a in all_activities if a['action'] == 'BLOCK']),
+                'high_risk_threats': len([a for a in all_activities if a.get('risk_level') in ['HIGH', 'CRITICAL']]),
+                'medium_risk_threats': len([a for a in all_activities if a.get('risk_level') == 'MEDIUM']),
+                'low_risk_threats': len([a for a in all_activities if a.get('risk_level') == 'LOW']),
+                'blocked_actions': len([a for a in all_activities if a.get('action') == 'BLOCK']),
                 'total_users': len(all_users),
-                'high_risk_users': len([u for u in all_users if u.get('current_risk_score', 0) >= 70])
+                'high_risk_users': len([u for u in all_users if u.get('current_risk_score', 0) >= 60])
             }
 
             time_period = report_data.get('time_period', '24h')
-            filepath = report_generator.generate_system_report(all_activities, system_stats, time_period)
+            filepath = report_generator.generate_comprehensive_report(all_users, all_activities, system_stats)
 
         # Verify file was created
         if not os.path.exists(filepath):
@@ -1307,7 +1213,9 @@ async def list_reports(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin privileges required")
 
     try:
-        reports_dir = "data/reports"
+        # Use absolute path to ensure consistency with report generator
+        backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        reports_dir = os.path.join(backend_dir, "data", "reports")
         if not os.path.exists(reports_dir):
             return {"reports": []}
 
@@ -1337,7 +1245,9 @@ async def download_report(filename: str):
     """Download a specific report"""
     from fastapi.responses import FileResponse
 
-    filepath = os.path.join("data/reports", filename)
+    # Use absolute path for consistency
+    backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    filepath = os.path.join(backend_dir, "data", "reports", filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Report not found")
 
@@ -1741,10 +1651,9 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
 _system_settings = {
     "autoBlockHighRisk": True,
     "emailNotifications": True,
-    "slackIntegration": False,
     "riskThresholdHigh": 70,
     "riskThresholdMedium": 30,
-    "sessionTimeout": 480,
+    "sessionTimeout": 60,
     "maxLoginAttempts": 5
 }
 
@@ -1844,11 +1753,11 @@ async def simulate_activity(count: int = 50, current_user: dict = Depends(get_cu
             # Add some randomness
             risk_score = min(100, max(0, base_risk + random.randint(-15, 25)))
             
-            # Determine risk level and action
-            if risk_score >= 70:
+            # Determine risk level and action (thresholds: 75+ CRITICAL, 60+ HIGH, 30+ MEDIUM)
+            if risk_score >= 75:
                 risk_level = "CRITICAL"
                 action = "BLOCK"
-            elif risk_score >= 50:
+            elif risk_score >= 60:
                 risk_level = "HIGH"
                 action = "RESTRICT"
             elif risk_score >= 30:
@@ -1902,6 +1811,142 @@ async def simulate_activity(count: int = 50, current_user: dict = Depends(get_cu
         
     except Exception as e:
         print(f"[ERROR] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/debug/regenerate-activities")
+async def regenerate_activities(current_user: dict = Depends(get_current_user)):
+    """Clear all activities and regenerate with proper varied timestamps (admin only)"""
+
+    # Check admin privileges
+    role = current_user.get('role', '').lower()
+    if role not in ['administrator', 'admin', 'security analyst']:
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+    try:
+        import random
+        from datetime import datetime, timedelta
+
+        # Clear existing activities
+        activity_logger.clear_all_activities()
+        print("[DATA] Cleared existing activities")
+
+        # Get all users
+        users = user_manager.get_all_users()
+        if not users:
+            return {"error": "No users found in database"}
+
+        activities_created = []
+
+        # Activity types with risk profiles
+        activity_types = [
+            {"type": "LOGIN", "risk_range": (0, 15), "bytes_range": (0, 1000)},
+            {"type": "FILE_READ", "risk_range": (5, 20), "bytes_range": (1000, 50000)},
+            {"type": "EMAIL_SENT", "risk_range": (0, 10), "bytes_range": (5000, 100000)},
+            {"type": "SYSTEM_ACCESS", "risk_range": (5, 25), "bytes_range": (0, 5000)},
+            {"type": "DATABASE_QUERY", "risk_range": (10, 30), "bytes_range": (1000, 20000)},
+            {"type": "LARGE_FILE_DOWNLOAD", "risk_range": (30, 55), "bytes_range": (5000000, 50000000)},
+            {"type": "AFTER_HOURS_ACCESS", "risk_range": (35, 60), "bytes_range": (1000, 100000)},
+            {"type": "CROSS_DEPARTMENT_ACCESS", "risk_range": (40, 65), "bytes_range": (10000, 500000)},
+            {"type": "USB_FILE_COPY", "risk_range": (45, 70), "bytes_range": (100000, 10000000)},
+            {"type": "SENSITIVE_FILE_ACCESS", "risk_range": (60, 85), "bytes_range": (50000, 5000000)},
+            {"type": "FAILED_LOGIN_ATTEMPT", "risk_range": (50, 75), "bytes_range": (0, 500)},
+            {"type": "UNUSUAL_DATA_TRANSFER", "risk_range": (70, 95), "bytes_range": (10000000, 100000000)},
+        ]
+
+        def get_risk_level(score):
+            if score >= 60:
+                return "HIGH"
+            elif score >= 30:
+                return "MEDIUM"
+            return "LOW"
+
+        def get_action(risk_level):
+            if risk_level == "HIGH":
+                return random.choice(["BLOCK", "RESTRICT", "ALERT"])
+            elif risk_level == "MEDIUM":
+                return random.choice(["ALERT", "MONITOR", "LOG"])
+            return random.choice(["ALLOW", "LOG", "MONITOR"])
+
+        for user in users:
+            # Generate 10-20 activities per user over the last 7 days
+            num_activities = random.randint(10, 20)
+            user_max_risk = 0
+
+            for i in range(num_activities):
+                # VARIED timestamps - spread across 7 days with random hours/minutes/seconds
+                days_ago = random.randint(0, 6)
+                hours_ago = random.randint(0, 23)
+                minutes_ago = random.randint(0, 59)
+                seconds_ago = random.randint(0, 59)
+                timestamp = datetime.now() - timedelta(
+                    days=days_ago,
+                    hours=hours_ago,
+                    minutes=minutes_ago,
+                    seconds=seconds_ago
+                )
+
+                # Select activity type (weighted towards normal)
+                if random.random() < 0.7:
+                    activity = random.choice(activity_types[:5])
+                elif random.random() < 0.8:
+                    activity = random.choice(activity_types[5:9])
+                else:
+                    activity = random.choice(activity_types[9:])
+
+                risk_score = random.uniform(*activity["risk_range"])
+                bytes_transferred = random.randint(*activity["bytes_range"])
+                risk_level = get_risk_level(risk_score)
+                action = get_action(risk_level)
+
+                user_max_risk = max(user_max_risk, risk_score)
+
+                activity_data = {
+                    "user_id": user["user_id"],
+                    "username": user["username"],
+                    "full_name": user["full_name"],
+                    "activity_type": activity["type"],
+                    "timestamp": timestamp.isoformat(),
+                    "risk_score": round(risk_score, 1),
+                    "risk_level": risk_level,
+                    "action": action,
+                    "bytes_transferred": bytes_transferred,
+                    "file_size": bytes_transferred if "FILE" in activity["type"] else 0,
+                    "summary": f"{activity['type'].replace('_', ' ').title()} by {user['full_name']}",
+                    "details": {
+                        "department": user.get("department", "N/A"),
+                        "role": user.get("role", "N/A"),
+                        "source_ip": f"192.168.1.{random.randint(10, 250)}",
+                        "device": random.choice(["Workstation-A", "Laptop-B", "Desktop-C", "Remote-VPN"])
+                    }
+                }
+
+                activity_logger.log_activity(activity_data)
+                activities_created.append(activity_data)
+
+            # Update user's risk score
+            recent_risk = round(0.6 * user_max_risk + 0.4 * (sum(a["risk_score"] for a in activities_created[-num_activities:]) / num_activities), 1)
+            user_manager.update_user_activity(user["user_id"], risk_score=recent_risk)
+
+        # Statistics
+        high_risk = len([a for a in activities_created if a["risk_level"] in ["HIGH", "CRITICAL"]])
+        blocked = len([a for a in activities_created if a["action"] == "BLOCK"])
+
+        return {
+            "success": True,
+            "activities_regenerated": len(activities_created),
+            "users_affected": len(users),
+            "statistics": {
+                "high_risk_activities": high_risk,
+                "blocked_activities": blocked
+            },
+            "message": f"Regenerated {len(activities_created)} activities with varied timestamps for {len(users)} users"
+        }
+
+    except Exception as e:
+        print(f"[ERROR] Error regenerating activities: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

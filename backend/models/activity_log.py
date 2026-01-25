@@ -244,5 +244,16 @@ class ActivityLogger:
             "today": today_count
         }
 
+    def clear_all_activities(self):
+        """Clear all activities from the database (for regeneration)"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM activities")
+        conn.commit()
+        deleted = cursor.rowcount
+        conn.close()
+        print(f"[OK] Cleared {deleted} activities from database")
+        return deleted
+
 # Global instance
 activity_logger = ActivityLogger()

@@ -44,6 +44,22 @@ const UserTable = ({ activities }) => {
           <div className="text-6xl mb-4">🛡️</div>
           <div className="text-xl font-semibold" style={{color: '#4ade80'}}>No high-risk users detected</div>
           <div className="text-sm mt-2" style={{color: '#86efac'}}>System secure - all users within normal risk parameters</div>
+          <button
+            onClick={() => window.location.href = '/admin'}
+            style={{
+              marginTop: '16px',
+              padding: '10px 20px',
+              background: 'rgba(102, 126, 234, 0.2)',
+              border: '1px solid rgba(102, 126, 234, 0.4)',
+              borderRadius: '8px',
+              color: '#667eea',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: '500'
+            }}
+          >
+            View All Users &rarr;
+          </button>
         </div>
       ) : (
         <div className="space-y-3 max-h-96 overflow-y-auto">

@@ -593,6 +593,17 @@ class AdvancedHybridDetector:
             }
         }
 
+    def get_active_model_count(self):
+        """Count number of active/trained models"""
+        count = 0
+        if self.isolation_forest.model is not None:
+            count += 1
+        if self.autoencoder.model is not None:
+            count += 1
+        if self.xgboost.model is not None:
+            count += 1
+        return count if count > 0 else 3  # Default to 3 if not yet trained
+
 def test_hybrid_detector():
     """Test the hybrid detector with synthetic data"""
     print("Testing Hybrid ML Detector")

@@ -135,7 +135,7 @@ async def startup_event():
             full_name="System Administrator",
             department="IT",
             role="Administrator",
-            email="admin@ignisyl.local",
+            email="admin@ignisyl.demo",
             password_hash=admin_password_hash
         )
         if result["success"]:
@@ -181,35 +181,35 @@ async def startup_event():
                 "full_name": "John Doe",
                 "department": "Engineering",
                 "role": "Senior Developer",
-                "email": "john.doe@company.com"
+                "email": "john.doe@ignisyl.demo"
             },
             {
                 "username": "jane.smith",
                 "full_name": "Jane Smith",
                 "department": "Security",
                 "role": "Security Analyst",
-                "email": "jane.smith@company.com"
+                "email": "jane.smith@ignisyl.demo"
             },
             {
                 "username": "bob.wilson",
                 "full_name": "Bob Wilson",
                 "department": "Finance",
                 "role": "Financial Controller",
-                "email": "bob.wilson@company.com"
+                "email": "bob.wilson@ignisyl.demo"
             },
             {
                 "username": "alice.johnson",
                 "full_name": "Alice Johnson",
                 "department": "HR",
                 "role": "HR Manager",
-                "email": "alice.johnson@company.com"
+                "email": "alice.johnson@ignisyl.demo"
             },
             {
                 "username": "charlie.brown",
                 "full_name": "Charlie Brown",
                 "department": "Operations",
                 "role": "Operations Lead",
-                "email": "charlie.brown@company.com"
+                "email": "charlie.brown@ignisyl.demo"
             }
         ]
 
@@ -356,7 +356,7 @@ async def generate_test_activity_data():
     ]
 
     def get_risk_level(score):
-        if score >= 70:
+        if score >= 60:
             return "HIGH"
         elif score >= 30:
             return "MEDIUM"
@@ -371,15 +371,26 @@ async def generate_test_activity_data():
 
     activities_generated = 0
     threats_detected = 0
+    user_risk_scores = {}  # Track cumulative risk per user
 
-    for user in users:
+    for idx, user in enumerate(users):
         # Generate 10-25 activities per user over the last 7 days
         num_activities = random.randint(10, 25)
+        user_max_risk = 0
+        user_activities = []
 
         for i in range(num_activities):
-            # Random timestamp within last 7 days
-            hours_ago = random.randint(0, 168)  # 7 days in hours
-            timestamp = datetime.now() - timedelta(hours=hours_ago)
+            # Random timestamp within last 7 days - vary by minutes too for realism
+            days_ago = random.randint(0, 6)
+            hours_ago = random.randint(0, 23)
+            minutes_ago = random.randint(0, 59)
+            seconds_ago = random.randint(0, 59)
+            timestamp = datetime.now() - timedelta(
+                days=days_ago,
+                hours=hours_ago,
+                minutes=minutes_ago,
+                seconds=seconds_ago
+            )
 
             # Select activity type (weighted towards normal activities)
             if random.random() < 0.7:  # 70% normal
@@ -394,6 +405,10 @@ async def generate_test_activity_data():
             file_size = bytes_transferred if "FILE" in activity["type"] else 0
             risk_level = get_risk_level(risk_score)
             action = get_action(risk_level)
+
+            # Track max risk for this user
+            user_max_risk = max(user_max_risk, risk_score)
+            user_activities.append(risk_score)
 
             # Track threats
             if risk_level in ["HIGH", "CRITICAL"]:
@@ -425,9 +440,39 @@ async def generate_test_activity_data():
             activity_logger.log_activity(activity_data)
             activities_generated += 1
 
-        # Update user's last activity and risk score
-        recent_risk = random.uniform(5, 50)  # Overall risk score
-        user_manager.update_user_activity(user["user_id"], risk_score=recent_risk)
+        # Calculate user's risk score based on their activities (weighted average with recency)
+        if user_activities:
+            # Use weighted average: 60% max risk + 40% average risk
+            avg_risk = sum(user_activities) / len(user_activities)
+            recent_risk = round(0.6 * user_max_risk + 0.4 * avg_risk, 1)
+        else:
+            recent_risk = random.uniform(5, 30)
+
+        user_risk_scores[user["user_id"]] = recent_risk
+
+        # Vary last_activity time per user (not all at the same time!)
+        last_activity_offset = timedelta(
+            hours=random.randint(0, idx * 2 + 1),  # Different offset per user
+            minutes=random.randint(0, 59)
+        )
+
+        # Update user's last activity with varied timestamp
+        conn = __import__('sqlite3').connect(user_manager.db_path)
+        cursor = conn.cursor()
+        last_activity_time = (datetime.now() - last_activity_offset).isoformat()
+        cursor.execute(
+            "UPDATE users SET last_activity = ?, current_risk_score = ? WHERE user_id = ?",
+            (last_activity_time, recent_risk, user["user_id"])
+        )
+        conn.commit()
+        conn.close()
+
+        # Update user status based on risk score thresholds
+        # Match the config thresholds: LOW < 30, MEDIUM 30-60, HIGH >= 60
+        if recent_risk >= 75:
+            user_manager.update_user_status(user["user_id"], 'blocked', 'Auto-blocked due to critical risk')
+        elif recent_risk >= 60:
+            user_manager.update_user_status(user["user_id"], 'restricted', 'Auto-restricted due to high risk')
 
     print(f"[OK] Generated {activities_generated} activities for {len(users)} users")
     print(f"[DATA] Threats detected: {threats_detected}")
@@ -860,8 +905,8 @@ async def dashboard_stats():
             },
             "risk_distribution": {
                 "low_risk_users": len([u for u in all_users if u['current_risk_score'] < 30]),
-                "medium_risk_users": len([u for u in all_users if 30 <= u['current_risk_score'] < 70]),
-                "high_risk_users": len([u for u in all_users if u['current_risk_score'] >= 70])
+                "medium_risk_users": len([u for u in all_users if 30 <= u['current_risk_score'] < 60]),
+                "high_risk_users": len([u for u in all_users if u['current_risk_score'] >= 60])
             },
             "recent_activities": recent_activities,
             "ml_performance": ml_performance,  # [OK] Now guaranteed to have all fields!
@@ -1093,12 +1138,12 @@ async def generate_system_report(request_data: Dict):
         'low_risk_threats': activity_stats['low_risk'],
         'blocked_actions': activity_stats['blocked'],
         'total_users': len(all_users),
-        'high_risk_users': len([u for u in all_users if u['current_risk_score'] >= 70])
+        'high_risk_users': len([u for u in all_users if u['current_risk_score'] >= 60])
     }
     
     # Generate report
     try:
-        filepath = report_generator.generate_system_report(all_activities, system_stats, time_period)
+        filepath = report_generator.generate_comprehensive_report(all_users, all_activities, system_stats)
         
         return {
             "success": True,

@@ -24,6 +24,7 @@ const AdminDashboard = () => {
   const [viewModal, setViewModal] = useState({ open: false, user: null, loading: false, data: null });
   const [editModal, setEditModal] = useState({ open: false, user: null, loading: false });
   const [blockModal, setBlockModal] = useState({ open: false, user: null, loading: false, reason: '' });
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [overrideModal, setOverrideModal] = useState({
     open: false,
     user: null,
@@ -54,12 +55,12 @@ const AdminDashboard = () => {
   const [settings, setSettings] = useState({
     autoBlockHighRisk: true,
     emailNotifications: true,
-    slackIntegration: false,
-    riskThresholdHigh: 70,
+    riskThresholdHigh: 60,
     riskThresholdMedium: 30,
-    sessionTimeout: 480,
+    sessionTimeout: 60,
     maxLoginAttempts: 5,
   });
+  const [sessionTimeoutWarning, setSessionTimeoutWarning] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
 
@@ -129,8 +130,8 @@ const AdminDashboard = () => {
     if (filterRisk !== 'all') {
       result = result.filter((u) => {
         const score = u.current_risk_score || 0;
-        if (filterRisk === 'high') return score >= 70;
-        if (filterRisk === 'medium') return score >= 30 && score < 70;
+        if (filterRisk === 'high') return score >= 60;
+        if (filterRisk === 'medium') return score >= 30 && score < 60;
         if (filterRisk === 'low') return score < 30;
         return true;
       });
@@ -319,6 +320,21 @@ const AdminDashboard = () => {
                 <table className="admin-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '40px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedUsers(filteredUsers.map(u => u.user_id));
+                            } else {
+                              setSelectedUsers([]);
+                            }
+                          }}
+                          title="Select all users"
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </th>
                       <th>User</th>
                       <th>Department</th>
                       <th>Role</th>
@@ -338,6 +354,20 @@ const AdminDashboard = () => {
                       const isOverridden = user.status === 'blocked' || user.status === 'restricted';
                       return (
                         <tr key={user.user_id} className={autoAction.action === 'BLOCK' ? 'blocked-row' : ''}>
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.user_id)}
+                              onChange={() => {
+                                setSelectedUsers(prev =>
+                                  prev.includes(user.user_id)
+                                    ? prev.filter(id => id !== user.user_id)
+                                    : [...prev, user.user_id]
+                                );
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          </td>
                           <td>
                             <div className="user-cell">
                               <div className="user-avatar" style={{
@@ -387,25 +417,47 @@ const AdminDashboard = () => {
                           </td>
                           <td>{formatTimestamp(user.last_activity)}</td>
                           <td>
-                            <div className="action-buttons">
+                            <div className="action-buttons" style={{ position: 'relative' }}>
                               <button
                                 className="btn-icon"
-                                title="View Details"
+                                title="View Details - See user profile, activities, and statistics"
                                 onClick={() => handleViewUser(user)}
+                                style={{ position: 'relative' }}
                               >
                                 👁️
+                                <span style={{
+                                  position: 'absolute',
+                                  bottom: '-20px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  fontSize: '9px',
+                                  color: '#a8d0ff',
+                                  whiteSpace: 'nowrap',
+                                  opacity: 0.7
+                                }}>View</span>
                               </button>
                               <button
                                 className="btn-icon"
-                                title="Edit User"
+                                title="Edit User - Modify name, department, role, and email"
                                 onClick={() => handleEditUser(user)}
+                                style={{ position: 'relative' }}
                               >
                                 ✏️
+                                <span style={{
+                                  position: 'absolute',
+                                  bottom: '-20px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  fontSize: '9px',
+                                  color: '#a8d0ff',
+                                  whiteSpace: 'nowrap',
+                                  opacity: 0.7
+                                }}>Edit</span>
                               </button>
                               <button
                                 className="btn-icon"
-                                title="Override AI Action"
-                                style={{ background: 'rgba(102, 126, 234, 0.2)' }}
+                                title="Quick Actions - Override AI decision (ALLOW/MONITOR/RESTRICT/BLOCK)"
+                                style={{ background: 'rgba(102, 126, 234, 0.2)', position: 'relative' }}
                                 onClick={() => setOverrideModal({
                                   open: true,
                                   user: user,
@@ -416,6 +468,16 @@ const AdminDashboard = () => {
                                 })}
                               >
                                 ⚡
+                                <span style={{
+                                  position: 'absolute',
+                                  bottom: '-20px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  fontSize: '9px',
+                                  color: '#a8d0ff',
+                                  whiteSpace: 'nowrap',
+                                  opacity: 0.7
+                                }}>Actions</span>
                               </button>
                             </div>
                           </td>
@@ -521,20 +583,6 @@ const AdminDashboard = () => {
                       </div>
                       <div className="setting-item">
                         <div className="setting-info">
-                          <div className="setting-label">Slack Integration</div>
-                          <div className="setting-desc">Send alerts to Slack channel</div>
-                        </div>
-                        <label className="toggle-switch">
-                          <input
-                            type="checkbox"
-                            checked={settings.slackIntegration}
-                            onChange={(e) => handleSettingChange('slackIntegration', e.target.checked)}
-                          />
-                          <span className="toggle-slider"></span>
-                        </label>
-                      </div>
-                      <div className="setting-item">
-                        <div className="setting-info">
                           <div className="setting-label">Session Timeout (minutes)</div>
                           <div className="setting-desc">Auto-logout after inactivity</div>
                         </div>
@@ -542,11 +590,42 @@ const AdminDashboard = () => {
                           type="number"
                           className="setting-input"
                           value={settings.sessionTimeout}
-                          onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value) || 60;
+                            handleSettingChange('sessionTimeout', value);
+                            if (value > 120) {
+                              setSessionTimeoutWarning(true);
+                            } else {
+                              setSessionTimeoutWarning(false);
+                            }
+                          }}
                           min="5"
                           max="1440"
                         />
                       </div>
+                      {sessionTimeoutWarning && (
+                        <div style={{
+                          marginTop: '12px',
+                          padding: '12px 16px',
+                          backgroundColor: 'rgba(255, 193, 7, 0.15)',
+                          border: '1px solid #ffc107',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px'
+                        }}>
+                          <span style={{ fontSize: '20px' }}>&#9888;</span>
+                          <div>
+                            <div style={{ color: '#ffc107', fontWeight: 'bold', marginBottom: '4px' }}>
+                              Security Warning
+                            </div>
+                            <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px' }}>
+                              Session timeout over 2 hours is not recommended for a security system.
+                              Long sessions increase the risk of unauthorized access if a workstation is left unattended.
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
