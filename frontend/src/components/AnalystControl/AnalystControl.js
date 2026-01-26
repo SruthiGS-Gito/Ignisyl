@@ -14,12 +14,105 @@ const AnalystControl = () => {
   const [showModal, setShowModal] = useState(false);
   const [stats, setStats] = useState({ pending: 0, reviewed: 0, avgRisk: 0, responseTime: '4hrs' });
 
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activityTypeFilter, setActivityTypeFilter] = useState('all');
+  const [selectedThreats, setSelectedThreats] = useState([]);
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+
   // Form states
   const [action, setAction] = useState('RESTRICT');
   const [reason, setReason] = useState('');
   const [duration, setDuration] = useState(60);
   const [customRestrictions, setCustomRestrictions] = useState({ ...DEFAULT_RESTRICTIONS });
   const [submitting, setSubmitting] = useState(false);
+
+  // Get unique activity types for filter
+  const activityTypes = [...new Set(pendingThreats.map(t => t.activity_type).filter(Boolean))];
+
+  // Filter threats based on search and activity type
+  const filteredThreats = pendingThreats.filter(threat => {
+    const matchesSearch = !searchTerm ||
+      threat.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      threat.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      threat.activity_type?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = activityTypeFilter === 'all' || threat.activity_type === activityTypeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  // Handle bulk selection
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedThreats(filteredThreats.map(t => t.id));
+    } else {
+      setSelectedThreats([]);
+    }
+  };
+
+  const handleSelectThreat = (id) => {
+    setSelectedThreats(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  // Bulk action handlers
+  const handleBulkFalsePositive = async () => {
+    if (selectedThreats.length === 0) {
+      alert('Please select at least one threat');
+      return;
+    }
+    const reason = prompt('Enter reason for marking as false positive:');
+    if (!reason) return;
+
+    setBulkActionLoading(true);
+    try {
+      for (const threatId of selectedThreats) {
+        const threat = pendingThreats.find(t => t.id === threatId);
+        if (threat) {
+          await analystAPI.takeAction(threat.user_id, {
+            action: 'ALLOW',
+            reason: `[BULK] False Positive: ${reason}`,
+            duration_minutes: 60,
+          });
+        }
+      }
+      alert(`${selectedThreats.length} threats marked as false positive`);
+      setSelectedThreats([]);
+      fetchData();
+    } catch (error) {
+      console.error('Bulk action failed:', error);
+      alert('Some actions may have failed. Please refresh and try again.');
+    }
+    setBulkActionLoading(false);
+  };
+
+  const handleBulkEscalate = async () => {
+    if (selectedThreats.length === 0) {
+      alert('Please select at least one threat');
+      return;
+    }
+    const escalateTo = prompt('Escalate to (admin/manager/incident_team):');
+    if (!escalateTo) return;
+    const notes = prompt('Enter escalation notes:');
+    if (!notes) return;
+
+    setBulkActionLoading(true);
+    try {
+      for (const threatId of selectedThreats) {
+        const threat = pendingThreats.find(t => t.id === threatId);
+        if (threat) {
+          await analystAPI.escalateThreat(threat.user_id, escalateTo, `[BULK] ${notes}`);
+        }
+      }
+      alert(`${selectedThreats.length} threats escalated to ${escalateTo}`);
+      setSelectedThreats([]);
+      fetchData();
+    } catch (error) {
+      console.error('Bulk escalation failed:', error);
+      alert('Some escalations may have failed. Please refresh and try again.');
+    }
+    setBulkActionLoading(false);
+  };
 
   useEffect(() => {
     fetchData();
@@ -184,9 +277,101 @@ const AnalystControl = () => {
         <div className="analyst-content-grid">
           {/* Left: Pending Threats Table */}
           <div className="analyst-card">
-            <h2 className="analyst-card-title">Pending Threat Decisions</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 className="analyst-card-title" style={{ margin: 0 }}>Pending Threat Decisions</h2>
+              {selectedThreats.length > 0 && (
+                <span style={{ color: '#a8d0ff', fontSize: '13px' }}>
+                  {selectedThreats.length} selected
+                </span>
+              )}
+            </div>
 
-            {pendingThreats.length === 0 ? (
+            {/* Search and Filter Bar */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              marginBottom: '16px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}>
+              <input
+                type="text"
+                placeholder="Search by user or activity..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  flex: '1',
+                  minWidth: '200px',
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '14px'
+                }}
+              />
+              <select
+                value={activityTypeFilter}
+                onChange={(e) => setActivityTypeFilter(e.target.value)}
+                style={{
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="all">All Activity Types</option>
+                {activityTypes.map(type => (
+                  <option key={type} value={type}>{type?.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {filteredThreats.length > 0 && (
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginBottom: '16px',
+                padding: '12px 16px',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderRadius: '8px',
+                alignItems: 'center'
+              }}>
+                <span style={{ color: '#a8d0ff', fontSize: '13px', fontWeight: 'bold' }}>Bulk Actions:</span>
+                <button
+                  className="btn-review"
+                  onClick={handleBulkFalsePositive}
+                  disabled={selectedThreats.length === 0 || bulkActionLoading}
+                  style={{
+                    backgroundColor: selectedThreats.length > 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(255,255,255,0.1)',
+                    padding: '8px 16px',
+                    fontSize: '13px'
+                  }}
+                >
+                  Mark as False Positive ({selectedThreats.length})
+                </button>
+                <button
+                  className="btn-review"
+                  onClick={handleBulkEscalate}
+                  disabled={selectedThreats.length === 0 || bulkActionLoading}
+                  style={{
+                    backgroundColor: selectedThreats.length > 0 ? 'rgba(255, 140, 0, 0.8)' : 'rgba(255,255,255,0.1)',
+                    padding: '8px 16px',
+                    fontSize: '13px'
+                  }}
+                >
+                  Escalate Selected ({selectedThreats.length})
+                </button>
+                {bulkActionLoading && (
+                  <span style={{ color: '#ffc107', fontSize: '13px' }}>Processing...</span>
+                )}
+              </div>
+            )}
+
+            {filteredThreats.length === 0 ? (
               <div className="analyst-empty-state">
                 <div className="analyst-empty-icon">&#10003;</div>
                 <div className="analyst-empty-title">No pending decisions</div>
@@ -198,6 +383,14 @@ const AnalystControl = () => {
               <table className="analyst-table">
                 <thead>
                   <tr>
+                    <th style={{ width: '40px' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedThreats.length === filteredThreats.length && filteredThreats.length > 0}
+                        onChange={handleSelectAll}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </th>
                     <th>User</th>
                     <th>Activity</th>
                     <th>Risk Score</th>
@@ -206,13 +399,21 @@ const AnalystControl = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingThreats.map((threat) => {
+                  {filteredThreats.map((threat) => {
                     const riskDetails = getRiskLevelDetails(threat.risk_score);
                     const riskClass = threat.risk_score >= 70 ? 'critical' :
                                      threat.risk_score >= 50 ? 'high' : 'medium';
                     return (
-                      <tr key={threat.id} onClick={() => handleThreatClick(threat)}>
-                        <td>
+                      <tr key={threat.id}>
+                        <td onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedThreats.includes(threat.id)}
+                            onChange={() => handleSelectThreat(threat.id)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                        </td>
+                        <td onClick={() => handleThreatClick(threat)} style={{ cursor: 'pointer' }}>
                           <div className="user-name">{threat.full_name}</div>
                           <div className="user-id">{threat.username}</div>
                           {threat.status === 'isolated' && (

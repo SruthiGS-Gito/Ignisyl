@@ -297,7 +297,7 @@ Latest user activities with:
 Username: john_doe
 Password: SecurePass123!
 Full Name: John Doe
-Email: john.doe@company.com
+Email: john.doe@ignisyl.demo
 Department: Finance
 Role: Analyst
 
@@ -1002,7 +1002,7 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 ## Support & Contact
 
 ### Technical Support
-- **Email:** support@company.com
+- **Email:** support@ignisyl.demo
 - **Phone:** +1-XXX-XXX-XXXX
 - **Hours:** Monday-Friday, 9 AM - 5 PM
 
@@ -1013,7 +1013,7 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 
 ### Report Issues
 - **GitHub Issues:** https://github.com/SruthiGS-Gito/Ignisyl/issues
-- **Email:** bugs@company.com
+- **Email:** bugs@ignisyl.demo
 
 ---
 

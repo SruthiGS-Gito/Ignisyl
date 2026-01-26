@@ -555,7 +555,7 @@ graph TD
 
 For architecture questions or deployment support:
 
-- **Email:** architecture@company.com
+- **Email:** architecture@ignisyl.demo
 - **Documentation:** https://docs.ignisyl.com
 - **GitHub:** https://github.com/company/ignisyl
 <<<END Architecture.md>>>

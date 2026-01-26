@@ -63,7 +63,7 @@ Authorization: Bearer <access_token>
   "user_id": "admin",
   "username": "admin",
   "full_name": "System Administrator",
-  "email": "admin@company.com",
+  "email": "admin@ignisyl.demo",
   "department": "IT Security",
   "role": "admin"
 }
@@ -158,7 +158,7 @@ Authorization: Bearer <access_token>
       "full_name": "System Administrator",
       "department": "IT Security",
       "role": "admin",
-      "email": "admin@company.com"
+      "email": "admin@ignisyl.demo"
     },
     {
       "user_id": "sruthi_g_s",
@@ -166,7 +166,7 @@ Authorization: Bearer <access_token>
       "full_name": "Sruthi G S",
       "department": "Finance",
       "role": "analyst",
-      "email": "sruthi.gs@company.com"
+      "email": "sruthi.gs@ignisyl.demo"
     }
   ],
   "total": 5
@@ -623,6 +623,6 @@ console.log(`Action: ${result.action}`);
 
 ## Support
 
-For API support, contact: security@company.com
+For API support, contact: security@ignisyl.demo
 <<<END API_Documentation.md>>>
 

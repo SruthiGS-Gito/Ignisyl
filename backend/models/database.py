@@ -237,7 +237,7 @@ def init_sample_data():
                 User(
                     username="john.doe",
                     password_hash=auth_manager.hash_password("password123"),
-                    email="john.doe@company.com",
+                    email="john.doe@ignisyl.demo",
                     full_name="John Doe",
                     department="IT",
                     role="Software Engineer"
@@ -245,7 +245,7 @@ def init_sample_data():
                 User(
                     username="jane.smith",
                     password_hash=auth_manager.hash_password("password123"),
-                    email="jane.smith@company.com", 
+                    email="jane.smith@ignisyl.demo",
                     full_name="Jane Smith",
                     department="Finance",
                     role="Financial Analyst"
@@ -253,7 +253,7 @@ def init_sample_data():
                 User(
                     username="admin",
                     password_hash=auth_manager.hash_password("admin123"),
-                    email="admin@company.com",
+                    email="admin@ignisyl.demo",
                     full_name="System Administrator",
                     department="IT",
                     role="Admin"
@@ -278,21 +278,21 @@ def init_sample_data():
             sample_users = [
                 User(
                     username="john.doe",
-                    email="john.doe@company.com",
+                    email="john.doe@ignisyl.demo",
                     full_name="John Doe",
                     department="IT",
                     role="Software Engineer"
                 ),
                 User(
                     username="jane.smith",
-                    email="jane.smith@company.com", 
+                    email="jane.smith@ignisyl.demo",
                     full_name="Jane Smith",
                     department="Finance",
                     role="Financial Analyst"
                 ),
                 User(
                     username="admin",
-                    email="admin@company.com",
+                    email="admin@ignisyl.demo",
                     full_name="System Administrator",
                     department="IT",
                     role="Admin"

@@ -150,4 +150,50 @@ docker-compose.override.yml
 
 # Generated reports
 backend/data/reports/*.pdf
-backend/data/reports/charts/
+backend/data/reports/charts/*
+backend/data/reports/tmp*.png
+data/reports/*.pdf
+data/reports/charts/*
+
+# Root level reports/docs that shouldn't be in repo
+ADVERSARIAL_ROBUSTNESS_REPORT.md
+BASELINE_COMPARISON_REPORT.md
+SECURITY_AUDIT_REPORT.md
+VERIFICATION_REPORT.md
+
+# Test artifacts
+backend/*test_report*.json
+backend/validation_results*.json
+backend/*_comparison_results.json
+
+# Stray git config files
+er.name*
+
+# ========================================
+# IGNISYL Additional Confidential Data Protection
+# ========================================
+
+# Honeypot files (operational security)
+backend/data/honeypots/*
+!backend/data/honeypots/.gitkeep
+
+# User data and synthetic data with PII
+backend/data/synthetic/users.json
+backend/data/synthetic/activities.json
+
+# Additional report paths
+backend/reports/*.pdf
+**/reports/*.pdf
+
+# Environment files for frontend
+frontend/.env.local
+frontend/.env
+
+# Any remaining baseline comparison files
+*baseline_comparison*
+
+# Project-specific sensitive documents
+PROJECT_ANALYSIS_REPORT.md
+DATABASE_MIGRATION_GUIDE.md
+PROJECT_STATUS.md
+QUICK_START_GUIDE.md

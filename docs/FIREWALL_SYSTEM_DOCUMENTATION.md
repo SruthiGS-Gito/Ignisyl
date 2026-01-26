@@ -736,7 +736,7 @@ class EnterpriseIntegrations:
 
         conn = Connection(
             Server('ldap://company-ad.com'),
-            user='ignisyl-service@company.com',
+            user='ignisyl-service@ignisyl.demo',
             password=os.environ['AD_SERVICE_PASSWORD']
         )
         conn.bind()

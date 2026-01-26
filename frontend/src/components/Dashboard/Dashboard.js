@@ -27,6 +27,7 @@ const Dashboard = () => {
   const [responseTime, setResponseTime] = useState(23);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [incidentTimeline, setIncidentTimeline] = useState([]);
+  const [showScoreModal, setShowScoreModal] = useState(false);
   const currentUser = getCurrentUser();
 
   // Calculate organizational security score based on risk distribution
@@ -240,14 +241,22 @@ const Dashboard = () => {
           marginBottom: '20px'
         }}>
           {/* Organizational Security Score */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.06)',
-            backdropFilter: 'blur(12px)',
-            borderRadius: '16px',
-            padding: '20px',
-            textAlign: 'center',
-            border: `2px solid ${getScoreColor(securityScore)}40`
-          }}>
+          <div
+            onClick={() => setShowScoreModal(true)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: '16px',
+              padding: '20px',
+              textAlign: 'center',
+              border: `2px solid ${getScoreColor(securityScore)}40`,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            title="Click to see how this score is calculated"
+          >
             <div style={{ fontSize: '12px', color: '#a8d0ff', marginBottom: '8px', fontWeight: 'bold' }}>
               SECURITY SCORE
             </div>
@@ -273,6 +282,13 @@ const Dashboard = () => {
               marginTop: '8px'
             }}>
               Avg Response: {responseTime}ms
+            </div>
+            <div style={{
+              fontSize: '10px',
+              color: '#667eea',
+              marginTop: '4px'
+            }}>
+              Click for details
             </div>
           </div>
 
@@ -481,6 +497,136 @@ const Dashboard = () => {
               <span style={{ color: 'rgba(255,255,255,0.6)', marginLeft: '12px', fontSize: '12px' }}>
                 {responseTime < 500 ? '✓ Within SLA target (<500ms)' : '⚠ Above SLA target'}
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Security Score Explanation Modal */}
+        {showScoreModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}
+            onClick={() => setShowScoreModal(false)}
+          >
+            <div
+              style={{
+                backgroundColor: '#1a1a2e',
+                borderRadius: '16px',
+                padding: '28px',
+                maxWidth: '550px',
+                width: '90%',
+                border: '1px solid rgba(255,255,255,0.1)',
+                maxHeight: '80vh',
+                overflowY: 'auto'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ color: '#fff', fontSize: '22px', margin: 0 }}>Security Score Calculation</h2>
+                <button
+                  onClick={() => setShowScoreModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#fff',
+                    fontSize: '24px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              <div style={{
+                padding: '20px',
+                background: `linear-gradient(135deg, ${getScoreColor(securityScore)}20 0%, ${getScoreColor(securityScore)}10 100%)`,
+                borderRadius: '12px',
+                border: `1px solid ${getScoreColor(securityScore)}40`,
+                textAlign: 'center',
+                marginBottom: '20px'
+              }}>
+                <div style={{ fontSize: '14px', color: '#a8d0ff', marginBottom: '8px' }}>Current Score</div>
+                <div style={{ fontSize: '56px', fontWeight: 'bold', color: getScoreColor(securityScore) }}>
+                  {securityScore}
+                </div>
+                <div style={{ fontSize: '14px', color: getScoreColor(securityScore), fontWeight: 'bold' }}>
+                  {getScoreLabel(securityScore)}
+                </div>
+              </div>
+
+              <h3 style={{ color: '#a8d0ff', fontSize: '16px', marginBottom: '12px' }}>How is it calculated?</h3>
+              <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px', lineHeight: '1.8' }}>
+                <p style={{ marginBottom: '12px' }}>
+                  The Organizational Security Score is calculated using the formula:
+                </p>
+                <div style={{
+                  padding: '12px 16px',
+                  background: 'rgba(0,0,0,0.3)',
+                  borderRadius: '8px',
+                  fontFamily: 'monospace',
+                  marginBottom: '16px',
+                  border: '1px solid rgba(102, 126, 234, 0.3)'
+                }}>
+                  Score = 100 - Avg User Risk - High Risk Penalty + Blocked Bonus
+                </div>
+
+                <h4 style={{ color: '#fff', fontSize: '14px', marginTop: '16px', marginBottom: '8px' }}>Components:</h4>
+                <ul style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+                  <li style={{ marginBottom: '8px' }}>
+                    <strong style={{ color: '#ff8c00' }}>Average User Risk:</strong> The mean risk score across all monitored users
+                  </li>
+                  <li style={{ marginBottom: '8px' }}>
+                    <strong style={{ color: '#dc3545' }}>High Risk Penalty:</strong> -2 points for each HIGH/CRITICAL activity (max -30)
+                  </li>
+                  <li style={{ marginBottom: '8px' }}>
+                    <strong style={{ color: '#28a745' }}>Blocked Bonus:</strong> +1 point for each successfully blocked threat (max +10)
+                  </li>
+                </ul>
+
+                <h4 style={{ color: '#fff', fontSize: '14px', marginTop: '16px', marginBottom: '8px' }}>Score Ranges:</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <div style={{ padding: '8px', background: 'rgba(40, 167, 69, 0.2)', borderRadius: '6px', borderLeft: '3px solid #28a745' }}>
+                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>80-100:</span> Excellent
+                  </div>
+                  <div style={{ padding: '8px', background: 'rgba(255, 193, 7, 0.2)', borderRadius: '6px', borderLeft: '3px solid #ffc107' }}>
+                    <span style={{ color: '#ffc107', fontWeight: 'bold' }}>60-79:</span> Good
+                  </div>
+                  <div style={{ padding: '8px', background: 'rgba(255, 140, 0, 0.2)', borderRadius: '6px', borderLeft: '3px solid #ff8c00' }}>
+                    <span style={{ color: '#ff8c00', fontWeight: 'bold' }}>40-59:</span> Moderate
+                  </div>
+                  <div style={{ padding: '8px', background: 'rgba(220, 53, 69, 0.2)', borderRadius: '6px', borderLeft: '3px solid #dc3545' }}>
+                    <span style={{ color: '#dc3545', fontWeight: 'bold' }}>0-39:</span> At Risk
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowScoreModal(false)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  marginTop: '20px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer'
+                }}
+              >
+                Got It
+              </button>
             </div>
           </div>
         )}

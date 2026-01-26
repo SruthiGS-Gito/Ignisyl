@@ -62,10 +62,11 @@ class BehavioralDataGenerator:
             dept = random.choice(departments)
             role = random.choice(roles[dept])
             
+            username = fake.user_name()
             user = {
                 'user_id': i + 1,
-                'username': fake.user_name(),
-                'email': fake.email(),
+                'username': username,
+                'email': f"{username}@ignisyl.demo",
                 'full_name': fake.name(),
                 'department': dept,
                 'role': role,

@@ -45,7 +45,7 @@ def generate_user():
         'user_id': f"{first_name.lower()}_{last_name.lower()}",
         'username': f"{first_name.lower()}.{last_name.lower()}",
         'full_name': f"{first_name} {last_name}",
-        'email': f"{first_name.lower()}.{last_name.lower()}@company.com",
+        'email': f"{first_name.lower()}.{last_name.lower()}@ignisyl.demo",
         'department': random.choice(DEPARTMENTS),
         'role': random.choice(['Employee', 'Developer', 'Manager', 'Administrator']),
     }

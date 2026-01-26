@@ -227,9 +227,9 @@ python -c "from models.database import create_sample_data; create_sample_data()"
 **Sample Users Created:**
 | Username | Password | Role | Email |
 |----------|----------|------|-------|
-| admin | admin123 | admin | admin@company.com |
-| sruthi_g_s | analyst123 | analyst | sruthi.gs@company.com |
-| r_anand | analyst123 | analyst | r.anand@company.com |
+| admin | admin123 | admin | admin@ignisyl.demo |
+| sruthi_g_s | analyst123 | analyst | sruthi.gs@ignisyl.demo |
+| r_anand | analyst123 | analyst | r.anand@ignisyl.demo |
 
 ---
 
@@ -515,6 +515,6 @@ For production deployment, refer to:
 
 For installation issues:
 - **GitHub Issues:** https://github.com/SruthiGS-Gito/Ignisyl/issues
-- **Email:** support@company.com
+- **Email:** support@ignisyl.demo
 - **Documentation:** https://docs.ignisyl.com
 <<<END Installation_Guide.md>>>

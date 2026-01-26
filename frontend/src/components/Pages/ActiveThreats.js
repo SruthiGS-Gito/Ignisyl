@@ -12,7 +12,28 @@ const ActiveThreats = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedThreat, setSelectedThreat] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [blockConfirmModal, setBlockConfirmModal] = useState({ open: false, threat: null });
+  const [sortBy, setSortBy] = useState('severity');
   const toast = useToast();
+
+  // Sort threats by severity (Critical > High > Medium > Low)
+  const getSeverityOrder = (severity) => {
+    const order = { 'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3 };
+    return order[severity?.toUpperCase()] ?? 4;
+  };
+
+  const sortedThreats = [...threats].sort((a, b) => {
+    if (sortBy === 'severity') {
+      const severityDiff = getSeverityOrder(a.severity) - getSeverityOrder(b.severity);
+      if (severityDiff !== 0) return severityDiff;
+      return b.risk_score - a.risk_score; // Secondary sort by risk score
+    } else if (sortBy === 'risk_score') {
+      return b.risk_score - a.risk_score;
+    } else if (sortBy === 'time') {
+      return new Date(b.detected_at) - new Date(a.detected_at);
+    }
+    return 0;
+  });
 
   useEffect(() => {
     loadThreats();
@@ -34,9 +55,15 @@ const ActiveThreats = () => {
     }
   };
 
-  const handleBlockThreat = async (threat) => {
-    if (!window.confirm(`Are you sure you want to block user "${threat.full_name}"?`)) return;
+  const handleBlockThreat = (threat) => {
+    setBlockConfirmModal({ open: true, threat });
+  };
 
+  const confirmBlockThreat = async () => {
+    const threat = blockConfirmModal.threat;
+    if (!threat) return;
+
+    setBlockConfirmModal({ open: false, threat: null });
     setActionLoading(true);
     try {
       await firewallAPI.blockUser(threat.user_id, null, 60);
@@ -95,9 +122,30 @@ const ActiveThreats = () => {
         </div>
 
         <div className="admin-card">
-          <h3 className="card-title">Active Threat List</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 className="card-title" style={{ margin: 0 }}>Active Threat List ({threats.length} threats)</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label style={{ color: '#a8d0ff', fontSize: '13px' }}>Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#1a252f',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontSize: '13px'
+                }}
+              >
+                <option value="severity">Severity (Critical first)</option>
+                <option value="risk_score">Risk Score (Highest first)</option>
+                <option value="time">Time (Most recent first)</option>
+              </select>
+            </div>
+          </div>
 
-          {threats.length === 0 ? (
+          {sortedThreats.length === 0 ? (
             <div className="empty-state" style={{ padding: '60px', textAlign: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>✓</div>
               <div style={{ fontSize: '18px', color: '#10b981' }}>No active threats detected</div>
@@ -105,7 +153,7 @@ const ActiveThreats = () => {
             </div>
           ) : (
             <div className="threats-list">
-              {threats.map((threat, index) => {
+              {sortedThreats.map((threat, index) => {
                 const riskDetails = getRiskLevelDetails(threat.risk_score);
                 return (
                   <div
@@ -146,6 +194,73 @@ const ActiveThreats = () => {
             </div>
           )}
         </div>
+
+        {/* Block Confirmation Modal */}
+        {blockConfirmModal.open && blockConfirmModal.threat && (
+          <div className="modal-overlay" onClick={() => setBlockConfirmModal({ open: false, threat: null })}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Confirm Block Action</h2>
+                <button className="modal-close" onClick={() => setBlockConfirmModal({ open: false, threat: null })}>×</button>
+              </div>
+              <div className="modal-body">
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: 'rgba(220, 53, 69, 0.15)',
+                  border: '1px solid #dc3545',
+                  borderRadius: '8px',
+                  marginBottom: '20px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '32px' }}>&#9888;</span>
+                    <div>
+                      <div style={{ color: '#dc3545', fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+                        Security Action Required
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>
+                        You are about to block user access. This action will:
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <ul style={{ color: 'rgba(255,255,255,0.8)', marginLeft: '20px', marginBottom: '20px', lineHeight: '1.8' }}>
+                  <li>Immediately terminate all active sessions</li>
+                  <li>Prevent the user from logging in</li>
+                  <li>Block all network access from this user</li>
+                  <li>Log this action to the audit trail</li>
+                </ul>
+
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ color: '#a8d0ff', fontSize: '12px', marginBottom: '8px' }}>Affected User</div>
+                  <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>
+                    {blockConfirmModal.threat.full_name}
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+                    {blockConfirmModal.threat.username} | Risk Score: {blockConfirmModal.threat.risk_score}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-admin" onClick={() => setBlockConfirmModal({ open: false, threat: null })}>
+                  Cancel
+                </button>
+                <button
+                  className="btn-admin"
+                  style={{ backgroundColor: '#dc3545' }}
+                  onClick={confirmBlockThreat}
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Blocking...' : 'Confirm Block'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Threat Detail Modal */}
         {selectedThreat && (

@@ -1,7 +1,7 @@
 {
-    "user_id": "user_sruthi_g_s",
-    "username": "sruthi_g_s",
-    "full_name": "Sruthi G S",
-    "department": "Computer Science",
-    "role": "Student"
+    "user_id": "demo_user",
+    "username": "demo_analyst",
+    "full_name": "Demo User",
+    "department": "Security",
+    "role": "Analyst"
 }
