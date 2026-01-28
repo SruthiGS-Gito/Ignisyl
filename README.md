@@ -2,7 +2,15 @@
 
 **AI-Powered Insider Threat Detection System with Adaptive Firewall Control**
 
-IGNISYL is an intelligent security system that detects insider threats using machine learning and implements graduated response actions through an adaptive firewall. Unlike traditional binary ALLOW/BLOCK systems, IGNISYL provides 5-level graduated responses with granular analyst controls.
+IGNISYL is an intelligent security system that detects insider threats using machine learning and implements graduated response actions through an adaptive firewall. Unlike traditional binary ALLOW/BLOCK systems, IGNISYL provides a 4-tier graduated response framework with granular analyst controls.
+
+---
+
+**Developer:** Sruthi CS
+**Institution:** Sree Buddha College of Engineering, Kerala, India
+**Academic Year:** 2025-2026
+**Project Type:** Final Year B.Tech Project
+**Conference:** IEEE ICAECT 2026 (Submission Completed)
 
 ---
 
@@ -17,7 +25,9 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 - [Project Structure](#project-structure)
 - [Screenshots](#screenshots)
 - [Future Enhancements](#future-enhancements)
-- [Team](#team)
+- [Risk Thresholds](#risk-thresholds)
+- [Important Notes](#important-notes)
+- [Developer](#developer)
 - [License](#license)
 
 ---
@@ -32,10 +42,11 @@ IGNISYL is an intelligent security system that detects insider threats using mac
   - XGBoost (supervised gradient boosting)
   - Weighted ensemble: 30% IF + 30% AE + 40% XGB
 
-- **Graduated Response Framework**
-  - 5-level adaptive response system
-  - Context-aware automation for clear cases
-  - Analyst decision support for ambiguous threats
+- **Graduated Response Framework:** 4-tier automated system
+  - **ALLOW** (0-30): Normal operations with standard logging
+  - **MONITOR** (31-50): Enhanced logging, analyst awareness
+  - **RESTRICT** (51-75): Analyst review required, limited access
+  - **BLOCK** (76-100): Complete block, incident response
 
 - **Analyst Control Panel**
   - Custom restriction options (block external only, rate limit, port blocking)
@@ -92,7 +103,7 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                     Services Layer                        │  │
 │  │  • Risk Scorer (27 factors + 13 business modifiers)      │  │
-│  │  • Firewall Controller (5-level graduated response)       │  │
+│  │  • Firewall Controller (4-tier graduated response)        │  │
 │  │  • Report Generator (PDF with visualizations)             │  │
 │  │  • System Monitor (real-time metrics)                     │  │
 │  └──────────────────────────────────────────────────────────┘  │
@@ -116,7 +127,7 @@ For detailed architecture, see [docs/Architecture.md](docs/Architecture.md)
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Ignisyl.git
+git clone https://github.com/SruthiGS-Gito/Ignisyl.git
 cd Ignisyl
 
 # Create Python virtual environment
@@ -283,21 +294,44 @@ Ignisyl/
 
 ---
 
-## Team
+## Developer
 
-**Project:** IGNISYL - AI-Powered Insider Threat Detection
-**Institution:** Sree Buddha College of Engineering
+**Developer:** Sruthi CS
+**Institution:** Sree Buddha College of Engineering, Kerala, India
 **Academic Year:** 2025-2026
-**Type:** B.Tech Final Year Project
+**Project Type:** Final Year B.Tech Project
+**Conference:** IEEE ICAECT 2026 (Submission Completed)
 
-| Name | Role |
-|------|------|
-| Sruthi G S | Lead Developer & ML Researcher |
-| R Anand | Frontend Developer & UI/UX Designer |
-| Aiswarya Lekshmi | Security Analyst & Testing Lead |
-| Vrinda V | Data Engineer & Documentation Lead |
+| Role | Responsibility |
+|------|----------------|
+| Full Stack Development | Backend (FastAPI), Frontend (React), Database |
+| ML Engineering | Ensemble model design, training, evaluation |
+| Security Research | Threat detection algorithms, graduated response framework |
+| Documentation | Technical docs, API reference, user guides |
 
-**Project Advisor:** Dr. Divya Mohan
+---
+
+## Risk Thresholds
+
+| Level | Score Range | Response | Description |
+|-------|-------------|----------|-------------|
+| **LOW** | 0-30 | ALLOW | Normal operations, standard logging |
+| **MEDIUM** | 31-50 | MONITOR | Enhanced logging, analyst awareness |
+| **HIGH** | 51-75 | RESTRICT | Analyst decision required, limited access |
+| **CRITICAL** | 76-100 | BLOCK | Auto-block, incident response triggered |
+
+---
+
+## Important Notes
+
+**Simulation Mode:** The firewall controller generates OS-specific commands (Windows/Linux/macOS) but does NOT execute them. This is intentional for:
+- Academic demonstration safety
+- Cross-platform compatibility
+- Production deployment requires agent installation on endpoints
+
+**ML Performance:** Detection accuracy metrics are calculated from ensemble model predictions on synthetic data. For production deployment, retrain models on organization-specific data.
+
+**Demo Data:** System includes 50 demo users with synthetic activities. For production, integrate with your organization's user directory (Active Directory, LDAP, etc.)
 
 ---
 
@@ -305,7 +339,7 @@ Ignisyl/
 
 This project is developed for academic research purposes.
 
-**Conference Target:** IEEE ICAECT 2026
+**Conference:** IEEE ICAECT 2026 (Submission Completed)
 
 ---
 
@@ -317,7 +351,7 @@ This project is developed for academic research purposes.
 | [User Manual](docs/User_Manual.md) | User guide for analysts |
 | [API Documentation](docs/API_Documentation.md) | Complete API reference |
 | [Architecture](docs/Architecture.md) | System design details |
-| [Quick Start Guide](docs/QUICK_START_GUIDE.md) | Get started quickly |
+| [Firewall System](docs/FIREWALL_SYSTEM_DOCUMENTATION.md) | Graduated response framework |
 
 ---
 
