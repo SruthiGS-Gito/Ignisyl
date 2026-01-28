@@ -19,6 +19,14 @@ IGNISYL provides a RESTful API for insider threat detection and adaptive firewal
 
 **Content-Type:** `application/json`
 
+> **Important: Simulation Mode**
+>
+> All firewall and restriction endpoints operate in **simulation mode** by default:
+> - Firewall commands are **generated and logged** but **NOT executed**
+> - This is intentional for academic demonstration and development safety
+> - Production deployment requires IGNISYL Agent installation on endpoints
+> - Response payloads include `simulation_mode: true` to indicate this status
+
 ---
 
 ## Authentication
@@ -179,6 +187,8 @@ POST /api/v1/firewall/block
 Authorization: Bearer <access_token>
 ```
 
+> **Simulation Mode:** This endpoint generates firewall commands but does NOT execute them on actual network infrastructure.
+
 **Request Body:**
 ```json
 {
@@ -191,11 +201,16 @@ Authorization: Bearer <access_token>
 **Response (200 OK):**
 ```json
 {
-  "message": "User blocked successfully",
+  "success": true,
+  "simulation_mode": true,
+  "message": "Block action logged successfully. Commands generated but not executed.",
   "rule_id": "FW_BLOCK_20251021_143045",
   "user_id": "sruthi_g_s",
   "action": "BLOCK",
-  "expires_at": "2025-10-21T15:30:45"
+  "expires_at": "2025-10-21T15:30:45",
+  "commands_generated": [
+    "netsh advfirewall firewall add rule name=\"IGNISYL_BLOCK_sruthi_g_s\" ..."
+  ]
 }
 ```
 
@@ -204,6 +219,8 @@ Authorization: Bearer <access_token>
 POST /api/v1/firewall/restrict
 Authorization: Bearer <access_token>
 ```
+
+> **Simulation Mode:** This endpoint generates firewall commands but does NOT execute them on actual network infrastructure.
 
 **Request Body:**
 ```json
@@ -218,10 +235,15 @@ Authorization: Bearer <access_token>
 **Response (200 OK):**
 ```json
 {
-  "message": "Restriction applied successfully",
+  "success": true,
+  "simulation_mode": true,
+  "message": "Restriction logged successfully. Commands generated but not executed.",
   "rule_id": "FW_RESTRICT_20251021_143100",
   "restriction_type": "block_external",
-  "expires_at": "2025-10-21T15:01:00"
+  "expires_at": "2025-10-21T15:01:00",
+  "commands_generated": [
+    "netsh advfirewall firewall add rule name=\"IGNISYL_RESTRICT_sruthi_g_s\" ..."
+  ]
 }
 ```
 
@@ -274,10 +296,17 @@ Authorization: Bearer <access_token>
 
 ## Analyst Threat Control Endpoints
 
+> **Important: Simulation Mode**
+>
+> All analyst action endpoints operate in simulation mode:
+> - Firewall actions are **logged but NOT executed** on actual network infrastructure
+> - This is intentional for academic demonstration safety
+> - Production deployment requires IGNISYL Agent installation on endpoints
+
 ### 1. Apply Analyst Action
 **Endpoint:** `POST /api/v1/analyst/threat/{threat_id}/action`
 
-**Description:** Analyst manually controls firewall response for a specific threat.
+**Description:** Analyst manually applies firewall response for a specific threat.
 
 **Authentication:** Required (Admin or Analyst role)
 
@@ -285,13 +314,6 @@ Authorization: Bearer <access_token>
 ```json
 {
   "action": "RESTRICT",
-  "custom_restrictions": {
-    "block_external_internet": true,
-    "rate_limit_mbps": 1,
-    "block_ports": [21, 22, 445],
-    "duration_minutes": 60,
-    "notify_user": true
-  },
   "reason": "Employee accessing confidential files outside business hours",
   "duration_minutes": 60
 }
@@ -301,15 +323,17 @@ Authorization: Bearer <access_token>
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | threat_id | string | Yes | User ID of the threat |
-| action | string | Yes | ALLOW, RESTRICT, ISOLATE, or BLOCK |
-| custom_restrictions | object | Yes | Custom firewall restrictions |
+| action | string | Yes | ALLOW, RESTRICT, or BLOCK |
 | reason | string | Yes | Justification for action |
 | duration_minutes | integer | No | Duration (default: 60) |
+
+**Note:** Custom restrictions (block_external_internet, rate_limit_mbps, block_ports) are planned for future release.
 
 **Response (200 OK):**
 ```json
 {
   "success": true,
+  "simulation_mode": true,
   "result": {
     "status": "RESTRICTED",
     "action_applied": "RESTRICT",
@@ -317,7 +341,10 @@ Authorization: Bearer <access_token>
     "timestamp": "2025-01-01T14:30:00",
     "reason": "Employee accessing confidential files outside business hours"
   },
-  "message": "Action RESTRICT applied successfully by security_analyst"
+  "message": "Action logged successfully. Commands generated but not executed.",
+  "commands_generated": [
+    "netsh advfirewall firewall add rule name=\"IGNISYL_RESTRICT_john_doe\" ..."
+  ]
 }
 ```
 
@@ -332,7 +359,7 @@ Authorization: Bearer <access_token>
 ### 2. Get Pending Decisions
 **Endpoint:** `GET /api/v1/analyst/pending-decisions`
 
-**Description:** Get all threats waiting for analyst decision (risk score 50-69).
+**Description:** Get all threats waiting for analyst decision (risk score 51-75, HIGH level).
 
 **Authentication:** Required (Admin or Analyst role)
 
@@ -341,6 +368,11 @@ Authorization: Bearer <access_token>
 {
   "success": true,
   "count": 5,
+  "risk_threshold": {
+    "min": 51,
+    "max": 75,
+    "level": "HIGH"
+  },
   "pending_decisions": [
     {
       "id": 12345,
@@ -358,6 +390,8 @@ Authorization: Bearer <access_token>
 }
 ```
 
+**Note:** Threats with risk score 76-100 (CRITICAL) are auto-blocked and do not appear in pending decisions.
+
 **Error Responses:**
 - `403 Forbidden` - Insufficient permissions
 - `500 Internal Server Error` - Failed to get pending decisions
@@ -370,6 +404,8 @@ Authorization: Bearer <access_token>
 **Description:** Analyst sends message to user about suspicious activity.
 
 **Authentication:** Required (Admin or Analyst role)
+
+> **Note:** In simulation mode, contact attempts are logged but actual notifications may not be delivered depending on endpoint agent configuration.
 
 **Request Body:**
 ```json
@@ -384,17 +420,18 @@ Authorization: Bearer <access_token>
 |-----------|------|----------|-------------|
 | threat_id | string | Yes | User ID to contact |
 | message | string | Yes | Message to send |
-| method | string | No | notification, email, or sms (default: notification) |
+| method | string | No | notification (default) - email/sms planned for future |
 
 **Response (200 OK):**
 ```json
 {
   "success": true,
-  "status": "message_sent",
+  "simulation_mode": true,
+  "status": "message_logged",
   "method": "notification",
   "target_user": "john_doe",
   "timestamp": "2025-01-01T14:30:00",
-  "message": "Message sent to John Doe via notification"
+  "message": "Contact attempt logged. Delivery depends on agent configuration."
 }
 ```
 
@@ -431,13 +468,16 @@ Authorization: Bearer <access_token>
 ```json
 {
   "success": true,
+  "simulation_mode": true,
   "escalated_to": "incident_team",
   "target_user": "john_doe",
   "analyst": "security_analyst",
   "timestamp": "2025-01-01T14:35:00",
-  "message": "Threat escalated to incident_team"
+  "message": "Escalation logged. Notification depends on integration configuration."
 }
 ```
+
+**Note:** In simulation mode, escalation is logged but actual notifications to incident teams depend on external integration configuration.
 
 **Error Responses:**
 - `403 Forbidden` - Insufficient permissions
@@ -621,8 +661,21 @@ console.log(`Action: ${result.action}`);
 
 ---
 
+## Risk Thresholds Reference
+
+| Level | Score Range | Automated Response | Analyst Action |
+|-------|-------------|-------------------|----------------|
+| LOW | 0-30 | ALLOW | Not required |
+| MEDIUM | 31-50 | MONITOR | Optional review |
+| HIGH | 51-75 | RESTRICT | **Required** (pending decisions queue) |
+| CRITICAL | 76-100 | BLOCK | Auto-applied, review recommended |
+
+---
+
 ## Support
 
 For API support, contact: security@ignisyl.demo
+
+**Note:** This API documentation reflects simulation mode operation. For production deployment guidance, see the Installation Guide.
 <<<END API_Documentation.md>>>
 
