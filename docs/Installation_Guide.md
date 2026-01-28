@@ -2,15 +2,40 @@
 # IGNISYL - Installation Guide
 
 ## Table of Contents
-1. [System Requirements](#system-requirements)
-2. [Prerequisites](#prerequisites)
-3. [Backend Installation](#backend-installation)
-4. [Frontend Installation](#frontend-installation)
-5. [Database Setup](#database-setup)
-6. [Configuration](#configuration)
-7. [Running the Application](#running-the-application)
-8. [Verification](#verification)
-9. [Troubleshooting](#troubleshooting)
+1. [What Gets Installed](#what-gets-installed)
+2. [System Requirements](#system-requirements)
+3. [Prerequisites](#prerequisites)
+4. [Backend Installation](#backend-installation)
+5. [Frontend Installation](#frontend-installation)
+6. [Database Setup](#database-setup)
+7. [Configuration](#configuration)
+8. [Running the Application](#running-the-application)
+9. [Verification](#verification)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## What Gets Installed
+
+### Included in This Installation
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Backend server | FastAPI Python application | ✅ Installed |
+| Frontend web app | React dashboard | ✅ Installed |
+| SQLite databases | 3 database files | ✅ Created |
+| Pre-trained ML models | Ensemble detector | ✅ Included |
+
+### NOT Included (Future Features)
+
+| Component | Description | Status |
+|-----------|-------------|--------|
+| Endpoint agents | Software on user computers | ❌ Not available |
+| Network monitoring | Infrastructure monitoring | ❌ Not available |
+| Active Directory integration | Enterprise user sync | ❌ Not available |
+| Real firewall execution | Actual network blocking | ❌ Simulation only |
+
+> **Important:** The firewall controller generates OS-specific commands but does NOT execute them. This is intentional for academic demonstration safety.
 
 ---
 
@@ -28,7 +53,8 @@
 - **RAM:** 16 GB
 - **Storage:** 20 GB free space
 - **CPU:** Intel i7 or equivalent (8 cores)
-- **GPU:** NVIDIA GPU with CUDA support (optional, for ML training)
+
+> **No GPU Required:** ML models are pre-trained and included. GPU is NOT needed for running the system.
 
 ---
 
@@ -118,20 +144,14 @@ python -m venv venv
 pip install --break-system-packages -r requirements.txt
 
 # This will install:
-# - fastapi
-# - uvicorn
-# - sqlalchemy
-# - pydantic
-# - python-jose
-# - passlib
-# - bcrypt
-# - python-multipart
-# - psutil
-# - scikit-learn
-# - tensorflow
-# - xgboost
-# - reportlab
-# - websockets
+# - fastapi, uvicorn (web framework)
+# - sqlalchemy, pydantic (database & validation)
+# - python-jose, passlib, bcrypt (authentication)
+# - scikit-learn (ML - Isolation Forest)
+# - torch (PyTorch - Autoencoder)
+# - xgboost (ML - gradient boosting)
+# - reportlab, matplotlib (PDF reports)
+# - websockets (real-time updates)
 ```
 
 **If you encounter errors:**
@@ -149,7 +169,7 @@ pip install --break-system-packages -r requirements.txt
 pip list
 
 # Test imports
-python -c "import fastapi; import tensorflow; import xgboost; print('All imports successful!')"
+python -c "import fastapi; import torch; import xgboost; import sklearn; print('All imports successful!')"
 ```
 
 ---
@@ -204,7 +224,10 @@ npm list --depth=0
 
 ### Step 1: Initialize Databases
 
-The system uses **SQLite** for development (production uses PostgreSQL).
+The system uses **SQLite** for development/demo purposes.
+
+> **Note:** PostgreSQL support is planned but not currently implemented.
+
 ```bash
 # From backend directory with venv activated
 cd backend
@@ -214,9 +237,9 @@ python -c "from models.database import init_db; init_db()"
 ```
 
 This creates:
-- `data/ignisyl.db` - Main application database
-- `data/users.db` - User authentication database
-- `data/activities.db` - Activity logs database
+- `backend/data/ignisyl.db` - Main application database (users, activities, alerts)
+- `data/activities.db` - Activity logs (optional)
+- `data/users.db` - User data (optional)
 
 ### Step 2: Create Sample Data (Optional)
 ```bash
@@ -462,17 +485,17 @@ npm start
 2. Verify `REACT_APP_API_URL` in frontend `.env`
 3. Restart both backend and frontend
 
-#### Issue 6: TensorFlow Installation Issues
+#### Issue 6: PyTorch Installation Issues
 
-**Error:** `Could not find a version that satisfies the requirement tensorflow`
+**Error:** `Could not find a version that satisfies the requirement torch`
 
 **Solution:**
 ```bash
-# For Windows, install specific version
-pip install tensorflow-cpu==2.15.0 --break-system-packages
+# For Windows, install CPU version
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# Or use conda
-conda install tensorflow
+# Or install with CUDA support (optional, for faster inference)
+pip install torch --index-url https://download.pytorch.org/whl/cu118
 ```
 
 #### Issue 7: WebSocket Connection Failed
@@ -494,20 +517,20 @@ After successful installation:
 1. **Read the User Manual** → `docs/User_Manual.md`
 2. **Review API Documentation** → http://localhost:8000/docs
 3. **Check Architecture** → `docs/Architecture.md`
-4. **Run ML Model Training** → `python backend/ml_engine/model_trainer.py`
-5. **Deploy Network Monitor** → Configure `user_config.json` on employee laptops
+4. **Generate Test Data** → Use the dashboard to analyze sample activities
+
+> **Note:** The system runs in simulation mode. Firewall actions are logged but not executed on actual network infrastructure.
 
 ---
 
-## Production Deployment
+## What This Installation Does NOT Include
 
-For production deployment, refer to:
-- **Architecture.md** → Deployment Architecture section
-- Use **PostgreSQL** instead of SQLite
-- Set **DEBUG=False** in `.env`
-- Use **Nginx** as reverse proxy
-- Enable **SSL/TLS** certificates
-- Configure **Gunicorn** with multiple workers
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Endpoint agents | ❌ Not available | Would need separate development |
+| Network monitor on laptops | ❌ Not available | Future feature |
+| PostgreSQL database | ❌ Not configured | SQLite used for demo |
+| Production deployment | ❌ Not configured | Single-server dev mode only |
 
 ---
 
@@ -515,6 +538,6 @@ For production deployment, refer to:
 
 For installation issues:
 - **GitHub Issues:** https://github.com/SruthiGS-Gito/Ignisyl/issues
-- **Email:** support@ignisyl.demo
-- **Documentation:** https://docs.ignisyl.com
+- **Developer:** Sruthi CS
+- **Institution:** Sree Buddha College of Engineering, Kerala, India
 <<<END Installation_Guide.md>>>
