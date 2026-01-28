@@ -10,9 +10,9 @@
 6. [User Management](#user-management)
 7. [Activity Monitoring](#activity-monitoring)
 8. [Alert Management](#alert-management)
-9. [Report Generation](#report-generation)
-10. [System Settings](#system-settings)
-11. [Network Monitor (Employee Laptops)](#network-monitor-employee-laptops)
+9. [Analyst Control Panel](#analyst-control-panel)
+10. [Report Generation](#report-generation)
+11. [System Status](#system-status)
 12. [Best Practices](#best-practices)
 13. [FAQ](#faq)
 
@@ -23,12 +23,12 @@
 **IGNISYL** is an AI-powered insider threat detection and adaptive firewall system designed to protect organizations from internal security threats. This manual will guide you through using the system effectively.
 
 ### Key Features
-- ✅ Real-time threat detection using ML
-- ✅ Automated firewall responses
-- ✅ Professional PDF report generation
-- ✅ Live activity monitoring dashboard
+- ✅ Real-time threat detection using ML ensemble
+- ✅ 4-tier graduated response framework (ALLOW/MONITOR/RESTRICT/BLOCK)
+- ✅ Professional PDF report generation (4 report types)
+- ✅ Live activity monitoring dashboard with WebSocket updates
 - ✅ Role-based access control
-- ✅ Network activity tracking on employee devices
+- ✅ Analyst decision queue for HIGH-risk threats
 
 ---
 
@@ -57,133 +57,29 @@
 - ✅ View all activities and alerts
 - ✅ Generate all types of reports
 - ✅ Configure system settings
-- ✅ Override ANY firewall action (all 5 levels)
-- ✅ Manage ML models
-- ✅ Remote shutdown capability
+- ✅ Override any firewall action (all 4 tiers)
+- ❌ Cannot manage ML models directly (backend only)
 
 ### 2. Security Analyst
 **Permissions:**
 - ✅ View dashboard and all activities
 - ✅ Monitor real-time threats
-- ✅ **REMOTE THREAT CONTROL:**
-  - ✅ Make decisions on RESTRICT level threats (50-69 risk)
-  - ✅ Apply custom firewall restrictions
-  - ✅ Contact users directly
-  - ✅ Escalate to manager/admin
-  - ✅ Override auto-restrictions with justification
 - ✅ Generate user-specific reports
 - ✅ Acknowledge and resolve alerts
 - ❌ Cannot create/delete users
 - ❌ Cannot modify global system settings
-- ⚠️ Limited to Level 3-4 actions (cannot force shutdown)
 
-## Analyst Remote Control Capabilities
+**What Analysts CAN Do:**
+- ✅ View pending threats (risk 51-75)
+- ✅ Apply actions: ALLOW, RESTRICT (with reason), BLOCK
+- ✅ Contact users (notification logging)
+- ✅ Escalate to admin/manager (notification logging)
+- ✅ View audit trail of their actions
 
-### Real-Time Threat Response Dashboard
-
-When a HIGH-risk threat is detected (risk score 50-69), the system **does not automatically block**. Instead, it sends the threat to the **Analyst Decision Queue**.
-
-### Analyst Decision Workflow
-
-1. **Threat Notification**
-   - Alert appears in "Pending Decisions" section
-   - Desktop notification (if enabled)
-   - Email alert for URGENT threats
-
-2. **Threat Analysis**
-   - View complete activity context
-   - See user's recent behavior history
-   - Review ML model reasoning
-   - Check if user is on-site or remote
-
-3. **Available Actions**
-
-#### Option 1: ALLOW (False Positive)
-```
-Use Case: Legitimate unusual activity
-Example: CFO accessing payroll data at night for audit
-Action: Clear alert, add to user baseline
-```
-
-#### Option 2: RESTRICT (Limit Access)
-```
-Use Case: Suspicious but not critical
-Example: Employee accessing confidential files outside normal hours
-Custom Restrictions:
-  ☐ Block external internet only
-  ☐ Block file transfers (FTP, SMB, SSH)
-  ☐ Rate limit to 1 Mbps
-  ☐ Disable USB devices
-  ☐ Force logout after 10 minutes
-  ☐ Send warning notification to user
-Duration: 30 min / 1 hr / 4 hrs / Until review
-```
-
-#### Option 3: ISOLATE (Network Quarantine)
-```
-Use Case: High-confidence threat
-Example: Large data exfiltration attempt
-Restrictions:
-  ✓ Block all external network
-  ✓ Allow internal corporate network only
-  ✓ Disconnect VPN
-  ✓ Disable USB ports
-  ✓ Log all local file operations
-Duration: Until analyst manually releases
-```
-
-#### Option 4: ESCALATE
-```
-Use Case: Need admin/management decision
-Action: Forward to admin with notes
-Notification: Immediate alert to admin
-```
-
-#### Option 5: CONTACT USER
-```
-Use Case: Need user explanation
-Action: Send message to user's device
-Message: "We've detected unusual activity on your account.
-         Please call Security at ext. 1234 immediately."
-```
-
-### Custom Restriction Examples
-
-**Scenario 1: Finance employee accessing HR files**
-```
-Risk Score: 62 (HIGH)
-Analyst Decision: RESTRICT
-Custom Actions:
-  ✓ Block external internet
-  ✓ Send warning notification
-  ✗ Allow internal network (for legitimate work)
-Duration: 30 minutes
-Reason: "Verify legitimate business need with manager"
-```
-
-**Scenario 2: Developer with sudden large data transfer**
-```
-Risk Score: 71 (CRITICAL - auto-isolated)
-Analyst Review: ISOLATE → ALLOW
-Custom Actions:
-  ✓ Contact user first
-  ✓ User confirmed: "Uploading product release to cloud"
-  ✓ Release isolation
-  ✓ Add to baseline: "Weekly release uploads"
-Reason: "Legitimate release process, updated user profile"
-```
-
-**Scenario 3: Honeypot access detected**
-```
-Risk Score: 95 (CRITICAL - auto-blocked)
-Analyst Review: Confirm block
-Actions:
-  ✓ Keep blocked
-  ✓ Contact user's manager
-  ✓ Initiate incident investigation
-  ✓ Preserve forensic evidence
-Reason: "Confirmed insider threat - investigating"
-```
+**What Analysts CANNOT Do:**
+- ❌ Custom firewall restrictions (block external only, rate limits, etc.) - *Future Feature*
+- ❌ Real-time network enforcement - *Requires agent deployment*
+- ❌ USB device control - *Requires endpoint agent*
 
 ---
 
@@ -246,10 +142,10 @@ Live updates of detected threats with:
 - Action Taken
 
 **Color Coding:**
-- 🟢 **GREEN** - LOW risk (0-29)
-- 🟡 **YELLOW** - MEDIUM risk (30-49)
-- 🟠 **ORANGE** - HIGH risk (50-69)
-- 🔴 **RED** - CRITICAL risk (70-100)
+- 🟢 **GREEN** - LOW risk (0-30) → ALLOW
+- 🟡 **YELLOW** - MEDIUM risk (31-50) → MONITOR
+- 🟠 **ORANGE** - HIGH risk (51-75) → RESTRICT (Analyst Decision)
+- 🔴 **RED** - CRITICAL risk (76-100) → BLOCK (Auto)
 
 #### 3. Risk Score Chart (Right)
 Line chart showing risk scores over time for quick trend analysis.
@@ -385,10 +281,10 @@ The system monitors:
 ### Alert Priorities
 
 Automatically assigned based on risk score:
-- **LOW** - Risk Score < 30
-- **MEDIUM** - Risk Score 30-49
-- **HIGH** - Risk Score 50-69
-- **CRITICAL** - Risk Score ≥ 70
+- **LOW** - Risk Score 0-30 → ALLOW
+- **MEDIUM** - Risk Score 31-50 → MONITOR
+- **HIGH** - Risk Score 51-75 → RESTRICT (Analyst Decision Required)
+- **CRITICAL** - Risk Score 76-100 → BLOCK (Auto)
 
 ### Alert Workflow
 
@@ -424,294 +320,34 @@ View system-wide alert statistics:
 - Priority Breakdown (graph)
 
 ---
-## Analyst Remote Threat Control
+## Analyst Control Panel
 
 ### Overview
 
-When a HIGH-risk threat is detected (risk score 50-69), the system **does not automatically block**. Instead, it sends the threat to the **Analyst Decision Queue** for human review.
-
-This graduated approach prevents false positives while ensuring real threats are addressed.
+When a HIGH-risk threat is detected (risk score 51-75), the system sends the threat to the **Analyst Decision Queue** for human review. This graduated approach prevents false positives while ensuring real threats are addressed.
 
 ### Accessing Pending Decisions
 
-1. Navigate to **Dashboard** → **Pending Decisions**
+1. Navigate to **Dashboard** → **Active Threats** tab
 2. Or click the **notification badge** when new threats appear
-3. You'll see threats sorted by risk score (highest first)
-
-### Threat Analysis Screen
-
-Each pending threat shows:
-- **User Information:** Name, department, role
-- **Activity Details:** What they did, when, where
-- **Risk Breakdown:**
-  - ML model scores (Isolation Forest, Autoencoder, XGBoost)
-  - Triggered risk factors (e.g., "outside_business_hours", "large_file_transfer")
-  - Contextual modifiers applied
-- **Recommended Action:** System suggestion
-- **Recent History:** User's last 10 activities
+3. Threats are sorted by risk score (highest first)
 
 ### Available Actions
 
-#### Option 1: ALLOW (False Positive)
-**Use When:** Activity is legitimate despite high risk score
+| Action | Use Case | Result |
+|--------|----------|--------|
+| **ALLOW** | False positive, legitimate activity | Alert cleared, logged |
+| **RESTRICT** | Suspicious, needs investigation | Limited access, analyst notified |
+| **BLOCK** | Confirmed threat | Complete block, incident logged |
+| **Contact User** | Need explanation | Notification sent (logged) |
+| **Escalate** | Need higher authority | Forwarded to admin/manager |
 
-**Example Scenario:**
-- CFO accessing payroll data at 11 PM for board meeting next morning
-- Developer downloading large codebase for urgent hotfix
+### Action Requirements
 
-**Steps:**
-1. Click **ALLOW** button
-2. Enter reason: "Legitimate business need - board meeting preparation"
-3. Optionally: Add to user's baseline behavior
-4. Click **Confirm**
-
-**Result:** Alert cleared, no restrictions applied
-
----
-
-#### Option 2: RESTRICT (Limit Access)
-**Use When:** Suspicious activity that needs investigation
-
-**Example Scenario:**
-- Employee accessing HR files outside their department
-- Large data transfer to personal cloud storage
-
-**Custom Restrictions:**
-```
-☐ Block external internet only
-☐ Block file transfers (FTP, SMB, SSH)
-☐ Rate limit to 1 Mbps
-☐ Disable USB devices
-☐ Force logout after 10 minutes
-☐ Send warning notification to user
-```
-
-**Duration Options:**
-- 30 minutes
-- 1 hour (default)
-- 4 hours
-- 8 hours
-- Until analyst review
-
-**Steps:**
-1. Click **RESTRICT** button
-2. Select custom restrictions (checkboxes)
-3. Choose duration
-4. Enter reason: "Accessing confidential files outside normal hours - verifying with manager"
-5. Optional: Send notification to user
-6. Click **Apply Restrictions**
-
-**Result:** User can access internal resources but limited external access
-
----
-
-#### Option 3: ISOLATE (Network Quarantine)
-**Use When:** High confidence of malicious activity
-
-**Example Scenario:**
-- Multiple honeypot file accesses
-- Attempting privilege escalation
-- Large data exfiltration in progress
-
-**Restrictions Applied:**
-```
-✓ Block all external network
-✓ Allow internal corporate network only
-✓ Disconnect VPN
-✓ Disable USB ports
-✓ Log all local file operations
-✓ Require admin unlock
-```
-
-**Steps:**
-1. Click **ISOLATE** button
-2. Confirm action (this is severe)
-3. Enter detailed reason
-4. Click **Quarantine User**
-
-**Result:** User completely isolated, investigation begins immediately
-
----
-
-#### Option 4: CONTACT USER
-**Use When:** Need user explanation before taking action
-
-**Steps:**
-1. Click **Contact User** button
-2. Select method:
-   - Desktop notification (instant)
-   - Email (within 5 min)
-   - SMS (if configured)
-3. Enter message:
-```
-   We've detected unusual activity on your account.
-   Please call Security at ext. 1234 immediately.
-```
-4. Click **Send Message**
-
-**Result:** User receives notification, analyst waits for response
-
----
-
-#### Option 5: ESCALATE
-**Use When:** Decision requires higher authority
-
-**Escalation Targets:**
-- **Admin:** For policy decisions
-- **Manager:** For department-specific context
-- **Incident Team:** For serious threats
-
-**Steps:**
-1. Click **Escalate** button
-2. Select escalation target
-3. Enter notes:
-```
-   User accessing multiple honeypot files.
-   Need executive decision on whether to involve HR.
-   Possible insider threat investigation required.
-```
-4. Click **Escalate**
-
-**Result:** Notification sent to target, they take over decision
-
----
-
-### Real-World Examples
-
-#### Example 1: Finance Employee Accessing HR Files
-
-**Alert:**
-```
-User: jane_smith
-Risk Score: 62 (HIGH)
-Activity: Accessed employee_salaries.xlsx
-Time: 2:47 AM
-Location: Home IP
-```
-
-**Analyst Analysis:**
-- Finance employee, but HR files are outside scope
-- Very unusual time (2:47 AM)
-- Working from home (not corporate network)
-- No recent approval for HR data access
-
-**Decision: RESTRICT**
-```
-Custom Actions:
-  ✓ Block external internet
-  ✓ Send warning notification
-  ✗ Allow internal network (for legitimate work)
-Duration: 1 hour
-Reason: "Verifying legitimate business need with HR director"
-```
-
-**Follow-up:**
-- Contacted user via notification
-- User responded: "Working on merger analysis, need salary data"
-- Contacted HR director: Confirmed approval exists
-- Released restriction after 30 minutes
-- Updated user profile: "Authorized for HR data access"
-
----
-
-#### Example 2: Developer with Large Data Transfer
-
-**Alert:**
-```
-User: bob_developer
-Risk Score: 71 (CRITICAL - auto-isolated)
-Activity: Uploading 5GB to external cloud
-Time: 6:15 PM
-Location: Office
-```
-
-**Analyst Analysis:**
-- System auto-isolated (risk > 70)
-- Developer transferring large amount of data
-- To personal Dropbox account
-- No business justification visible
-
-**Decision: Review Isolation → ALLOW**
-```
-Actions Taken:
-  1. Contacted user immediately
-  2. User explained: "Uploading product release to cloud for distribution"
-  3. Verified: Weekly release schedule, this is normal
-  4. Released isolation
-  5. Updated baseline: "Weekly 5GB uploads on Friday evenings"
-  
-Reason: "Legitimate release process, updated user profile"
-```
-
-**Lesson:** Auto-isolation for CRITICAL threats, but analyst can override with justification
-
----
-
-#### Example 3: Honeypot Access (Confirmed Threat)
-
-**Alert:**
-```
-User: john_contractor
-Risk Score: 95 (CRITICAL - auto-blocked)
-Activity: Accessed admin_passwords.txt (honeypot)
-Time: 11:32 PM
-Location: Unknown IP
-```
-
-**Analyst Analysis:**
-- Honeypot file (decoy trap)
-- Any access is malicious
-- Unknown IP (not corporate network)
-- Late night activity
-- Contractor, not full employee
-
-**Decision: Keep BLOCK + Escalate to Incident Team**
-```
-Actions Taken:
-  1. Keep full network block (already applied)
-  2. Contacted user's manager
-  3. Escalated to Incident Response Team
-  4. Started forensic investigation
-  5. Notified HR for contract review
-  
-Reason: "Confirmed insider threat - honeypot access indicates malicious intent"
-```
-
-**Result:** Full investigation launched, contractor's access revoked
-
----
-
-### Best Practices for Analysts
-
-#### 1. Always Investigate Context
-- Check user's normal behavior patterns
-- Review recent activities (last 24 hours)
-- Consider business context (month-end, audits, releases)
-- Contact user's manager if unsure
-
-#### 2. Document Everything
-- Always provide detailed reasons
-- Note any contact made with user/manager
-- Document follow-up actions
-- Update user baselines when patterns change
-
-#### 3. Response Time Targets
-- **CRITICAL (90-100):** Already auto-handled, review within 30 min
-- **HIGH (70-89):** Review within 1 hour
-- **MEDIUM-HIGH (50-69):** Review within 4 hours
-
-#### 4. Communication
-- Use **Contact User** for quick clarification
-- Use **Escalate** when you need more authority
-- Always notify users when applying restrictions
-- Follow up after restrictions expire
-
-#### 5. False Positive Handling
-- If ALLOW, update user's baseline behavior
-- Document why it was flagged (for model improvement)
-- Add notes for future analysts
-
----
+All actions require:
+- **Reason:** Text explanation (mandatory)
+- **Timestamp:** Automatically recorded
+- **Analyst ID:** Automatically recorded
 
 ### Audit Trail
 
@@ -722,10 +358,11 @@ All analyst actions are logged for compliance:
 - Why (justification required)
 - Result of action
 
-**View Your Actions:**
-1. Navigate to **Profile** → **My Actions**
-2. See complete history of your decisions
-3. Export for compliance reporting
+**View Action History:**
+1. Navigate to **Activity Log** page
+2. Filter by "Analyst Actions"
+3. See complete history of decisions
+
 ---
 
 ## Report Generation
@@ -780,121 +417,43 @@ All analyst actions are logged for compliance:
 
 ---
 
-## System Settings
+## System Status
 
-*(Admin Only)*
+### Current Implementation
 
-### ML Model Configuration
+The system operates in **Simulation Mode** for academic demonstration:
 
-1. Navigate to **Settings** → **ML Models**
-2. Configure:
-   - **Enable ML Training** (On/Off)
-   - **Auto-Retraining Threshold** (accuracy < 85%)
-   - **Model Persistence Path**
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Dashboard | ✅ Active | Real-time metrics via WebSocket |
+| ML Models | ✅ Active | Running on backend only |
+| Detection | ✅ Active | Based on activity logs |
+| Firewall Commands | ⚠️ Simulation | Generated but NOT executed |
+| Network Enforcement | ❌ Not Active | Requires endpoint agent |
 
-### Risk Scoring Configuration
+### What IS Working
 
-1. Navigate to **Settings** → **Risk Scoring**
-2. Adjust thresholds:
-   - **LOW Risk:** 0-29
-   - **MEDIUM Risk:** 30-49
-   - **HIGH Risk:** 50-69
-   - **CRITICAL Risk:** 70-100
+- ✅ **Dashboard:** Shows real-time metrics and threat feed
+- ✅ **ML Detection:** Ensemble model analyzes all activities
+- ✅ **Risk Scoring:** 27 factors + 13 business modifiers
+- ✅ **Graduated Response:** 4-tier automated classification
+- ✅ **Analyst Actions:** Logged and displayed in UI
+- ✅ **PDF Reports:** All 4 report types generate correctly
+- ✅ **Audit Trail:** Complete action history
 
-### Firewall Configuration
+### What is SIMULATED
 
-1. Navigate to **Settings** → **Firewall**
-2. Configure:
-   - **Auto-Block Threshold** (default: 70)
-   - **Default Block Duration** (default: 60 minutes)
-   - **Restriction Types:**
-     - Block External (no internet)
-     - Rate Limit (1 Mbps)
-     - Block File Transfer (ports 21, 22, 445)
+- ⚠️ **Firewall Commands:** System generates OS-specific commands but does NOT execute them
+- ⚠️ **Network Blocking:** Commands are logged, not enforced
+- ⚠️ **USB Control:** Not implemented (requires endpoint agent)
 
-### Logging Configuration
+### For Production Deployment
 
-1. Navigate to **Settings** → **Logging**
-2. Set:
-   - **Log Level** (DEBUG, INFO, WARNING, ERROR)
-   - **Log to File** (On/Off)
-   - **Log Retention** (default: 90 days)
-
----
-
-## Network Monitor (Employee Laptops)
-
-### Deployment
-
-The **Network Monitor** runs on each employee's laptop to track network activity.
-
-#### Step 1: Install on Employee Laptop
-```bash
-# Copy network_monitor.py to employee laptop
-# Navigate to directory
-cd C:\Ignisyl
-
-# Install dependencies
-pip install psutil requests
-```
-
-#### Step 2: Configure User
-
-Create `user_config.json`:
-```json
-{
-  "user_id": "john_doe",
-  "username": "john_doe",
-  "full_name": "John Doe",
-  "department": "Finance",
-  "role": "analyst",
-  "api_url": "http://central-server:8000/api/v1"
-}
-```
-
-#### Step 3: Run Monitor
-```bash
-# Start network monitor
-python network_monitor.py
-
-# You should see:
-# Starting network monitoring for user: john_doe
-# Monitoring every 30 seconds...
-# Press Ctrl+C to stop
-```
-
-#### Step 4: Set as Startup Service
-
-**Windows:**
-
-1. Create batch file `start_monitor.bat`:
-```batch
-@echo off
-cd C:\Ignisyl
-python network_monitor.py
-```
-
-2. Press `Win + R`, type `shell:startup`
-3. Copy `start_monitor.bat` to Startup folder
-
-### Monitoring Behavior
-
-The network monitor:
-- ✅ Checks network usage every 30 seconds
-- ✅ Detects large transfers (> 50 MB in 30 seconds)
-- ✅ Monitors high transfer rates (> 50 MB/s)
-- ✅ Sends data to central API
-- ✅ Receives firewall commands
-
-### Employee Notifications
-
-When suspicious activity is detected:
-1. Network monitor sends data to server
-2. Server analyzes with ML models
-3. If HIGH/CRITICAL risk:
-   - Alert appears on security dashboard
-   - Firewall restriction applied
-   - Employee receives notification (if configured)
+To enable actual network enforcement:
+1. Deploy endpoint agents on user workstations
+2. Configure agent-to-server communication
+3. Enable firewall command execution in config
+4. Test thoroughly in isolated environment first
 
 ---
 
@@ -960,11 +519,13 @@ A: The system uses a 3-model ensemble (Isolation Forest, Autoencoder, XGBoost) t
 A: Yes, transparency is recommended. Inform employees about monitoring for security purposes.
 
 **Q: What happens when a threat is detected?**
-A: Depending on risk level, the system can:
-- ALLOW (log only)
-- MONITOR (flag for review)
-- RESTRICT (limit network/file access)
-- BLOCK (complete network isolation)
+A: Depending on risk level, the system responds:
+- ALLOW (0-30): Log only, normal operations
+- MONITOR (31-50): Enhanced logging, analyst awareness
+- RESTRICT (51-75): Analyst decision required
+- BLOCK (76-100): Auto-block, incident response
+
+**Note:** In current simulation mode, firewall commands are generated but not executed.
 
 ### Technical Questions
 
@@ -978,7 +539,7 @@ A: Yes (Admin only). Go to Settings → Risk Scoring to adjust thresholds.
 A: Default: 90 days for logs, indefinite for activities. Configurable in Settings.
 
 **Q: Can the system detect USB data exfiltration?**
-A: Yes. The comprehensive monitor tracks USB device usage and flags suspicious transfers.
+A: The current implementation detects USB-related activities in activity logs, but real-time USB device control requires endpoint agent deployment (future feature).
 
 **Q: What is a honeypot file?**
 A: A decoy file that shouldn't be accessed. Any access triggers CRITICAL alert.
@@ -994,8 +555,8 @@ A: Verify ReportLab is installed and `data/reports/` directory exists with write
 **Q: User can't login?**
 A: Verify credentials. Check if account is active. Admin can reset password in User Management.
 
-**Q: Network monitor not sending data?**
-A: Check `user_config.json` has correct API URL and user is not blocked by firewall.
+**Q: Why aren't firewall actions being enforced?**
+A: The system runs in simulation mode by default. Firewall commands are generated and logged but not executed. This is intentional for academic demonstration safety.
 
 ---
 
@@ -1034,10 +595,10 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 
 | Score | Level | Meaning | Typical Action |
 |-------|-------|---------|----------------|
-| 0-29 | LOW | Normal behavior | ALLOW |
-| 30-49 | MEDIUM | Slightly suspicious | MONITOR |
-| 50-69 | HIGH | Concerning behavior | RESTRICT |
-| 70-100 | CRITICAL | Immediate threat | BLOCK |
+| 0-30 | LOW | Normal behavior | ALLOW |
+| 31-50 | MEDIUM | Slightly suspicious | MONITOR |
+| 51-75 | HIGH | Concerning behavior | RESTRICT (Analyst Decision) |
+| 76-100 | CRITICAL | Immediate threat | BLOCK (Auto)
 
 ### Activity Type Definitions
 
@@ -1053,9 +614,10 @@ A: Check `user_config.json` has correct API URL and user is not blocked by firew
 
 ---
 
-**Last Updated:** January 2025  
-**Version:** 1.0  
+**Last Updated:** January 2026
+**Version:** 2.0
 **Document:** User Manual
+**Note:** This documentation reflects the current simulation mode implementation.
 <<<END User_Manual.md>>>
 
 
