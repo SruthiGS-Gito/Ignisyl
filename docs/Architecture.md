@@ -14,41 +14,79 @@
 
 ## Overview
 
-IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System** built with a modular, microservices-inspired architecture.
+IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System** designed for academic demonstration and research purposes.
 
-**Tech Stack:**
-- **Backend:** Python 3.11, FastAPI, SQLAlchemy
-- **Frontend:** React.js, Tailwind CSS
-- **ML:** scikit-learn, TensorFlow/Keras, XGBoost
-- **Database:** SQLite (dev), PostgreSQL (production)
-- **Real-time:** WebSockets
-- **Reporting:** ReportLab (PDF generation)
+> **Important: Current Version (v1.0)**
+>
+> This documentation describes the actual implemented system. Features marked as "Future" are planned but not yet built.
+
+---
+
+## Current System Architecture (v1.0)
+
+| Component | Technology | Status |
+|-----------|------------|--------|
+| **Backend** | Python 3.11, FastAPI | ✅ Implemented |
+| **Frontend** | React 18, Tailwind CSS | ✅ Implemented |
+| **Database** | SQLite (3 databases) | ✅ Implemented |
+| **ML Engine** | Ensemble (IF + XGBoost + PyTorch AE) | ✅ Implemented |
+| **Reporting** | ReportLab PDF generation | ✅ Implemented |
+| **Real-time** | WebSocket for dashboard | ✅ Implemented |
+| **Firewall** | Command generation (simulation) | ✅ Simulation Mode |
+
+**NOT INCLUDED IN CURRENT VERSION:**
+- ❌ Endpoint agents (firewall enforcement is simulation only)
+- ❌ PostgreSQL/MySQL production database
+- ❌ Container orchestration (Kubernetes)
+- ❌ Network-level enforcement
+- ❌ SIEM/SOAR integration
+- ❌ Active Directory integration
+
+---
+
+## Tech Stack (Implemented)
+
+**Backend:** Python 3.11, FastAPI, SQLAlchemy
+**Frontend:** React 18, Tailwind CSS
+**ML:** scikit-learn, XGBoost, PyTorch (Autoencoder)
+**Database:** SQLite (development mode)
+**Real-time:** WebSockets
+**Reporting:** ReportLab (PDF generation)
 
 ---
 
 ## High-Level Architecture
-```mermaid
-graph TB
-    subgraph "IGNISYL System"
-        Frontend[Frontend<br/>React.js]
-        Backend[Backend<br/>FastAPI]
-        ML[ML Engine<br/>Hybrid Detector]
-        DB[(Database<br/>SQLite/PostgreSQL)]
-        Services[Services<br/>Monitoring & Firewall]
-        
-        Frontend <--> Backend
-        Backend --> ML
-        Backend --> DB
-        Backend --> Services
-    end
-    
-    subgraph "Employee Laptops"
-        Monitor[Network Monitor<br/>psutil]
-    end
-    
-    Monitor -->|POST /api/v1/analyze| Backend
-    Backend -->|Firewall Commands| Monitor
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                    IGNISYL SYSTEM (v1.0)                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
+│  │   Frontend   │    │   Backend    │    │  ML Engine   │      │
+│  │   React 18   │◄──►│   FastAPI    │◄──►│   Ensemble   │      │
+│  │  Tailwind    │    │  WebSocket   │    │  Detector    │      │
+│  └──────────────┘    └──────────────┘    └──────────────┘      │
+│                             │                    │              │
+│                             ▼                    ▼              │
+│                      ┌──────────────┐    ┌──────────────┐      │
+│                      │   Database   │    │    Models    │      │
+│                      │   SQLite     │    │  .pkl/.pt    │      │
+│                      └──────────────┘    └──────────────┘      │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │                     Services Layer                        │  │
+│  │  • Risk Scorer (27 factors + 13 business modifiers)      │  │
+│  │  • Firewall Controller (4-tier graduated response)       │  │
+│  │  • Report Generator (4 PDF report types)                 │  │
+│  │  • System Monitor (real-time metrics)                    │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ⚠️ Note: Firewall commands are SIMULATED (not executed)       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+> **Note:** The current architecture is single-server deployment. There are no endpoint agents - all processing happens on the backend server.
 
 ---
 
@@ -83,18 +121,19 @@ graph TB
 
 #### Services (`backend/services/`)
 
-| File | Purpose | New Features |
-|------|---------|--------------|
-| `intelligent_risk_engine.py` | Real-time risk assessment | |
-| `system_monitor.py` | CPU/RAM/Disk monitoring | |
-| `ml_performance_tracker.py` | Model accuracy tracking | |
-| `honeypot_watcher.py` | Decoy file monitoring | |
-| `comprehensive_monitor.py` | Multi-vector threat detection | |
-| `report_generator.py` | PDF report generation | |
-| `alert_manager.py` | Alert lifecycle management | |
-| `firewall_controller.py` | Adaptive firewall rules | **✨ Graduated Response Framework (5 levels)**<br>**✨ Analyst Override Controls**<br>**✨ Custom Restriction Management** |
-| `log_processor.py` | SIEM-style log analysis | |
-| `network_monitor.py` | Network activity monitoring | |
+| File | Purpose | Status |
+|------|---------|--------|
+| `intelligent_risk_engine.py` | Real-time risk assessment | ✅ Implemented |
+| `system_monitor.py` | CPU/RAM/Disk monitoring | ✅ Implemented |
+| `report_generator.py` | PDF report generation (4 types) | ✅ Implemented |
+| `alert_manager.py` | Alert lifecycle management | ✅ Implemented |
+| `firewall_controller.py` | 4-tier graduated response | ✅ Simulation Mode |
+| `honeypot_watcher.py` | Decoy file monitoring | ✅ Implemented |
+
+**Firewall Controller Features:**
+- 4-tier graduated response (ALLOW/MONITOR/RESTRICT/BLOCK)
+- OS-specific command generation (Windows/Linux/macOS)
+- **Simulation Mode:** Commands generated but NOT executed
 
 #### Utilities (`backend/utils/`)
 - **`helpers.py`**: Common functions (formatting, hashing, time windows)
@@ -138,34 +177,33 @@ data/
 
 ## Data Flow
 
-### Activity Analysis Flow
-```mermaid
-sequenceDiagram
-    participant Laptop as Employee Laptop
-    participant Monitor as network_monitor.py
-    participant API as FastAPI Routes
-    participant Engine as Risk Engine
-    participant ML as Hybrid Detector
-    participant Scorer as Risk Scorer
-    participant FW as Firewall Controller
-    participant WS as WebSocket
-    participant Dashboard as Frontend
-    
-    Laptop->>Monitor: Network activity detected
-    Monitor->>API: POST /api/v1/analyze
-    API->>Engine: Analyze activity
-    Engine->>ML: Get ML prediction
-    ML->>ML: Isolation Forest (0.72)
-    ML->>ML: Autoencoder (0.81)
-    ML->>ML: XGBoost (0.83)
-    ML->>Scorer: Ensemble score
-    Scorer->>Scorer: Apply 27 risk factors
-    Scorer->>Scorer: Apply 13 modifiers
-    Scorer->>FW: Risk: 78.5 (HIGH)
-    FW->>FW: Action: RESTRICT
-    FW->>WS: Broadcast threat
-    WS->>Dashboard: Real-time update
+### Activity Analysis Flow (Current Implementation)
+
 ```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Frontend   │────►│   Backend    │────►│  ML Engine   │
+│  (Dashboard) │     │   FastAPI    │     │   Ensemble   │
+└──────────────┘     └──────────────┘     └──────────────┘
+       ▲                    │                    │
+       │                    ▼                    ▼
+       │              ┌──────────────┐    ┌──────────────┐
+       │              │   Database   │    │ Risk Scorer  │
+       │              │   (SQLite)   │    │ (27 factors) │
+       │              └──────────────┘    └──────────────┘
+       │                                        │
+       │              ┌──────────────┐          │
+       └──────────────│  WebSocket   │◄─────────┘
+         Real-time    │   Updates    │   Threat Alert
+                      └──────────────┘
+```
+
+**Flow:**
+1. Activity data submitted via API (POST /api/v1/analyze)
+2. Backend processes through ML Engine (3-model ensemble)
+3. Risk Scorer applies 27 factors + 13 modifiers
+4. Firewall Controller determines action (ALLOW/MONITOR/RESTRICT/BLOCK)
+5. WebSocket broadcasts threat to dashboard
+6. **Note:** Firewall commands generated but NOT executed (simulation mode)
 
 ### Honeypot Detection Flow
 ```mermaid
@@ -184,112 +222,75 @@ flowchart TD
 
 ## Graduated Response Framework
 
-### Response Levels
+### 4-Tier Response System (Implemented)
 
-IGNISYL implements a **5-level graduated response system** instead of binary ALLOW/BLOCK:
-```mermaid
-graph TD
-    A[Risk Score Detected] --> B{Risk Level?}
-    B -->|0-29| C[Level 1: ALLOW]
-    B -->|30-49| D[Level 2: MONITOR]
-    B -->|50-69| E[Level 3: RESTRICT]
-    B -->|70-89| F[Level 4: ISOLATE]
-    B -->|90-100| G[Level 5: BLOCK]
-    
-    C --> C1[Normal logging]
-    D --> D1[Enhanced monitoring]
-    E --> E1{Analyst Override?}
-    E1 -->|Yes| E2[Wait for analyst decision]
-    E1 -->|No| E3[Auto-restrict + Notify analyst]
-    F --> F1[Auto-isolate + Alert analyst]
-    G --> G1[Critical block + Incident response]
+IGNISYL implements a **4-tier graduated response system** instead of binary ALLOW/BLOCK:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    RISK SCORE → RESPONSE                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   0 ──────────── 30 ──────────── 50 ──────────── 75 ──── 100   │
+│   │     LOW      │    MEDIUM    │     HIGH      │  CRITICAL │   │
+│   │    ALLOW     │   MONITOR    │   RESTRICT    │   BLOCK   │   │
+│   │              │              │  (Analyst)    │  (Auto)   │   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Level Details
+### Tier Details
 
-#### Level 1: ALLOW (Risk 0-29)
+| Tier | Score | Action | Authority | Current Status |
+|------|-------|--------|-----------|----------------|
+| **ALLOW** | 0-30 | Normal logging | Automated | ✅ Implemented |
+| **MONITOR** | 31-50 | Enhanced logging | Automated | ✅ Implemented |
+| **RESTRICT** | 51-75 | Analyst decision | Human-in-the-loop | ✅ Implemented (simulation) |
+| **BLOCK** | 76-100 | Auto-block | Automated | ✅ Implemented (simulation) |
+
+### Tier 1: ALLOW (Risk 0-30)
 - **Action:** Normal operations with standard logging
 - **Authority:** Automated
 - **Use Case:** Legitimate business activities
 
-#### Level 2: MONITOR (Risk 30-49)
-- **Action:** Increased logging detail, analyst notification
-- **Authority:** Automated with analyst awareness
+### Tier 2: MONITOR (Risk 31-50)
+- **Action:** Enhanced logging, analyst awareness
+- **Authority:** Automated with analyst notification
 - **Use Case:** Slightly unusual but likely legitimate activity
 
-#### Level 3: RESTRICT (Risk 50-69)
-- **Action:** Limited network access, analyst decision required
-- **Authority:** Analyst control (human-in-the-loop)
-- **Custom Options:**
-  - Block external internet only
-  - Rate limit bandwidth (1 Mbps)
-  - Block file transfer ports (FTP, SSH, SMB)
-  - Disable USB devices
-  - Time-limited restrictions
+### Tier 3: RESTRICT (Risk 51-75)
+- **Action:** Analyst decision required
+- **Authority:** Human-in-the-loop
+- **Options:** ALLOW, RESTRICT, or BLOCK with reason
 - **Use Case:** Suspicious activity requiring investigation
+- **Note:** Custom restrictions (rate limiting, port blocking) planned for future
 
-#### Level 4: ISOLATE (Risk 70-89)
-- **Action:** Network quarantine, mandatory analyst intervention
-- **Authority:** Auto-isolation + analyst review required
-- **Restrictions:**
-  - Block all external network
-  - Allow internal corporate network only
-  - Disconnect VPN
-  - Disable USB ports
-  - Require admin unlock
-- **Use Case:** High-confidence threat detection
+### Tier 4: BLOCK (Risk 76-100)
+- **Action:** Automatic block, incident response
+- **Authority:** Automated (analyst review recommended)
+- **Use Case:** Critical insider threat (e.g., honeypot access)
 
-#### Level 5: BLOCK (Risk 90-100)
-- **Action:** Complete shutdown, critical incident response
-- **Authority:** Automated critical response
-- **Restrictions:**
-  - Complete network disconnect
-  - System lock
-  - Forensics capture
-  - Security team alert
-  - Incident response activation
-- **Use Case:** Critical insider threat (e.g., honeypot access + data exfiltration)
+### Analyst Workflow (Simplified)
 
-### Analyst Control Flow
-```mermaid
-sequenceDiagram
-    participant System
-    participant Analyst
-    participant User
-    participant Firewall
-    
-    System->>Analyst: HIGH risk detected (50-69)
-    System->>Analyst: Send to pending decisions queue
-    Analyst->>System: Review threat details
-    Analyst->>Analyst: Analyze context
-    
-    alt Decision: ALLOW
-        Analyst->>System: Mark as false positive
-        System->>User: Clear alert
-    else Decision: RESTRICT
-        Analyst->>Firewall: Apply custom restrictions
-        Firewall->>User: Block external internet
-        Analyst->>User: Send notification
-    else Decision: ISOLATE
-        Analyst->>Firewall: Full network isolation
-        Firewall->>User: Quarantine
-        Analyst->>System: Start investigation
-    else Decision: ESCALATE
-        Analyst->>System: Forward to admin/manager
-        System->>Admin: Urgent notification
-    end
 ```
+Threat Detected (51-75) → Pending Queue → Analyst Review → Action Applied
+                                              │
+                                              ├── ALLOW (false positive)
+                                              ├── RESTRICT (with reason)
+                                              └── BLOCK (confirmed threat)
+```
+
+> **Simulation Mode:** All firewall actions are logged but NOT executed on actual network infrastructure.
 
 ### Research Contribution
 
 **Novel Aspect:** Unlike traditional binary systems (ALLOW/BLOCK), IGNISYL introduces:
 
-1. **Graduated Response:** 5 levels instead of 2
-2. **Human-in-the-Loop:** Analyst control for ambiguous cases (risk 50-69)
-3. **Custom Restrictions:** Granular control (e.g., "block external but allow internal")
-4. **Context-Aware Actions:** Different responses based on risk level and business context
+1. **Graduated Response:** 4 tiers instead of 2
+2. **Human-in-the-Loop:** Analyst control for ambiguous cases (risk 51-75)
+3. **Context-Aware Actions:** Different responses based on risk level
 
-**Impact:** Reduces false positives by 73% while maintaining high threat detection accuracy.
+**Note:** Custom restrictions (granular port/bandwidth control) are planned for future versions.
 
 ## ML Pipeline
 
@@ -382,11 +383,14 @@ sequenceDiagram
 
 ## Deployment Architecture
 
-### Development
-Localhost
-├── Backend: http://localhost:8000
-├── Frontend: http://localhost:3000
-└── Database: data/ignisyl.db (SQLite)
+### Current Deployment (Development/Demo)
+
+```
+Localhost (Single Server)
+├── Backend: http://localhost:8000 (FastAPI + Uvicorn)
+├── Frontend: http://localhost:3000 (React dev server)
+└── Database: SQLite (3 files in data/ and backend/data/)
+```
 
 **Start commands:**
 ```bash
@@ -399,61 +403,27 @@ cd frontend
 npm start
 ```
 
-### Production
-```mermaid
-graph TD
-    Internet[Internet] --> LB[Load Balancer<br/>Nginx]
-    LB --> BE1[Backend Worker 1<br/>Gunicorn+Uvicorn]
-    LB --> BE2[Backend Worker 2<br/>Gunicorn+Uvicorn]
-    LB --> BEN[Backend Worker N<br/>Gunicorn+Uvicorn]
-    
-    BE1 --> DB1[(PostgreSQL<br/>Primary)]
-    BE2 --> DB1
-    BEN --> DB1
-    
-    DB1 --> DB2[(PostgreSQL<br/>Replica)]
-    
-    BE1 --> Redis[Redis<br/>Cache & Sessions]
-    BE2 --> Redis
-    BEN --> Redis
-```
+**Database Files:**
+- `backend/data/ignisyl.db` - Main database (users, activities, alerts)
+- `data/activities.db` - Activity logs
+- `data/users.db` - User data
 
-**Production Stack:**
-- **Web Server:** Nginx (reverse proxy, SSL)
-- **WSGI Server:** Gunicorn with 4-8 Uvicorn workers
-- **Database:** PostgreSQL 14+ with replication
-- **Cache:** Redis 7+ for sessions
-- **SSL/TLS:** Let's Encrypt certificates
+### Production Deployment (Future)
 
----
+> **Note:** The following is planned but NOT currently implemented.
 
-## Scalability Considerations
+**Planned Production Stack:**
+- Web Server: Nginx (reverse proxy, SSL)
+- WSGI Server: Gunicorn with Uvicorn workers
+- Database: PostgreSQL (migration scripts available)
+- Cache: Redis for sessions (optional)
 
-### Horizontal Scaling
-
-1. **Backend Scaling**
-   - Add more Gunicorn workers
-   - Multiple backend instances
-   - Auto-scaling on CPU/memory
-
-2. **Database Scaling**
-   - Read replicas for SELECT queries
-   - Connection pooling (pool_size=20)
-   - Sharding by user_id
-
-3. **Caching Strategy**
-   - Redis for frequent queries
-   - TTL: 5min (dynamic), 1hr (static)
-   - Cache invalidation on updates
-
-4. **Async Processing**
-   - Celery for report generation
-   - RabbitMQ message broker
-   - Separate ML inference workers
-
-5. **CDN**
-   - CloudFlare/AWS CloudFront
-   - Serve static frontend assets
+**Not Yet Implemented:**
+- ❌ Kubernetes/container orchestration
+- ❌ Load balancing
+- ❌ Database replication
+- ❌ Redis caching
+- ❌ Endpoint agents
 
 ---
 
@@ -474,29 +444,28 @@ graph TD
 
 ## Monitoring & Observability
 
-### System Monitoring
+### System Monitoring (Implemented)
 
 **Metrics tracked:**
-- CPU/Memory/Disk per worker
-- Network bandwidth
+- CPU/Memory/Disk usage
 - Active WebSocket connections
+- API response times
 
-**Tools:**
-- `system_monitor.py` (built-in)
-- Prometheus (metrics collection)
-- Grafana (dashboards)
+**Built-in Tools:**
+- `system_monitor.py` - Real-time system metrics
+- Dashboard System Status page
 
-### Application Monitoring
+### Application Logging (Implemented)
 
-**Log Aggregation:**
-- ELK Stack (Elasticsearch, Logstash, Kibana)
-- Centralized logging
-- Log levels: DEBUG → CRITICAL
+**Log Levels:** DEBUG → INFO → WARNING → ERROR → CRITICAL
+**Log Files:** Rotated automatically (10MB max, 5 backups)
 
-**ML Performance:**
-- `ml_performance_tracker.py` tracks accuracy
-- Drift detection
-- Auto-retraining when accuracy < 85%
+### External Monitoring (Not Implemented)
+
+> The following are planned but not currently integrated:
+- ❌ Prometheus metrics collection
+- ❌ Grafana dashboards
+- ❌ ELK Stack log aggregation
 
 ---
 
@@ -515,49 +484,48 @@ graph TD
 
 ---
 
-## Future Enhancements
+## Future Enhancements (Planned)
 
-### Roadmap (6-12 Months)
+> **Note:** These features are planned for future development but are NOT currently implemented.
 
-1. **Kubernetes Deployment**
-   - Container orchestration
-   - Auto-scaling pods
-   - Self-healing
+### High Priority
+- [ ] Endpoint agent for actual firewall enforcement
+- [ ] PostgreSQL production database support
+- [ ] Custom restriction options (rate limiting, port blocking)
+- [ ] Active Directory integration
 
-2. **Advanced ML**
-   - LSTM for sequences
-   - Graph Neural Networks
-   - Federated learning
+### Medium Priority
+- [ ] Docker containerization
+- [ ] SIEM/SOAR integration (Splunk, QRadar)
+- [ ] Advanced ML (LSTM for sequential patterns)
+- [ ] Email/SMS notification delivery
 
-3. **UEBA Integration**
-   - User behavior analytics
-   - Peer group analysis
-   - Baseline modeling
+### Low Priority
+- [ ] Kubernetes deployment
+- [ ] Multi-tenancy support
+- [ ] Compliance reporting (SOC 2, ISO 27001)
+- [ ] Mobile application
 
-4. **SOAR Platform**
-   - Automated incident response
-   - Playbook execution
-   - Ticketing integration
+---
 
-5. **Multi-Tenancy**
-   - Multiple organizations
-   - Tenant isolation
-   - Custom branding
+## Limitations (Current Version)
 
-6. **Advanced Reporting**
-   - Executive dashboards
-   - Compliance reports (SOC 2, ISO 27001)
-   - Custom report builder
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Firewall enforcement | Simulation only | Commands generated but not executed |
+| Network monitoring | Not implemented | Requires endpoint agent |
+| USB control | Not implemented | Requires endpoint agent |
+| Database | SQLite only | PostgreSQL migration planned |
+| Scaling | Single server | No load balancing |
+| Notifications | Logged only | Email/SMS not connected |
 
 ---
 
 ## Contact & Support
 
-For architecture questions or deployment support:
-
-- **Email:** architecture@ignisyl.demo
-- **Documentation:** https://docs.ignisyl.com
-- **GitHub:** https://github.com/company/ignisyl
+- **GitHub:** https://github.com/SruthiGS-Gito/Ignisyl
+- **Developer:** Sruthi CS
+- **Institution:** Sree Buddha College of Engineering, Kerala, India
 <<<END Architecture.md>>>
 
 
