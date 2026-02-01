@@ -105,9 +105,8 @@ Thumbs.db
 temp/
 tmp/
 
-# Claude Code temporary files
+# Temporary tool files
 *.cwd
-*tmpclaude*
 
 # Test reports and results
 *test_report_*
@@ -146,6 +145,7 @@ docker-compose.override.yml
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+# Local tool config
 .claude/
 
 # Generated reports
