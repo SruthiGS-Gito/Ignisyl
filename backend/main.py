@@ -18,8 +18,11 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import json
 import numpy as np  # Required for np.log1p() in extract_features()
+import pandas as pd
+import random
 import time
 from pathlib import Path
+from faker import Faker
 
 # Pre-import matplotlib with Agg backend for report visualizations
 # Must be done before any other matplotlib imports
@@ -52,6 +55,67 @@ from models.user_management import user_manager
 from services.system_monitor import system_monitor
 from services.ml_performance_tracker import ml_performance_tracker
 from services.intelligent_risk_engine import intelligent_risk_engine
+
+# Fixed seed for reproducible synthetic data generation (see startup_event)
+SYNTHETIC_DATA_SEED = 42
+SYNTHETIC_DATA_CACHE_PATH = os.path.join(settings.DATA_PATH, "synthetic", "combined_activities.csv")
+
+# The exact 9 features the model is trained on, in the exact order it's trained on.
+# extract_features() below is the SINGLE source of truth for this - both the training
+# path (startup_event) and the inference path (/api/v1/analyze) call this same function
+# so they can never drift out of sync with each other again.
+FEATURE_COLUMNS = [
+    'hour', 'day_of_week', 'file_size', 'file_size_log',
+    'bytes_transferred', 'network_bytes_log',
+    'is_weekend', 'is_business_hours', 'confidence_score'
+]
+
+
+def _column_or_default(df: "pd.DataFrame", col: str, default):
+    """Return df[col] filled with `default`, or a full-length Series of `default` if col is absent."""
+    if col in df.columns:
+        return df[col].fillna(default)
+    return pd.Series(default, index=df.index)
+
+
+def extract_features(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Extract the 9 numerical features used by the ML ensemble - aligned with hybrid_detector.
+
+    Shared by training (startup_event) and inference (/api/v1/analyze) so the two
+    can never disagree about feature count or order.
+    """
+    df = df.copy()
+    features = pd.DataFrame(index=df.index)
+
+    # Time-based features
+    if 'timestamp' in df.columns:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        features['hour'] = df['timestamp'].dt.hour
+        features['day_of_week'] = df['timestamp'].dt.dayofweek
+        features['is_weekend'] = df['timestamp'].dt.dayofweek.isin([5, 6])
+        features['is_business_hours'] = df['timestamp'].dt.hour.between(9, 17)
+    else:
+        features['hour'] = 12
+        features['day_of_week'] = 2
+        features['is_weekend'] = False
+        features['is_business_hours'] = True
+
+    # File size feature (use log scale to match anomaly_detector)
+    file_size = _column_or_default(df, 'file_size', 0)
+    features['file_size'] = file_size
+    features['file_size_log'] = np.log1p(file_size)  # Log transformation
+
+    # Network bytes transferred (use log scale)
+    bytes_transferred = _column_or_default(df, 'bytes_transferred', 0)
+    features['bytes_transferred'] = bytes_transferred
+    features['network_bytes_log'] = np.log1p(bytes_transferred)  # Log transformation
+
+    # Confidence score (default for normal activities)
+    features['confidence_score'] = _column_or_default(df, 'confidence_score', 0.2)
+
+    # Return columns in the exact fixed order every caller relies on
+    return features[FEATURE_COLUMNS]
+
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -220,7 +284,7 @@ async def startup_event():
             result = user_manager.register_user(**user_data)
             if result["success"]:
                 # Set initial activity time and risk score
-                import random
+                # (random is imported at module level now)
                 user_manager.update_user_activity(result["user_id"], risk_score=float(random.randint(5, 30)))
 
         print(f"[OK] Created {len(default_users)} monitored users (default password: demo123)")
@@ -236,57 +300,100 @@ async def startup_event():
     # Train ML models with sample data
     print("[DATA] Training ML models...")
     try:
-        normal_data, anomalous_data = data_generator.generate_complete_dataset()
-        
-        # Prepare training data
-        all_data = normal_data + anomalous_data
-        import pandas as pd
-        import numpy as np
-        
-        df = pd.DataFrame(all_data)
-        
-        # Extract and engineer features from the generated data
-        def extract_features(df):
-            """Extract numerical features from activity data - aligned with hybrid_detector"""
-            features = pd.DataFrame()
+        # --- Reproducible dataset: load the cached copy if we have one, else
+        # generate exactly once with a fixed seed and cache it to disk so every
+        # future startup (and every teammate) trains on the identical dataset. ---
+        if os.path.exists(SYNTHETIC_DATA_CACHE_PATH):
+            print(f"[DATA] Loading cached synthetic dataset: {SYNTHETIC_DATA_CACHE_PATH}")
+            df = pd.read_csv(SYNTHETIC_DATA_CACHE_PATH)
+        else:
+            print(f"[DATA] No cached dataset found - generating fresh with seed={SYNTHETIC_DATA_SEED}")
+            random.seed(SYNTHETIC_DATA_SEED)
+            np.random.seed(SYNTHETIC_DATA_SEED)
+            Faker.seed(SYNTHETIC_DATA_SEED)
 
-            # Time-based features
-            if 'timestamp' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                features['hour'] = df['timestamp'].dt.hour
-                features['day_of_week'] = df['timestamp'].dt.dayofweek
-            else:
-                features['hour'] = 12
-                features['day_of_week'] = 2
+            normal_data, anomalous_data = data_generator.generate_complete_dataset()
+            all_data = normal_data + anomalous_data
+            df = pd.DataFrame(all_data)
 
-            # File size feature (use log scale to match anomaly_detector)
-            file_size = df.get('file_size', 0).fillna(0)
-            features['file_size'] = file_size
-            features['file_size_log'] = np.log1p(file_size)  # Log transformation
+            os.makedirs(os.path.dirname(SYNTHETIC_DATA_CACHE_PATH), exist_ok=True)
+            df.to_csv(SYNTHETIC_DATA_CACHE_PATH, index=False)
+            print(f"[DATA] Cached {len(df)} synthetic activity records to {SYNTHETIC_DATA_CACHE_PATH}")
 
-            # Network bytes transferred (use log scale)
-            bytes_transferred = df.get('bytes_transferred', 0).fillna(0)
-            features['bytes_transferred'] = bytes_transferred
-            features['network_bytes_log'] = np.log1p(bytes_transferred)  # Log transformation
-    
-            # Boolean features
-            features['is_weekend'] = df['timestamp'].dt.dayofweek.isin([5, 6]) if 'timestamp' in df.columns else False
-            features['is_business_hours'] = df['timestamp'].dt.hour.between(9, 17) if 'timestamp' in df.columns else True
-    
-            # Confidence score (default for normal activities)
-            features['confidence_score'] = df.get('confidence_score', 0.2).fillna(0.2)
-
-            return features
-
+        # Extract and engineer features (shared with the /api/v1/analyze inference path)
         X = extract_features(df).values
         y = df.get('is_suspicious', pd.Series([False] * len(df))).astype(int).values
 
-        print(f"Training features shape: {X.shape}")  # This will show you (samples, 4)
-        
-        # Train the detector
-        ml_detector.fit(X, y)
+        print(f"Training features shape: {X.shape}")
+
+        # --- Stratified 80/20 train/test split - the test set is held out and
+        # never touched by SMOTE or by fit(); it exists only for evaluation below. ---
+        from sklearn.model_selection import train_test_split
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=SYNTHETIC_DATA_SEED, stratify=y
+        )
+        print(f"[DATA] Split: {len(X_train)} train / {len(X_test)} test "
+              f"(train class counts: {np.bincount(y_train)}, test class counts: {np.bincount(y_test)})")
+
+        # --- SMOTE oversampling of the minority (anomalous) class, fit on the
+        # training split ONLY, after the split - the test set stays untouched
+        # and real, so evaluation below reflects genuine unseen data. ---
+        try:
+            from imblearn.over_sampling import SMOTE
+            minority_count = int(min(np.bincount(y_train)))
+            if minority_count >= 2:
+                k_neighbors = min(5, minority_count - 1)
+                smote = SMOTE(random_state=SYNTHETIC_DATA_SEED, k_neighbors=k_neighbors)
+                X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
+                print(f"[DATA] SMOTE applied to training set only (k_neighbors={k_neighbors}): "
+                      f"{len(X_train)} -> {len(X_train_res)} samples "
+                      f"(class counts now: {np.bincount(y_train_res)})")
+            else:
+                print(f"[WARN] SMOTE skipped - minority class has only {minority_count} training "
+                      f"sample(s), need at least 2. Training on original (imbalanced) split.")
+                X_train_res, y_train_res = X_train, y_train
+        except ImportError:
+            print("[WARN] imbalanced-learn not installed - training on original (imbalanced) split.")
+            X_train_res, y_train_res = X_train, y_train
+
+        # Train the detector: Isolation Forest and Autoencoder get the original,
+        # non-resampled X_train/y_train (Autoencoder further filtered to
+        # normal-only inside fit()); XGBoost gets the SMOTE-resampled set.
+        # See AdvancedHybridDetector.fit() for why each sub-model gets what it gets.
+        ml_detector.fit(X_train, y_train, X_train_res, y_train_res)
         print("[OK] ML models trained successfully!")
-            
+
+        # --- Evaluate on the held-out, untouched test set ---
+        from sklearn.metrics import (
+            accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+        )
+        test_risk_scores, _ = ml_detector.predict(X_test)
+        y_pred = (test_risk_scores > 50).astype(int)
+
+        eval_accuracy = accuracy_score(y_test, y_pred)
+        eval_precision = precision_score(y_test, y_pred, zero_division=0)
+        eval_recall = recall_score(y_test, y_pred, zero_division=0)
+        eval_f1 = f1_score(y_test, y_pred, zero_division=0)
+        eval_cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+
+        print("\n" + "=" * 60)
+        print("[EVAL] Held-out test set evaluation (never used in training)")
+        print("=" * 60)
+        print(f"   Test samples : {len(y_test)}")
+        print(f"   Accuracy     : {eval_accuracy * 100:.2f}%")
+        print(f"   Precision    : {eval_precision * 100:.2f}%")
+        print(f"   Recall       : {eval_recall * 100:.2f}%")
+        print(f"   F1 Score     : {eval_f1 * 100:.2f}%")
+        tn, fp, fn, tp = eval_cm.ravel()
+        print(f"   Confusion matrix [[TN FP] [FN TP]]: {eval_cm.tolist()}")
+        print(f"     True Negatives  (normal, correctly cleared) : {tn}")
+        print(f"     False Positives (normal, wrongly flagged)   : {fp}")
+        print(f"     False Negatives (real threat, MISSED)       : {fn}")
+        print(f"     True Positives  (real threat, CAUGHT)       : {tp}")
+        print(f"   -> Caught {tp} of {tp + fn} real anomalies in the test set (recall), "
+              f"at {fp} false alarms per {tp} genuine catch (precision).")
+        print("=" * 60 + "\n")
+
     except Exception as e:
         print(f"[WARN] ML training error: {e}. Using fallback configuration.")
         
@@ -596,37 +703,19 @@ async def analyze_activity(activity_data: Dict):
         
         # Perform risk assessment
         risk_assessment = risk_scorer.assess_activity_risk(activity_data, user_profile)
-        
-        # Extract features
+
+        # Used later for event logging/explanation, independent of the ML feature vector
         activity_timestamp = activity_data.get('timestamp')
         if isinstance(activity_timestamp, str):
             activity_timestamp = pd.to_datetime(activity_timestamp)
         else:
             activity_timestamp = dt.now()
-        
-        # Prepare ML features - MUST MATCH TRAINING (9 features)
-        import numpy as np
 
-        # Calculate log-transformed features (same as training)
-        file_size = float(activity_data.get('file_size', 0))
-        bytes_transferred = float(activity_data.get('bytes_transferred', 0))
-
-        ml_features = [[
-            float(activity_data.get('hour', datetime.now().hour)),
-            float(activity_data.get('day_of_week', datetime.now().weekday())),
-            float(activity_data.get('file_size', 0)),
-            float(np.log1p(activity_data.get('file_size', 0))),
-            float(activity_data.get('bytes_transferred', 0)),
-            float(np.log1p(activity_data.get('bytes_transferred', 0))),
-            float(activity_data.get('is_weekend', 0)),
-            float(activity_data.get('is_business_hours', 0)),
-            float(activity_data.get('confidence_score', 0.2)),
-            float(activity_data.get('failed_login_count', 0)),        # NEW
-            float(activity_data.get('access_frequency', 1.0)),        # NEW
-            float(activity_data.get('unusual_location', False)),      # NEW
-            float(activity_data.get('file_type_risk', 0)),           # NEW
-            float(activity_data.get('time_since_last', 60))          # NEW
-        ]]
+        # Extract features - MUST MATCH TRAINING. Uses the exact same
+        # extract_features() function the training path in startup_event()
+        # calls, so this can never drift out of sync with training again.
+        activity_row = pd.DataFrame([activity_data])
+        ml_features = extract_features(activity_row).values
         
         try:
             ml_risk_scores, individual_scores = ml_detector.predict(ml_features)

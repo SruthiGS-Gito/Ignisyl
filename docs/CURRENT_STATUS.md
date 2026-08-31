@@ -24,7 +24,7 @@
 - Isolation Forest (unsupervised anomaly detection)
 - XGBoost (supervised gradient boosting)
 - PyTorch Autoencoder (deep learning reconstruction)
-- Weighted ensemble: 30% IF + 30% AE + 40% XGB
+- Weighted ensemble: 40% IF + 40% AE + 20% XGB
 - Risk Scorer: 27 factors + 13 business modifiers
 
 ### Reports (All Functional)
@@ -172,11 +172,11 @@ iptables -A OUTPUT -m owner --uid-owner john.doe -j DROP
 ## Quick Start
 
 ```bash
-# Backend (Terminal 1)
-cd backend
+# Backend (Terminal 1) — run from repo root, requirements.txt lives there
 python -m venv venv
 venv\Scripts\activate  # Windows
 pip install -r requirements.txt
+cd backend
 python main.py
 
 # Frontend (Terminal 2)

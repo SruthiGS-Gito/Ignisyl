@@ -436,17 +436,41 @@ class HybridXGBoost:
 
 class AdvancedHybridDetector:
     """Advanced hybrid anomaly detector using best available implementations"""
-    
-    def __init__(self):
+
+    # Measured anomaly rate in the synthetic training set: 147 anomalous /
+    # 46934 total activities ~= 0.31% (see data_generator.py's inject_anomalies).
+    # Used as IsolationForest's contamination default - see __init__ for why
+    # this is preferred over sklearn's contamination='auto'.
+    MEASURED_ANOMALY_RATE = 0.003
+
+    def __init__(self, contamination: float = MEASURED_ANOMALY_RATE):
         self.detector = MLLibraryDetector()
         self.models = {}
         self.is_trained = False
         self.feature_columns = []
-        
-        # Initialize models with best available implementations
+
+        # contamination was hardcoded to 0.1 (10% expected anomalies), but the
+        # actual measured rate in the synthetic data is ~0.3% - a >30x mismatch
+        # that made IsolationForest's decision threshold badly miscalibrated
+        # (it was tuned to flag the most anomalous-looking 10% of activities,
+        # not the ~0.3% that are actually anomalous).
+        #
+        # contamination='auto' was considered instead, but sklearn's 'auto'
+        # does NOT use the data's real outlier proportion - it applies a fixed
+        # heuristic threshold from the original Isolation Forest paper,
+        # independent of dataset. Since we have a genuine measured rate from
+        # labeled synthetic data, an explicit value tied to that measurement
+        # is more accurate here than the generic heuristic.
+        #
+        # Caveat: fit() below trains isolation_forest on whatever X it's given,
+        # which upstream (main.py's startup_event) is the SMOTE-resampled
+        # ~50/50 training set, not the natural ~0.3% distribution. contamination
+        # describes the real-world rate we want the decision threshold tuned
+        # for, not the class balance of the data isolation_forest is literally
+        # fit on - those two are different things when SMOTE is involved.
         self.isolation_forest = HybridIsolationForest(
-            self.detector, 
-            contamination=0.1, 
+            self.detector,
+            contamination=contamination,
             n_estimators=100
         )
         
@@ -488,30 +512,66 @@ class AdvancedHybridDetector:
             
             return (X - self.manual_mean) / self.manual_std
     
-    def fit(self, X, y=None):
-        """Train all models in the ensemble"""
-        X = np.array(X, dtype=np.float32)
-        
-        print(f"Training hybrid detector with {X.shape[0]} samples, {X.shape[1]} features")
+    def fit(self, X_train, y_train=None, X_train_res=None, y_train_res=None):
+        """Train each sub-model on the data that's actually correct for its method.
+
+        - Isolation Forest: fit on X_train/y_train - the ORIGINAL, non-resampled,
+          naturally-imbalanced data (all classes). Its `contamination` parameter
+          is calibrated against this real-ish anomaly ratio, so feeding it a
+          SMOTE-balanced 50/50 pool would defeat that calibration.
+        - Autoencoder: fit on X_train filtered to y_train == 0 only - no
+          anomalies, real or SMOTE-synthesized, ever enter its training data.
+          This is the textbook-correct setup for reconstruction-error-based
+          detection: it learns what "normal" looks like, nothing else.
+        - XGBoost: fit on X_train_res/y_train_res - the SMOTE-resampled data.
+          It's the supervised leg of the ensemble and is the one model that
+          actually benefits from class balancing.
+
+        X_train_res/y_train_res default to X_train/y_train when not given, so
+        existing callers that only ever had one dataset (no SMOTE step) keep
+        working exactly as before.
+        """
+        X_train = np.array(X_train, dtype=np.float32)
+        y_train = np.array(y_train) if y_train is not None else None
+
+        if X_train_res is None:
+            X_train_res, y_train_res = X_train, y_train
+        else:
+            X_train_res = np.array(X_train_res, dtype=np.float32)
+            y_train_res = np.array(y_train_res) if y_train_res is not None else None
+
+        print(f"Training hybrid detector - Isolation Forest & Autoencoder on "
+              f"{X_train.shape[0]} original (non-resampled) samples, XGBoost on "
+              f"{X_train_res.shape[0]} (SMOTE-resampled) samples, {X_train.shape[1]} features")
         print(f"Available libraries: {list(k for k, v in self.detector.available_libraries.items() if v.get('available', False))}")
-        
-        # Scale features
-        X_scaled = self._scale_features(X, fit=True)
-        
-        # Train isolation forest (unsupervised)
+
+        # Fit the scaler on the ORIGINAL training distribution - this is what
+        # real activities actually look like at inference time, not the
+        # SMOTE-synthesized points, so it's the correct basis for scaling.
+        X_train_scaled = self._scale_features(X_train, fit=True)
+
+        # Isolation Forest: original, naturally-imbalanced data (all classes)
         print("Training Isolation Forest...")
-        self.isolation_forest.fit(X_scaled)
-        
-        # Train autoencoder (unsupervised)
+        self.isolation_forest.fit(X_train_scaled)
+
+        # Autoencoder: normal-only
         print("Training Autoencoder...")
-        self.autoencoder.fit(X_scaled)
-        
-        # Train XGBoost (supervised if labels available)
-        if y is not None:
+        if y_train is not None:
+            normal_mask = (y_train == 0)
+            X_normal_scaled = X_train_scaled[normal_mask]
+            print(f"   Autoencoder training set: {X_normal_scaled.shape[0]} normal-only samples "
+                  f"(excluded {int((~normal_mask).sum())} anomalous samples)")
+        else:
+            X_normal_scaled = X_train_scaled
+            print("   No labels provided - autoencoder trained on all samples")
+        self.autoencoder.fit(X_normal_scaled)
+
+        # XGBoost: SMOTE-resampled data (supervised - benefits from balancing)
+        if y_train_res is not None:
             print("Training XGBoost...")
-            y = np.array(y)
-            self.xgboost.fit(X_scaled, y)
-        
+            X_train_res_scaled = self._scale_features(X_train_res, fit=False)
+            self.xgboost.fit(X_train_res_scaled, y_train_res)
+
         self.is_trained = True
         print("Hybrid detector training complete!")
         return self

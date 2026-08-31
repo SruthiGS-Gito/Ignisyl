@@ -23,7 +23,7 @@ fake = Faker()
 class BehavioralDataGenerator:
     """Generate realistic user behavior data with anomalies for ML training"""
     
-    def __init__(self, num_users: int = 50, num_days: int = 30):
+    def __init__(self, num_users: int = 200, num_days: int = 30):
         self.num_users = num_users
         self.num_days = num_days
         self.users = []
@@ -422,31 +422,32 @@ class BehavioralDataGenerator:
             'action': random.choice(['read', 'write', 'both'])
         }
     
+    def _users_for_scenario(self, total_users: int, scenario: str) -> List[Dict]:
+        """Sample the user count implied by threat_scenarios[scenario]'s percentage.
+
+        Uses round() rather than int()/truncation so the stated percentages are
+        actually distinguishable from each other at the configured num_users
+        (int() truncation collapsed every scenario <=3% down to the same "1 user"
+        floor at the old default of 50 users). The max(1, ...) floor is kept
+        deliberately - at any user count a scenario should still produce at
+        least one instance in a demo dataset rather than silently vanishing -
+        but it's now hit only for genuinely tiny percentages, not all of them.
+        """
+        target = max(1, round(total_users * self.threat_scenarios[scenario]))
+        return random.sample(self.users, min(target, total_users))
+
     def inject_anomalies(self, activities: List[Dict]) -> List[Dict]:
         """Inject realistic anomalies based on threat scenarios"""
         anomalous_activities = []
-        
+
         # Select users for different threat scenarios
         total_users = len(self.users)
-        
-        # Data exfiltration anomalies
-        exfil_users = random.sample(
-            self.users, 
-            max(1, int(total_users * self.threat_scenarios['data_exfiltration']))
-        )
-        
-        # Privilege abuse anomalies
-        privilege_users = random.sample(
-            self.users,
-            max(1, int(total_users * self.threat_scenarios['privilege_abuse']))
-        )
-        
-        # Credential compromise anomalies
-        compromise_users = random.sample(
-            self.users,
-            max(1, int(total_users * self.threat_scenarios['credential_compromise']))
-        )
-        
+
+        exfil_users = self._users_for_scenario(total_users, 'data_exfiltration')
+        privilege_users = self._users_for_scenario(total_users, 'privilege_abuse')
+        compromise_users = self._users_for_scenario(total_users, 'credential_compromise')
+        sabotage_users = self._users_for_scenario(total_users, 'insider_sabotage')
+
         # Generate anomalous activities
         for activities_batch in [activities[i:i+1000] for i in range(0, len(activities), 1000)]:
             # Data exfiltration patterns
@@ -455,21 +456,28 @@ class BehavioralDataGenerator:
                     anomaly = self._create_exfiltration_anomaly(user, activities_batch)
                     if anomaly:
                         anomalous_activities.append(anomaly)
-            
-            # Privilege abuse patterns  
+
+            # Privilege abuse patterns
             for user in privilege_users:
                 if random.random() < 0.25:  # 25% chance per batch
                     anomaly = self._create_privilege_anomaly(user, activities_batch)
                     if anomaly:
                         anomalous_activities.append(anomaly)
-            
+
             # Credential compromise patterns
             for user in compromise_users:
                 if random.random() < 0.2:  # 20% chance per batch
                     anomaly = self._create_compromise_anomaly(user, activities_batch)
                     if anomaly:
                         anomalous_activities.append(anomaly)
-        
+
+            # Insider sabotage patterns
+            for user in sabotage_users:
+                if random.random() < 0.15:  # 15% chance per batch
+                    anomaly = self._create_sabotage_anomaly(user, activities_batch)
+                    if anomaly:
+                        anomalous_activities.append(anomaly)
+
         return activities + anomalous_activities
     
     def _create_exfiltration_anomaly(self, user: Dict, activities_batch: List[Dict]) -> Dict:
@@ -533,9 +541,32 @@ class BehavioralDataGenerator:
             'anomaly_type': 'credential_compromise',
             'risk_factors': ['unusual_location', 'new_device', 'multiple_attempts']
         })
-        
+
         return anomaly
-    
+
+    def _create_sabotage_anomaly(self, user: Dict, activities_batch: List[Dict]) -> Dict:
+        """Create insider sabotage anomaly - destructive/mass-deletion activity.
+
+        Previously 'insider_sabotage' existed only as an unused key in
+        threat_scenarios with no corresponding creation method, so it never
+        actually injected anything despite being configured at 0.5% of users.
+        """
+        anomaly_time = fake.date_time_between(start_date='-30d', end_date='now')
+
+        # Off-hours mass deletion of files the user has elevated access to
+        anomaly = self._create_activity(user, 'file_access', anomaly_time)
+        anomaly.update({
+            'is_suspicious': True,
+            'confidence_score': random.uniform(0.65, 0.95),
+            'action': 'delete',
+            'permission_level': 'admin',
+            'file_size': random.randint(1024, 50 * 1024 * 1024),
+            'anomaly_type': 'insider_sabotage',
+            'risk_factors': ['mass_deletion', 'off_hours', 'destructive_action', 'elevated_permissions']
+        })
+
+        return anomaly
+
     def save_to_csv(self, activities: List[Dict], filename: str):
         """Save activities to CSV file"""
         df = pd.DataFrame(activities)

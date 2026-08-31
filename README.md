@@ -40,7 +40,7 @@ IGNISYL is an intelligent security system that detects insider threats using mac
   - Isolation Forest (unsupervised anomaly detection)
   - Autoencoder (deep learning pattern recognition)
   - XGBoost (supervised gradient boosting)
-  - Weighted ensemble: 30% IF + 30% AE + 40% XGB
+  - Weighted ensemble: 40% IF + 40% AE + 20% XGB
 
 - **Graduated Response Framework:** 4-tier automated system
   - **ALLOW** (0-30): Normal operations with standard logging

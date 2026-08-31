@@ -63,7 +63,7 @@ prometheus-client>=0.18.0
 
 # PDF Generation
 reportlab==4.0.7
-matplotlib>=25.0.1
+matplotlib>=3.7.0
 
 # Network & System Monitoring
 psutil>=5.9.0

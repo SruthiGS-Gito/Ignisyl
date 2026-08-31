@@ -188,7 +188,7 @@ const SystemStatus = () => {
                   <span style={{ fontSize: '20px' }}>&#127795;</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>Isolation Forest</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Unsupervised anomaly detection | Weight: 30%</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Unsupervised anomaly detection | Weight: 40%</div>
                   </div>
                   <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold' }}>ACTIVE</span>
                 </div>
@@ -205,7 +205,7 @@ const SystemStatus = () => {
                   <span style={{ fontSize: '20px' }}>&#129504;</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>Autoencoder</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Deep learning pattern recognition | Weight: 30%</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Deep learning pattern recognition | Weight: 40%</div>
                   </div>
                   <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold' }}>ACTIVE</span>
                 </div>
@@ -222,7 +222,7 @@ const SystemStatus = () => {
                   <span style={{ fontSize: '20px' }}>&#128640;</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>XGBoost</div>
-                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Supervised gradient boosting | Weight: 40%</div>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>Supervised gradient boosting | Weight: 20%</div>
                   </div>
                   <span style={{ color: '#10b981', fontSize: '12px', fontWeight: 'bold' }}>ACTIVE</span>
                 </div>

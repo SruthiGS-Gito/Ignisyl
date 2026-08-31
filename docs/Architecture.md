@@ -329,7 +329,7 @@ flowchart TD
    - Isolation Forest: 0.72
    - Autoencoder: 0.81
    - XGBoost: 0.83
-3. **Score Aggregation** → `risk_score = (0.72×0.3 + 0.81×0.3 + 0.83×0.4) × 100 = 78.5`
+3. **Score Aggregation** → `risk_score = (0.72×0.4 + 0.81×0.4 + 0.83×0.2) × 100 = 77.8`
 4. **Contextual Scoring** → Apply risk factors and modifiers
 5. **Final Risk Score** → 0-100 range with risk level
 

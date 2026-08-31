@@ -4,7 +4,7 @@ Monitors actual laptop network usage and sends data to the threat detection API
 The monitor will:
 1. Check your network every 30 seconds
 2. Print current network usage
-3. Detect if you transfer more than 100MB
+3. Detect if you transfer more than 50MB
 4. Send suspicious activity to your API
 5. Show the risk analysis results
 """
@@ -30,7 +30,7 @@ class NetworkMonitor:
         self.api_url = api_url
         self.baseline_bytes = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
         self.last_check_time = time.time()
-        self.alert_threshold_mb = 50  # Alert if more than 100MB transferred in 30 seconds
+        self.alert_threshold_mb = 50  # Alert if more than 50MB transferred in 30 seconds
         self.monitoring_active = False
         
         # Load user configuration
@@ -141,7 +141,7 @@ class NetworkMonitor:
         transfer_rate = network_usage['transfer_rate_mbps']
         
         # Suspicious if:
-        # 1. Large transfer in short time (more than 100MB in 30 seconds)
+        # 1. Large transfer in short time (more than 50MB in 30 seconds)
         # 2. Very high transfer rate (more than 50 MB/s)
         
         if mb_transferred > self.alert_threshold_mb:

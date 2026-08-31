@@ -329,23 +329,34 @@ class IntelligentRiskEngine:
                 'context': {}
             })
 
-        # Calculate final score from recent events (last 24 hours)
+        # Calculate final score, preferring events from the last 24 hours but
+        # falling back to the user's full history when none are that recent.
+        #
+        # Previously this only ever looked at the last-24h bucket and, if it
+        # came up empty, silently left current_score at the 0 it was reset to
+        # above - regardless of how high that user's actual activity risk
+        # scores were. Demo/synthetic activities are spread randomly across
+        # the last 7 days (see generate_test_activity_data() in main.py), so
+        # whether any given user had at least one activity land inside the
+        # last 24 hours was essentially a coin flip - users who "lost" that
+        # flip scored 0 no matter what their real activity history showed.
         user_data = self.user_scores[user_id]
         recent_events = [
             e for e in user_data['events']
             if (datetime.now() - e['timestamp']).total_seconds() < 86400  # 24 hours
         ]
+        scoring_events = recent_events if recent_events else user_data['events']
 
         # Calculate score using weighted average with recency bias
-        # Also consider the MAXIMUM risk score for recent events (for critical threats)
-        if recent_events:
-            # Find the maximum recent risk score
-            max_recent_score = max(e['score'] for e in recent_events)
+        # Also consider the MAXIMUM risk score among the scoring events (for critical threats)
+        if scoring_events:
+            # Find the maximum risk score among the events we're scoring from
+            max_recent_score = max(e['score'] for e in scoring_events)
 
             # Calculate weighted average
             total_score = 0
             total_weight = 0
-            for i, event in enumerate(sorted(recent_events, key=lambda x: x['timestamp'], reverse=True)[:20]):  # Limit to 20 most recent
+            for i, event in enumerate(sorted(scoring_events, key=lambda x: x['timestamp'], reverse=True)[:20]):  # Limit to 20 most recent
                 weight = 1.0 / (i + 1)  # Recency weight
                 total_score += event['score'] * weight
                 total_weight += weight
