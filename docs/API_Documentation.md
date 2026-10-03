@@ -40,7 +40,7 @@ POST /api/v1/auth/login
 ```json
 {
   "username": "admin",
-  "password": "admin123"
+  "password": "demo123"
 }
 ```
 
@@ -390,7 +390,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-**Note:** Threats with risk score 76-100 (CRITICAL) are auto-blocked and do not appear in pending decisions.
+**Note:** Threats with risk score 76-100 (CRITICAL) are blocked automatically (simulated — commands generated, not executed) and do not appear in pending decisions.
 
 **Error Responses:**
 - `403 Forbidden` - Insufficient permissions
@@ -601,7 +601,7 @@ import requests
 # Login
 response = requests.post(
     'http://localhost:8000/api/v1/auth/login',
-    json={'username': 'admin', 'password': 'admin123'}
+    json={'username': 'admin', 'password': 'demo123'}
 )
 token = response.json()['access_token']
 
@@ -633,7 +633,7 @@ print(f"Action: {result['action']}")
 const loginResponse = await fetch('http://localhost:8000/api/v1/auth/login', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
-  body: JSON.stringify({username: 'admin', password: 'admin123'})
+  body: JSON.stringify({username: 'admin', password: 'demo123'})
 });
 const {access_token} = await loginResponse.json();
 

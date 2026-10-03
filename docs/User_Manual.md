@@ -39,12 +39,17 @@
 **URL:** http://localhost:3000 (or your organization's deployed URL)
 
 **Default Credentials:**
+
+Local demo seed accounts (reset on startup):
+
 | Role | Username | Password |
 |------|----------|----------|
-| Admin | admin | admin123 |
-| Analyst | sruthi_g_s | analyst123 |
-
-⚠️ **Security Notice:** Change default passwords immediately after first login!
+| Admin | admin | demo123 |
+| Monitored user | john.doe | demo123 |
+| Monitored user | jane.smith | demo123 |
+| Monitored user | bob.wilson | demo123 |
+| Monitored user | alice.johnson | demo123 |
+| Monitored user | charlie.brown | demo123 |
 
 ---
 
@@ -98,7 +103,7 @@ You'll see the **IGNISYL Login Page** with:
 ### Step 2: Enter Credentials
 
 Username: admin
-Password: admin123
+Password: demo123
 
 ### Step 3: First-Time Setup
 
@@ -435,7 +440,7 @@ The system operates in **Simulation Mode** for academic demonstration:
 
 - ✅ **Dashboard:** Shows real-time metrics and threat feed
 - ✅ **ML Detection:** Ensemble model analyzes all activities
-- ✅ **Risk Scoring:** 27 factors + 13 business modifiers
+- ✅ **Risk Scoring:** multi-factor risk scorer (19 implemented behavioral factors) with business-context modifiers
 - ✅ **Graduated Response:** 4-tier automated classification
 - ✅ **Analyst Actions:** Logged and displayed in UI
 - ✅ **PDF Reports:** All 4 report types generate correctly
@@ -523,7 +528,7 @@ A: Depending on risk level, the system responds:
 - ALLOW (0-30): Log only, normal operations
 - MONITOR (31-50): Enhanced logging, analyst awareness
 - RESTRICT (51-75): Analyst decision required
-- BLOCK (76-100): Auto-block, incident response
+- BLOCK (76-100): Block (simulated — commands generated, not executed)
 
 **Note:** In current simulation mode, firewall commands are generated but not executed.
 

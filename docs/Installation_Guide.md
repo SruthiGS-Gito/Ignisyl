@@ -148,7 +148,7 @@ pip install --break-system-packages -r requirements.txt
 # - sqlalchemy, pydantic (database & validation)
 # - python-jose, passlib, bcrypt (authentication)
 # - scikit-learn (ML - Isolation Forest)
-# - torch (PyTorch - Autoencoder)
+# - tensorflow, keras (TensorFlow/Keras - Autoencoder)
 # - xgboost (ML - gradient boosting)
 # - reportlab, matplotlib (PDF reports)
 # - websockets (real-time updates)
@@ -169,7 +169,7 @@ pip install --break-system-packages -r requirements.txt
 pip list
 
 # Test imports
-python -c "import fastapi; import torch; import xgboost; import sklearn; print('All imports successful!')"
+python -c "import fastapi; import tensorflow; import xgboost; import sklearn; print('All imports successful!')"
 ```
 
 ---
@@ -247,12 +247,18 @@ This creates:
 python -c "from models.database import create_sample_data; create_sample_data()"
 ```
 
-**Sample Users Created:**
-| Username | Password | Role | Email |
-|----------|----------|------|-------|
-| admin | admin123 | admin | admin@ignisyl.demo |
-| sruthi_g_s | analyst123 | analyst | sruthi.gs@ignisyl.demo |
-| r_anand | analyst123 | analyst | r.anand@ignisyl.demo |
+**Demo accounts** are seeded automatically when the backend starts.
+
+Local demo seed accounts (reset on startup):
+
+| Role | Username | Password |
+|------|----------|----------|
+| Admin | admin | demo123 |
+| Monitored user | john.doe | demo123 |
+| Monitored user | jane.smith | demo123 |
+| Monitored user | bob.wilson | demo123 |
+| Monitored user | alice.johnson | demo123 |
+| Monitored user | charlie.brown | demo123 |
 
 ---
 
@@ -385,7 +391,7 @@ curl http://localhost:8000/health
 # Test login endpoint
 curl -X POST http://localhost:8000/api/v1/auth/login ^
   -H "Content-Type: application/json" ^
-  -d "{\"username\":\"admin\",\"password\":\"admin123\"}"
+  -d "{\"username\":\"admin\",\"password\":\"demo123\"}"
 
 # Expected: JSON with access_token
 ```
@@ -394,7 +400,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login ^
 
 1. Open browser to http://localhost:3000
 2. You should see the **IGNISYL Login Page**
-3. Login with credentials: `admin` / `admin123`
+3. Login with credentials: `admin` / `demo123`
 4. You should be redirected to the **Dashboard**
 
 ### Step 4: Test WebSocket Connection
@@ -485,17 +491,15 @@ npm start
 2. Verify `REACT_APP_API_URL` in frontend `.env`
 3. Restart both backend and frontend
 
-#### Issue 6: PyTorch Installation Issues
+#### Issue 6: TensorFlow/Keras Installation Issues
 
-**Error:** `Could not find a version that satisfies the requirement torch`
+**Error:** `Could not find a version that satisfies the requirement tensorflow`
 
 **Solution:**
 ```bash
-# For Windows, install CPU version
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-
-# Or install with CUDA support (optional, for faster inference)
-pip install torch --index-url https://download.pytorch.org/whl/cu118
+# Use a 64-bit Python version that TensorFlow supports, then upgrade pip and retry
+python -m pip install --upgrade pip
+pip install tensorflow
 ```
 
 #### Issue 7: WebSocket Connection Failed
@@ -538,6 +542,6 @@ After successful installation:
 
 For installation issues:
 - **GitHub Issues:** https://github.com/SruthiGS-Gito/Ignisyl/issues
-- **Developer:** Sruthi CS
+- **Developer:** Sruthi G S
 - **Institution:** Sree Buddha College of Engineering, Kerala, India
 <<<END Installation_Guide.md>>>

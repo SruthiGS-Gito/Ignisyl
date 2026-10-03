@@ -29,7 +29,7 @@ IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System
 | **Backend** | Python 3.11, FastAPI | ✅ Implemented |
 | **Frontend** | React 18, Tailwind CSS | ✅ Implemented |
 | **Database** | SQLite (3 databases) | ✅ Implemented |
-| **ML Engine** | Ensemble (IF + XGBoost + PyTorch AE) | ✅ Implemented |
+| **ML Engine** | Ensemble (IF + XGBoost + TensorFlow/Keras AE) | ✅ Implemented |
 | **Reporting** | ReportLab PDF generation | ✅ Implemented |
 | **Real-time** | WebSocket for dashboard | ✅ Implemented |
 | **Firewall** | Command generation (simulation) | ✅ Simulation Mode |
@@ -48,7 +48,7 @@ IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System
 
 **Backend:** Python 3.11, FastAPI, SQLAlchemy
 **Frontend:** React 18, Tailwind CSS
-**ML:** scikit-learn, XGBoost, PyTorch (Autoencoder)
+**ML:** scikit-learn, XGBoost, TensorFlow/Keras (Autoencoder)
 **Database:** SQLite (development mode)
 **Real-time:** WebSockets
 **Reporting:** ReportLab (PDF generation)
@@ -70,12 +70,12 @@ IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System
 │                             ▼                    ▼              │
 │                      ┌──────────────┐    ┌──────────────┐      │
 │                      │   Database   │    │    Models    │      │
-│                      │   SQLite     │    │  .pkl/.pt    │      │
+│                      │   SQLite     │    │ (in memory)  │      │
 │                      └──────────────┘    └──────────────┘      │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                     Services Layer                        │  │
-│  │  • Risk Scorer (27 factors + 13 business modifiers)      │  │
+│  │  • Risk Scorer (19 implemented factors + modifiers)      │  │
 │  │  • Firewall Controller (4-tier graduated response)       │  │
 │  │  • Report Generator (4 PDF report types)                 │  │
 │  │  • System Monitor (real-time metrics)                    │  │
@@ -116,7 +116,7 @@ IGNISYL is an **AI-powered Insider Threat Detection and Adaptive Firewall System
 | File | Purpose |
 |------|---------|
 | `hybrid_detector.py` | 3-model ensemble (IF + AE + XGB) |
-| `risk_scorer.py` | Context-aware scoring (27 factors) |
+| `risk_scorer.py` | Multi-factor risk scorer (19 implemented behavioral factors) with business-context modifiers |
 | `model_trainer.py` | Training pipeline |
 
 #### Services (`backend/services/`)
@@ -188,7 +188,7 @@ data/
        │                    ▼                    ▼
        │              ┌──────────────┐    ┌──────────────┐
        │              │   Database   │    │ Risk Scorer  │
-       │              │   (SQLite)   │    │ (27 factors) │
+       │              │   (SQLite)   │    │ (19 factors) │
        │              └──────────────┘    └──────────────┘
        │                                        │
        │              ┌──────────────┐          │
@@ -200,7 +200,7 @@ data/
 **Flow:**
 1. Activity data submitted via API (POST /api/v1/analyze)
 2. Backend processes through ML Engine (3-model ensemble)
-3. Risk Scorer applies 27 factors + 13 modifiers
+3. Risk Scorer applies its checks: multi-factor risk scorer (19 implemented behavioral factors) with business-context modifiers
 4. Firewall Controller determines action (ALLOW/MONITOR/RESTRICT/BLOCK)
 5. WebSocket broadcasts threat to dashboard
 6. **Note:** Firewall commands generated but NOT executed (simulation mode)
@@ -246,7 +246,7 @@ IGNISYL implements a **4-tier graduated response system** instead of binary ALLO
 | **ALLOW** | 0-30 | Normal logging | Automated | ✅ Implemented |
 | **MONITOR** | 31-50 | Enhanced logging | Automated | ✅ Implemented |
 | **RESTRICT** | 51-75 | Analyst decision | Human-in-the-loop | ✅ Implemented (simulation) |
-| **BLOCK** | 76-100 | Auto-block | Automated | ✅ Implemented (simulation) |
+| **BLOCK** | 76-100 | Block (simulated — commands generated, not executed) | Automated | ✅ Implemented (simulation) |
 
 ### Tier 1: ALLOW (Risk 0-30)
 - **Action:** Normal operations with standard logging
@@ -524,7 +524,7 @@ npm start
 ## Contact & Support
 
 - **GitHub:** https://github.com/SruthiGS-Gito/Ignisyl
-- **Developer:** Sruthi CS
+- **Developer:** Sruthi G S
 - **Institution:** Sree Buddha College of Engineering, Kerala, India
 <<<END Architecture.md>>>
 

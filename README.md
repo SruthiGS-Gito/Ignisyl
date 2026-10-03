@@ -4,13 +4,15 @@
 
 IGNISYL is an intelligent security system that detects insider threats using machine learning and implements graduated response actions through an adaptive firewall. Unlike traditional binary ALLOW/BLOCK systems, IGNISYL provides a 4-tier graduated response framework with granular analyst controls.
 
+**Publication:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
+
 ---
 
-**Developer:** Sruthi CS
+**Developer:** Sruthi G S
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Academic Year:** 2025-2026
 **Project Type:** Final Year B.Tech Project
-**Conference:** IEEE ICAECT 2026 (Submission Completed)
+**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
 
 ---
 
@@ -27,6 +29,8 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 - [Future Enhancements](#future-enhancements)
 - [Risk Thresholds](#risk-thresholds)
 - [Important Notes](#important-notes)
+- [Evaluation Status](#evaluation-status)
+- [Known Limitations](#known-limitations)
 - [Developer](#developer)
 - [License](#license)
 
@@ -46,7 +50,7 @@ IGNISYL is an intelligent security system that detects insider threats using mac
   - **ALLOW** (0-30): Normal operations with standard logging
   - **MONITOR** (31-50): Enhanced logging, analyst awareness
   - **RESTRICT** (51-75): Analyst review required, limited access
-  - **BLOCK** (76-100): Complete block, incident response
+  - **BLOCK** (76-100): Block (simulated — commands generated, not executed)
 
 - **Analyst Control Panel**
   - Custom restriction options (block external only, rate limit, port blocking)
@@ -73,11 +77,10 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 | **Backend** | Python 3.11, FastAPI, SQLAlchemy |
 | **Frontend** | React 18, Tailwind CSS, Recharts |
 | **Machine Learning** | scikit-learn, TensorFlow/Keras, XGBoost |
-| **Database** | SQLite (dev), PostgreSQL/MySQL (production) |
+| **Database** | SQLite |
 | **Real-time** | WebSockets |
 | **PDF Generation** | ReportLab, Matplotlib |
 | **Authentication** | JWT, bcrypt |
-| **Containerization** | Docker, Docker Compose |
 
 ---
 
@@ -97,12 +100,12 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 │                             ▼                    ▼              │
 │                      ┌──────────────┐    ┌──────────────┐      │
 │                      │   Database   │    │    Models    │      │
-│                      │ SQLite/PSQL  │    │  .pkl/.h5    │      │
+│                      │    SQLite    │    │ (in memory)  │      │
 │                      └──────────────┘    └──────────────┘      │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                     Services Layer                        │  │
-│  │  • Risk Scorer (27 factors + 13 business modifiers)      │  │
+│  │  • Risk Scorer (19 implemented factors + modifiers)      │  │
 │  │  • Firewall Controller (4-tier graduated response)        │  │
 │  │  • Report Generator (PDF with visualizations)             │  │
 │  │  • System Monitor (real-time metrics)                     │  │
@@ -110,6 +113,10 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+The risk scorer is a multi-factor risk scorer (19 implemented behavioral factors) with business-context modifiers.
+
+Models are trained at startup; scripts/train_models.py exports them if needed.
 
 For detailed architecture, see [docs/Architecture.md](docs/Architecture.md)
 
@@ -186,23 +193,20 @@ npm start
 ```
 Frontend runs at: http://localhost:3000
 
-### Using Docker
+### Demo Login Credentials
 
-```bash
-# Build and start all services
-docker-compose up --build
-
-# Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000
-```
-
-### Default Login Credentials
+Local demo seed accounts (reset on startup):
 
 | Role | Username | Password |
 |------|----------|----------|
-| Admin | admin | admin123 |
-| Analyst | analyst | analyst123 |
+| Admin | admin | demo123 |
+| Monitored user | john.doe | demo123 |
+| Monitored user | jane.smith | demo123 |
+| Monitored user | bob.wilson | demo123 |
+| Monitored user | alice.johnson | demo123 |
+| Monitored user | charlie.brown | demo123 |
+
+`demo123` is a local demo seed only, set in `backend/main.py`.
 
 ---
 
@@ -219,12 +223,12 @@ http://localhost:8000/api/v1
 |--------|----------|-------------|
 | POST | `/analyze` | Analyze user activity for threats |
 | GET | `/dashboard/stats` | Get dashboard statistics |
-| GET | `/users` | List all monitored users |
-| GET | `/users/{id}/activities` | Get user activity history |
-| GET | `/threats` | List detected threats |
-| POST | `/threats/{id}/action` | Apply analyst action to threat |
-| GET | `/reports/generate/{type}` | Generate PDF report |
-| WS | `/ws` | WebSocket for real-time updates |
+| GET | `/users/list` | List all monitored users |
+| GET | `/users/{id}/profile` | Get user profile |
+| GET | `/threats/active` | List active threats |
+| POST | `/analyst/threat/{id}/action` | Apply analyst action to threat |
+| POST | `/reports/generate` | Generate PDF report |
+| WS | `/ws/{client_id}` | WebSocket for real-time updates (server root, not under `/api/v1`) |
 
 ### Interactive API Docs
 
@@ -260,11 +264,11 @@ Ignisyl/
 ├── config/
 │   └── config.py            # Application configuration
 ├── data/
-│   ├── models/              # Trained ML models (.pkl, .h5)
-│   ├── synthetic/           # Training data
+│   ├── models/              # Exported models (git-ignored; trained at startup)
+│   ├── synthetic/           # Synthetic data
 │   └── honeypots/           # Decoy files for detection
 ├── docs/                    # Documentation
-├── docker-compose.yml
+├── run_adversarial_test.py  # Adversarial evasion suite
 ├── requirements.txt
 └── README.md
 ```
@@ -273,11 +277,7 @@ Ignisyl/
 
 ## Screenshots
 
-> Screenshots will be added after deployment. The application includes:
-> - **Dashboard:** Real-time threat monitoring with risk metrics
-> - **Analyst Panel:** Threat review and action controls
-> - **User Activity:** Detailed activity logs with risk scores
-> - **Reports:** PDF report generation interface
+Screenshots: coming soon
 
 ---
 
@@ -296,11 +296,11 @@ Ignisyl/
 
 ## Developer
 
-**Developer:** Sruthi CS
+**Developer:** Sruthi G S
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Academic Year:** 2025-2026
 **Project Type:** Final Year B.Tech Project
-**Conference:** IEEE ICAECT 2026 (Submission Completed)
+**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
 
 | Role | Responsibility |
 |------|----------------|
@@ -318,7 +318,7 @@ Ignisyl/
 | **LOW** | 0-30 | ALLOW | Normal operations, standard logging |
 | **MEDIUM** | 31-50 | MONITOR | Enhanced logging, analyst awareness |
 | **HIGH** | 51-75 | RESTRICT | Analyst decision required, limited access |
-| **CRITICAL** | 76-100 | BLOCK | Auto-block, incident response triggered |
+| **CRITICAL** | 76-100 | BLOCK | Block (simulated — commands generated, not executed) |
 
 ---
 
@@ -329,9 +329,24 @@ Ignisyl/
 - Cross-platform compatibility
 - Production deployment requires agent installation on endpoints
 
-**ML Performance:** Detection accuracy metrics are calculated from ensemble model predictions on synthetic data. For production deployment, retrain models on organization-specific data.
+**Demo Data:** The app seeds 6 demo accounts (admin plus 5 monitored users). The models train on a 46,934-event synthetic dataset (200 users, 4 threat scenarios: data exfiltration, privilege abuse, credential compromise, insider sabotage), generated at first startup with a fixed seed. For production, integrate with your organization's user directory (Active Directory, LDAP, etc.) and retrain on organization-specific data.
 
-**Demo Data:** System includes 50 demo users with synthetic activities. For production, integrate with your organization's user directory (Active Directory, LDAP, etc.)
+---
+
+## Evaluation Status
+
+Labels come from the data generator; a clean held-out evaluation is pending, so no accuracy figure is claimed. The dashboard shows "Not evaluated" until real predictions have been logged.
+
+An adversarial evasion suite (`run_adversarial_test.py`) runs evasion attacks against the detector, including slow-and-low. Slow-and-low evasion is a known blind spot.
+
+---
+
+## Known Limitations
+
+- Labels come from the data generator; a clean held-out evaluation is pending, so no accuracy figure is claimed.
+- Firewall enforcement is simulated (commands generated, not executed).
+- Slow-and-low evasion is a known blind spot (adversarial suite: `run_adversarial_test.py`).
+- Some defined risk factors and context modifiers are not yet implemented.
 
 ---
 
@@ -339,7 +354,7 @@ Ignisyl/
 
 This project is developed for academic research purposes.
 
-**Conference:** IEEE ICAECT 2026 (Submission Completed)
+**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
 
 ---
 

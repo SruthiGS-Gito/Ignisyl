@@ -2,7 +2,7 @@
 
 **Version:** 1.0 (Demo/Academic)
 **Last Updated:** January 2026
-**Developer:** Sruthi CS
+**Developer:** Sruthi G S
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Status:** Functional Demo System
 
@@ -23,9 +23,9 @@
 ### ML Engine
 - Isolation Forest (unsupervised anomaly detection)
 - XGBoost (supervised gradient boosting)
-- PyTorch Autoencoder (deep learning reconstruction)
+- TensorFlow/Keras Autoencoder (deep learning reconstruction)
 - Weighted ensemble: 40% IF + 40% AE + 20% XGB
-- Risk Scorer: 27 factors + 13 business modifiers
+- Risk Scorer: multi-factor risk scorer (19 implemented behavioral factors) with business-context modifiers
 
 ### Reports (All Functional)
 | Report Type | Pages | Content |
@@ -36,8 +36,8 @@
 | Individual User Report | ~17 | Detailed user behavioral analysis |
 
 ### Data
-- 50 demo users with realistic profiles
-- Synthetic activity data (100+ activities)
+- 6 seeded demo accounts (admin plus 5 monitored users)
+- Synthetic training dataset: 46,934 events, 200 users, 4 threat scenarios (generated at first startup)
 - Risk scores distributed realistically (0-100)
 - Timestamps spread across multiple days
 - Honeypot files for detection testing
@@ -120,7 +120,7 @@ iptables -A OUTPUT -m owner --uid-owner john.doe -j DROP
 │  Frontend: React 18 + Tailwind CSS      │
 │  Backend:  FastAPI + Python 3.11        │
 │  Database: SQLite (3 files)             │
-│  ML:       PyTorch + XGBoost + sklearn  │
+│  ML:    TF/Keras + XGBoost + sklearn    │
 │  Reports:  ReportLab PDF                │
 │  Realtime: WebSocket                    │
 └─────────────────────────────────────────┘
@@ -189,13 +189,13 @@ npm start
 # API Docs:  http://localhost:8000/docs
 ```
 
-**Default Login:** admin / admin123
+**Default Login:** admin / demo123 (local demo seed account, reset on startup)
 
 ---
 
 ## Contact
 
-**Developer:** Sruthi CS
+**Developer:** Sruthi G S
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Project:** B.Tech Final Year Project (2025-2026)
 **Conference:** IEEE ICAECT 2026
