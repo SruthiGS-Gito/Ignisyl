@@ -50,6 +50,7 @@ from ml_engine.risk_scorer import ContextualRiskScorer
 from ml_engine.data_generator import BehavioralDataGenerator
 from fastapi import WebSocket
 from api.websocket import websocket_endpoint, manager as ws_manager
+from api.auth import get_current_user, get_admin_user
 from models.activity_log import activity_logger
 from models.user_management import user_manager
 from services.system_monitor import system_monitor
@@ -1016,7 +1017,7 @@ async def dashboard_stats():
         raise HTTPException(status_code=500, detail=f"Dashboard stats error: {str(e)}")
 
 @app.post("/api/v1/simulate")
-async def simulate_threat(scenario: Dict):
+async def simulate_threat(scenario: Dict, current_user: Dict = Depends(get_admin_user)):
     """Simulate different threat scenarios for demonstration"""
     global data_generator, ml_detector, risk_scorer
     
@@ -1099,7 +1100,7 @@ async def websocket_stats():
     }
 
 @app.post("/api/v1/broadcast/threat")
-async def broadcast_threat(threat_data: Dict):
+async def broadcast_threat(threat_data: Dict, current_user: Dict = Depends(get_admin_user)):
     """Endpoint to broadcast threat alerts via WebSocket"""
     from api.websocket import notify_threat_detected 
     
@@ -1110,7 +1111,7 @@ async def broadcast_threat(threat_data: Dict):
         return {"status": "error", "message": str(e)}
 
 @app.post("/api/v1/users/register")
-async def register_user(user_data: Dict):
+async def register_user(user_data: Dict, current_user: Dict = Depends(get_admin_user)):
     """Register a new user for monitoring"""
     from models.user_management import user_manager 
     
@@ -1511,8 +1512,8 @@ async def login(login_data: Dict):
     }
 
 @app.post("/api/v1/auth/change-password")
-async def change_password(password_data: Dict):
-    """Change user password with complexity validation"""
+async def change_password(password_data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Change user password with complexity validation (authenticated; own account only)"""
     from api.auth import auth_manager
     from models.user_management import user_manager
 
@@ -1525,6 +1526,13 @@ async def change_password(password_data: Dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username, current password, and new password are required"
+        )
+
+    # A token only authorizes changing the password of the account it was issued for
+    if username != current_user.get('sub'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only change your own password"
         )
 
     # Verify current credentials

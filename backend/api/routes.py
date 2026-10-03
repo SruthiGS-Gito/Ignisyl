@@ -11,7 +11,7 @@ import pandas as pd
 import os
 from models.activity_log import activity_logger
 from models.user_management import user_manager
-from api.auth import get_current_user
+from api.auth import get_current_user, get_admin_user, get_analyst_user
 import psutil
 import logging
 
@@ -678,7 +678,7 @@ async def get_analytics_trends(
     }
 
 @router.post("/firewall/action")
-async def execute_firewall_action(action_data: Dict):
+async def execute_firewall_action(action_data: Dict, current_user: dict = Depends(get_analyst_user)):
     """Execute immediate firewall action"""
     
     user_id = action_data.get("user_id")
@@ -1546,7 +1546,7 @@ async def unblock_user(user_id: str, current_user: dict = Depends(get_current_us
 
 
 @router.post("/users/register")
-async def register_user(user_data: dict):
+async def register_user(user_data: dict, current_user: dict = Depends(get_admin_user)):
     """Register a new user"""
     from api.auth import auth_manager
 

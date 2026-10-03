@@ -335,7 +335,7 @@ Screenshots: coming soon
 
 ## Evaluation Status
 
-Labels come from the data generator; a clean held-out evaluation is pending, so no accuracy figure is claimed. The dashboard shows "Not evaluated" until real predictions have been logged.
+The backend evaluates on a held-out 20% split at startup. On the current synthetic data it catches all 29 held-out anomalies (recall 100%) but precision is 2.77% (1,018 false alarms), so accuracy (89%) is not a meaningful figure at a 0.31% anomaly rate. Labels come from the data generator, so these numbers do not reflect real-world performance. The figures vary slightly between startups (precision 2.77-2.85% and 989-1,018 false alarms over three runs). The dashboard shows "Not evaluated" until real predictions have been logged.
 
 An adversarial evasion suite (`run_adversarial_test.py`) runs evasion attacks against the detector, including slow-and-low. Slow-and-low evasion is a known blind spot.
 
@@ -343,7 +343,7 @@ An adversarial evasion suite (`run_adversarial_test.py`) runs evasion attacks ag
 
 ## Known Limitations
 
-- Labels come from the data generator; a clean held-out evaluation is pending, so no accuracy figure is claimed.
+- On the held-out 20% split, recall is 100% but precision is 2.77% (1,018 false alarms), so accuracy (89%) is not a meaningful figure at a 0.31% anomaly rate. Labels come from the data generator, so these numbers do not reflect real-world performance.
 - Firewall enforcement is simulated (commands generated, not executed).
 - Slow-and-low evasion is a known blind spot (adversarial suite: `run_adversarial_test.py`).
 - Some defined risk factors and context modifiers are not yet implemented.
