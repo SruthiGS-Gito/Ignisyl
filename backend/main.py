@@ -979,7 +979,7 @@ async def dashboard_stats():
         
         # Ensure all ML metrics have values (fix undefined issue)
         ml_performance = {
-            "accuracy": ml_performance_raw.get('accuracy', 94.2),
+            "accuracy": ml_performance_raw.get('accuracy'),
             "false_positive_rate": ml_performance_raw.get('false_positive_rate', 0.05),
             "detection_latency_ms": ml_performance_raw.get('detection_latency_ms', 45),  # [OK] FIXED
             "models_active": ml_performance_raw.get('models_active', 3)

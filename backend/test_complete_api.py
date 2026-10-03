@@ -67,7 +67,7 @@ class CompleteTester:
                     "email": "test@test.com"
                 }
             elif "/login" in path:
-                data = {"username": "admin", "password": "admin123"}
+                data = {"username": "admin", "password": "demo123"}
             elif "/contact-user" in path:
                 data = {"message": "Test message", "method": "notification"}
             elif "/escalate" in path:

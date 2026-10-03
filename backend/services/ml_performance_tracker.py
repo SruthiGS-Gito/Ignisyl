@@ -87,7 +87,7 @@ class MLPerformanceTracker:
         with self.lock:
             if self.prediction_count == 0:
                 return {
-                    'accuracy': 85.0,  # Default baseline
+                    'accuracy': None,  # Not evaluated - no predictions logged yet
                     'false_positive_rate': 0.10,
                     'false_negative_rate': 0.05,
                     'precision': 80.0,

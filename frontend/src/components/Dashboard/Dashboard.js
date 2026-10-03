@@ -371,7 +371,9 @@ const Dashboard = () => {
               <div className="health-item">
                 <div className="health-label">Accuracy</div>
                 <div className="health-value" style={{color: '#4caf50'}}>
-                  {(mlPerformance.accuracy || 94.2).toFixed(1)}%
+                  {typeof mlPerformance.accuracy === 'number'
+                    ? `${mlPerformance.accuracy.toFixed(1)}%`
+                    : 'Not evaluated'}
                 </div>
                 <div className="text-xs text-blue-300 mt-1">Training Data Benchmark</div>
               </div>

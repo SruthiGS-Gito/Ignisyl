@@ -14,7 +14,7 @@ API_URL = f"{BASE_URL}/api/v1"
 # Test credentials
 TEST_USER = {
     "username": "admin",
-    "password": "admin123"
+    "password": "demo123"
 }
 
 class TestAuthentication:

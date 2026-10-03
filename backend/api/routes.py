@@ -97,7 +97,7 @@ def _get_real_ml_metrics():
         from services.ml_performance_tracker import ml_performance_tracker
         metrics = ml_performance_tracker.get_performance_metrics()
         return {
-            "accuracy": metrics.get('accuracy', 85.0),
+            "accuracy": metrics.get('accuracy'),
             "false_positive_rate": metrics.get('false_positive_rate', 0.10),
             "detection_latency_ms": metrics.get('detection_latency_ms', 25),
             "models_active": metrics.get('models_active', 3),
@@ -109,7 +109,7 @@ def _get_real_ml_metrics():
     except Exception as e:
         print(f"[WARN] Could not get ML metrics: {e}")
         return {
-            "accuracy": 85.0,
+            "accuracy": None,
             "false_positive_rate": 0.10,
             "detection_latency_ms": 25,
             "models_active": 3
@@ -461,7 +461,6 @@ async def debug_auth_check():
             "admin_user": admin_status,
             "login_endpoint": "/api/v1/auth/login",
             "test_credentials": {
-                "admin": {"username": "admin", "password": "admin123"},
                 "demo_user": {"username": "john.doe", "password": "demo123"}
             }
         }
@@ -730,7 +729,7 @@ async def get_ml_model_info():
         "libraries": info.get("available_libraries", {}),
         "training_status": "trained" if ml_detector.is_trained else "not_trained",
         "model_performance": {
-            "accuracy": ml_metrics.get("accuracy", 85.0),
+            "accuracy": ml_metrics.get("accuracy"),
             "precision": ml_metrics.get("precision", 80.0),
             "recall": ml_metrics.get("recall", 75.0),
             "f1_score": ml_metrics.get("f1_score", 77.0)
@@ -1122,7 +1121,7 @@ async def generate_pdf_report(
             # Get real ML metrics
             ml_metrics = _get_real_ml_metrics()
             ml_stats = {
-                'accuracy': ml_metrics.get('accuracy', 85.0),
+                'accuracy': ml_metrics.get('accuracy'),
                 'false_positive_rate': ml_metrics.get('false_positive_rate', 0.10),
                 'false_negative_rate': 1.0 - (ml_metrics.get('recall', 75.0) / 100.0),
                 'detection_latency_ms': ml_metrics.get('detection_latency_ms', 25),

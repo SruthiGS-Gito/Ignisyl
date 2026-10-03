@@ -145,7 +145,9 @@ const SystemStatus = () => {
                   ></div>
                 </div>
                 <span className="health-value" style={{ color: '#10b981' }}>
-                  {(mlPerformance.accuracy || 0).toFixed(1)}%
+                  {typeof mlPerformance.accuracy === 'number'
+                    ? `${mlPerformance.accuracy.toFixed(1)}%`
+                    : 'Not evaluated'}
                 </span>
               </div>
               <div className="health-metric">
