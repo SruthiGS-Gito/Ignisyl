@@ -67,9 +67,8 @@ backend/data/ignisyl.db
 logs/
 data/logs/*.log
 
-# ML Models (optional - uncomment if models are large)
-# data/models/*.pkl
-# data/models/*.h5
+# ML Models (trained at startup; scripts/train_models.py exports them if needed)
+data/models/
 
 # Reports (generated PDFs)
 data/reports/*.pdf
@@ -177,7 +176,7 @@ er.name*
 backend/data/honeypots/*
 !backend/data/honeypots/.gitkeep
 
-# User data and synthetic data with PII
+# Regenerated synthetic data (Faker-generated names, @ignisyl.demo emails - no real PII)
 backend/data/synthetic/users.json
 backend/data/synthetic/activities.json
 
@@ -192,7 +191,8 @@ frontend/.env
 # Any remaining baseline comparison files
 *baseline_comparison*
 
-# Project-specific sensitive documents
+# Project-specific internal notes
+IGNISYL_PREP.md
 PROJECT_ANALYSIS_REPORT.md
 DATABASE_MIGRATION_GUIDE.md
 PROJECT_STATUS.md
