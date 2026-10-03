@@ -1,3 +1,5 @@
+Multi-database support is scaffolded but unused; the app runs on SQLite.
+
 # Database Abstraction Layer - Ignisyl
 
 Production-ready database abstraction layer supporting SQLite, PostgreSQL, and MySQL.

@@ -380,13 +380,17 @@ const Dashboard = () => {
               <div className="health-item">
                 <div className="health-label">False Positive</div>
                 <div className="health-value">
-                  {((mlPerformance.false_positive_rate || 0.05) * 100).toFixed(1)}%
+                  {typeof mlPerformance.false_positive_rate === 'number'
+                    ? `${(mlPerformance.false_positive_rate * 100).toFixed(1)}%`
+                    : 'Not evaluated'}
                 </div>
               </div>
               <div className="health-item">
                 <div className="health-label">Latency</div>
                 <div className="health-value">
-                  {(mlPerformance.detection_latency_ms || 25)}ms
+                  {typeof mlPerformance.detection_latency_ms === 'number'
+                    ? `${mlPerformance.detection_latency_ms}ms`
+                    : '—'}
                 </div>
               </div>
               <div className="health-item">

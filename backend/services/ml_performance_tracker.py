@@ -88,12 +88,12 @@ class MLPerformanceTracker:
             if self.prediction_count == 0:
                 return {
                     'accuracy': None,  # Not evaluated - no predictions logged yet
-                    'false_positive_rate': 0.10,
-                    'false_negative_rate': 0.05,
-                    'precision': 80.0,
-                    'recall': 75.0,
-                    'f1_score': 77.0,
-                    'detection_latency_ms': 25,
+                    'false_positive_rate': None,
+                    'false_negative_rate': None,
+                    'precision': None,
+                    'recall': None,
+                    'f1_score': None,
+                    'detection_latency_ms': None,
                     'models_active': 3,
                     'total_predictions': 0
                 }

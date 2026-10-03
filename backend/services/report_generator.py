@@ -2764,15 +2764,18 @@ class ReportGenerator:
         # Detection metrics
         story.append(Paragraph("<b>Detection Performance</b>", styles['SubsectionTitle']))
 
+        def _pct(value):
+            return f"{value:.2%}" if value is not None else "Not evaluated"
+
         detection_data = [['Metric', 'Value']]
         det_metrics = [
             ('Detection Threshold', ml_stats.get('threshold', 'Auto')),
             ('Total Anomalies Detected', ml_stats.get('anomalies_detected', 0)),
             ('True Positive Rate', f"{ml_stats.get('true_positive_rate', 0):.2%}"),
-            ('False Positive Rate', f"{ml_stats.get('false_positive_rate', 0):.2%}"),
-            ('Precision', f"{ml_stats.get('precision', 0):.2%}"),
-            ('Recall', f"{ml_stats.get('recall', 0):.2%}"),
-            ('F1 Score', f"{ml_stats.get('f1_score', 0):.2%}"),
+            ('False Positive Rate', _pct(ml_stats.get('false_positive_rate', 0))),
+            ('Precision', _pct(ml_stats.get('precision', 0))),
+            ('Recall', _pct(ml_stats.get('recall', 0))),
+            ('F1 Score', _pct(ml_stats.get('f1_score', 0))),
         ]
 
         for metric, value in det_metrics:
@@ -2846,7 +2849,7 @@ class ReportGenerator:
             "Review high-confidence anomalies for potential security policy updates",
         ]
 
-        if ml_stats.get('false_positive_rate', 0) > 0.1:
+        if (ml_stats.get('false_positive_rate') or 0) > 0.1:
             recs.insert(0, "HIGH PRIORITY: False positive rate exceeds 10% - consider threshold adjustment")
 
         if ml_stats.get('training_samples', 0) < 1000:

@@ -12,7 +12,7 @@ IGNISYL is an intelligent security system that detects insider threats using mac
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Academic Year:** 2025-2026
 **Project Type:** Final Year B.Tech Project
-**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
+**Conference:** IEEE ICAECT 2026 (published)
 
 ---
 
@@ -300,7 +300,7 @@ Screenshots: coming soon
 **Institution:** Sree Buddha College of Engineering, Kerala, India
 **Academic Year:** 2025-2026
 **Project Type:** Final Year B.Tech Project
-**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
+**Conference:** IEEE ICAECT 2026 (published)
 
 | Role | Responsibility |
 |------|----------------|
@@ -354,7 +354,7 @@ An adversarial evasion suite (`run_adversarial_test.py`) runs evasion attacks ag
 
 This project is developed for academic research purposes.
 
-**Published:** IEEE ICAECT 2026, IEEE Xplore — https://ieeexplore.ieee.org/document/11425945
+**Conference:** IEEE ICAECT 2026 (published)
 
 ---
 

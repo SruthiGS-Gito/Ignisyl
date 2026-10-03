@@ -222,30 +222,11 @@ npm list --depth=0
 
 ## Database Setup
 
-### Step 1: Initialize Databases
-
 The system uses **SQLite** for development/demo purposes.
 
 > **Note:** PostgreSQL support is planned but not currently implemented.
 
-```bash
-# From backend directory with venv activated
-cd backend
-
-# Run database initialization
-python -c "from models.database import init_db; init_db()"
-```
-
-This creates:
-- `backend/data/ignisyl.db` - Main application database (users, activities, alerts)
-- `data/activities.db` - Activity logs (optional)
-- `data/users.db` - User data (optional)
-
-### Step 2: Create Sample Data (Optional)
-```bash
-# Run with DEBUG=True to create sample users
-python -c "from models.database import create_sample_data; create_sample_data()"
-```
+There is no separate database setup step. The SQLite databases are created automatically when the backend starts; see "Running the Project" in the [README](../README.md#running-the-project).
 
 **Demo accounts** are seeded automatically when the backend starts.
 

@@ -159,12 +159,18 @@ const SystemStatus = () => {
                   ></div>
                 </div>
                 <span className="health-value">
-                  {((mlPerformance.false_positive_rate || 0) * 100).toFixed(1)}%
+                  {typeof mlPerformance.false_positive_rate === 'number'
+                    ? `${(mlPerformance.false_positive_rate * 100).toFixed(1)}%`
+                    : 'Not evaluated'}
                 </span>
               </div>
               <div className="health-metric">
                 <span className="health-label">Detection Latency</span>
-                <span className="health-value">{mlPerformance.detection_latency_ms || 0}ms</span>
+                <span className="health-value">
+                  {typeof mlPerformance.detection_latency_ms === 'number'
+                    ? `${mlPerformance.detection_latency_ms}ms`
+                    : '—'}
+                </span>
               </div>
               <div className="health-metric">
                 <span className="health-label">Active Models</span>

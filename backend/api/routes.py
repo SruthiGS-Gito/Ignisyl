@@ -98,20 +98,20 @@ def _get_real_ml_metrics():
         metrics = ml_performance_tracker.get_performance_metrics()
         return {
             "accuracy": metrics.get('accuracy'),
-            "false_positive_rate": metrics.get('false_positive_rate', 0.10),
-            "detection_latency_ms": metrics.get('detection_latency_ms', 25),
+            "false_positive_rate": metrics.get('false_positive_rate'),
+            "detection_latency_ms": metrics.get('detection_latency_ms'),
             "models_active": metrics.get('models_active', 3),
-            "precision": metrics.get('precision', 80.0),
-            "recall": metrics.get('recall', 75.0),
-            "f1_score": metrics.get('f1_score', 77.0),
+            "precision": metrics.get('precision'),
+            "recall": metrics.get('recall'),
+            "f1_score": metrics.get('f1_score'),
             "total_predictions": metrics.get('total_predictions', 0)
         }
     except Exception as e:
         print(f"[WARN] Could not get ML metrics: {e}")
         return {
             "accuracy": None,
-            "false_positive_rate": 0.10,
-            "detection_latency_ms": 25,
+            "false_positive_rate": None,
+            "detection_latency_ms": None,
             "models_active": 3
         }
 
@@ -409,7 +409,13 @@ async def debug_users(current_user: dict = Depends(get_current_user)):
 
 @router.get("/debug/auth-check")
 async def debug_auth_check():
-    """Public endpoint to verify authentication system status (no auth required)"""
+    """Debug endpoint to verify authentication system status (no auth required).
+
+    Only served when the IGNISYL_DEBUG=true environment variable is set; otherwise 404.
+    """
+    if os.environ.get('IGNISYL_DEBUG', '').strip().lower() != 'true':
+        raise HTTPException(status_code=404, detail="Not Found")
+
     from pathlib import Path
     import sqlite3
 
@@ -730,9 +736,9 @@ async def get_ml_model_info():
         "training_status": "trained" if ml_detector.is_trained else "not_trained",
         "model_performance": {
             "accuracy": ml_metrics.get("accuracy"),
-            "precision": ml_metrics.get("precision", 80.0),
-            "recall": ml_metrics.get("recall", 75.0),
-            "f1_score": ml_metrics.get("f1_score", 77.0)
+            "precision": ml_metrics.get("precision"),
+            "recall": ml_metrics.get("recall"),
+            "f1_score": ml_metrics.get("f1_score")
         }
     }
 
@@ -1120,15 +1126,16 @@ async def generate_pdf_report(
             print(f"[REPORT] Generating ml_performance report...")
             # Get real ML metrics
             ml_metrics = _get_real_ml_metrics()
+            recall = ml_metrics.get('recall')
             ml_stats = {
                 'accuracy': ml_metrics.get('accuracy'),
-                'false_positive_rate': ml_metrics.get('false_positive_rate', 0.10),
-                'false_negative_rate': 1.0 - (ml_metrics.get('recall', 75.0) / 100.0),
-                'detection_latency_ms': ml_metrics.get('detection_latency_ms', 25),
+                'false_positive_rate': ml_metrics.get('false_positive_rate'),
+                'false_negative_rate': (1.0 - recall / 100.0) if recall is not None else None,
+                'detection_latency_ms': ml_metrics.get('detection_latency_ms'),
                 'models_active': ml_metrics.get('models_active', 3),
-                'precision': ml_metrics.get('precision', 80.0),
-                'recall': ml_metrics.get('recall', 75.0),
-                'f1_score': ml_metrics.get('f1_score', 77.0)
+                'precision': ml_metrics.get('precision'),
+                'recall': recall,
+                'f1_score': ml_metrics.get('f1_score')
             }
             filepath = report_generator.generate_ml_report(ml_stats, all_activities)
             if not os.path.exists(filepath):
