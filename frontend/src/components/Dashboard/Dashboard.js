@@ -24,7 +24,8 @@ const Dashboard = () => {
   const [mlPerformance, setMlPerformance] = useState({});
   const [isAdminView, setIsAdminView] = useState(false);
   const [securityScore, setSecurityScore] = useState(85);
-  const [responseTime, setResponseTime] = useState(23);
+  // Average detection latency measured by the backend; null until a real value arrives
+  const [responseTime, setResponseTime] = useState(null);
   const [activeAlerts, setActiveAlerts] = useState([]);
   const [incidentTimeline, setIncidentTimeline] = useState([]);
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -96,6 +97,8 @@ const Dashboard = () => {
       // Set system health and ML performance
       setSystemHealth(data.system_health || {});
       setMlPerformance(data.ml_performance || {});
+      const latency = data.ml_performance?.detection_latency_ms;
+      setResponseTime(typeof latency === 'number' ? Math.round(latency) : null);
       setIsAdminView(data.is_admin_view || false);
 
       if (data.recent_activities) {
@@ -123,18 +126,8 @@ const Dashboard = () => {
         // Create incident timeline from recent actions
         const timeline = mappedActivities
           .filter(a => a.action === 'BLOCK' || a.action === 'RESTRICT')
-          .slice(0, 5)
-          .map(a => ({
-            ...a,
-            responseTime: Math.floor(Math.random() * 400) + 50 // Simulated response time 50-450ms
-          }));
+          .slice(0, 5);
         setIncidentTimeline(timeline);
-
-        // Calculate average response time
-        if (timeline.length > 0) {
-          const avgTime = timeline.reduce((sum, t) => sum + t.responseTime, 0) / timeline.length;
-          setResponseTime(Math.round(avgTime));
-        }
       }
 
       setLastUpdate(new Date().toLocaleTimeString());
@@ -281,7 +274,7 @@ const Dashboard = () => {
               color: 'rgba(255,255,255,0.5)',
               marginTop: '8px'
             }}>
-              Avg Response: {responseTime}ms
+              Avg Response: {responseTime !== null ? `${responseTime}ms` : 'n/a'}
             </div>
             <div style={{
               fontSize: '10px',
@@ -303,10 +296,10 @@ const Dashboard = () => {
               <div className="status-item">Real-time Monitoring: Enabled</div>
               <div className="status-item">Last Update: {lastUpdate}</div>
               <div className="status-item" style={{
-                background: responseTime < 100 ? 'rgba(40, 167, 69, 0.3)' : 'rgba(255, 152, 0, 0.3)',
-                borderColor: responseTime < 100 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(255, 152, 0, 0.5)'
+                background: responseTime !== null && responseTime < 100 ? 'rgba(40, 167, 69, 0.3)' : 'rgba(255, 152, 0, 0.3)',
+                borderColor: responseTime !== null && responseTime < 100 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(255, 152, 0, 0.5)'
               }}>
-                Response Time: {responseTime}ms
+                Response Time: {responseTime !== null ? `${responseTime}ms` : 'n/a'}
               </div>
               {!isAdminView && <div className="status-item" style={{background: 'rgba(255, 152, 0, 0.3)', borderColor: 'rgba(255, 152, 0, 0.5)'}}>Personal View Only</div>}
             </div>
@@ -478,9 +471,9 @@ const Dashboard = () => {
                     <div style={{
                       fontSize: '16px',
                       fontWeight: 'bold',
-                      color: incident.responseTime < 200 ? '#28a745' : '#ff8c00'
+                      color: 'rgba(255,255,255,0.5)'
                     }}>
-                      {incident.responseTime}ms
+                      n/a
                     </div>
                     <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>
                       Response Time
@@ -498,10 +491,10 @@ const Dashboard = () => {
               border: '1px solid rgba(40, 167, 69, 0.3)'
             }}>
               <span style={{ color: '#28a745', fontWeight: 'bold' }}>
-                Average Response Time: {responseTime}ms
+                Average Response Time: {responseTime !== null ? `${responseTime}ms` : 'n/a'}
               </span>
               <span style={{ color: 'rgba(255,255,255,0.6)', marginLeft: '12px', fontSize: '12px' }}>
-                {responseTime < 500 ? '✓ Within SLA target (<500ms)' : '⚠ Above SLA target'}
+                {responseTime !== null && (responseTime < 500 ? '✓ Within SLA target (<500ms)' : '⚠ Above SLA target')}
               </span>
             </div>
           </div>

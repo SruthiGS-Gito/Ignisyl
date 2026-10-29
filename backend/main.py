@@ -702,6 +702,9 @@ async def analyze_activity(activity_data: Dict):
             'activity_frequencies': {'file_access': 0.5}
         }
         
+        # Time the scoring pipeline (contextual, ML and intelligent engine)
+        scoring_start = time.perf_counter()
+
         # Perform risk assessment
         risk_assessment = risk_scorer.assess_activity_risk(activity_data, user_profile)
 
@@ -756,6 +759,7 @@ async def analyze_activity(activity_data: Dict):
             event_type=risk_event_type,
             context=context
         )
+        scoring_time_ms = (time.perf_counter() - scoring_start) * 1000
         
         # Use intelligent engine's scoring
         final_risk_score = intelligent_assessment['current_score']
@@ -847,7 +851,7 @@ async def analyze_activity(activity_data: Dict):
             "metadata": {
                 "user_id": activity_data.get('user_id'),
                 "activity_type": activity_data.get('activity_type'),
-                "processing_time_ms": 1
+                "processing_time_ms": round(scoring_time_ms, 2)
             }
         }
         
